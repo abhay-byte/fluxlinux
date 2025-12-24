@@ -1,0 +1,93 @@
+12-24 23:28:44.065  1622  7134 W ActivityManager: stopServiceToken startId 12 is last, but have 1 remaining args
+12-24 23:28:44.374 10538 10538 D FluxLinux: Connect button clicked
+12-24 23:28:44.383 10538 10538 D FluxLinux: Script read (len=640)
+12-24 23:28:44.384 10538 10538 D FluxLinux: Attempting startService with intent: Intent { act=com.termux.RUN_COMMAND cmp=com.termux/.app.RunCommandService (has extras) }
+12-24 23:28:44.386  1622  4267 W ActivityManager: Permission Denial: Accessing service com.termux/.app.RunCommandService from pid=10538, uid=10564 requires com.termux.permission.RUN_COMMAND
+12-24 23:28:44.391 10538 10538 E FluxLinux: Failed to send intent
+12-24 23:28:44.391 10538 10538 E FluxLinux: java.lang.SecurityException: Not allowed to start service Intent { act=com.termux.RUN_COMMAND xflg=0x4 cmp=com.termux/.app.RunCommandService (has extras) } without permission com.termux.permission.RUN_COMMAND
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.app.ContextImpl.startServiceCommon(ContextImpl.java:2042)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.app.ContextImpl.startService(ContextImpl.java:2003)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.content.ContextWrapper.startService(ContextWrapper.java:855)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at com.fluxlinux.app.MainActivity$onCreate$1$1$1.invoke$lambda$3$lambda$2$lambda$1$lambda$0(MainActivity.kt:43)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at com.fluxlinux.app.MainActivity$onCreate$1$1$1.$r8$lambda$vYKyIOezv10RIcgOeaW-Z8OoZjo(Unknown Source:0)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at com.fluxlinux.app.MainActivity$onCreate$1$1$1$$ExternalSyntheticLambda0.invoke(D8$$SyntheticClass:0)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.foundation.ClickablePointerInputNode$pointerInput$3.invoke-k-4lQ0M(Clickable.kt:987)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.foundation.ClickablePointerInputNode$pointerInput$3.invoke(Clickable.kt:981)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.foundation.gestures.TapGestureDetectorKt$detectTapAndPress$2$1.invokeSuspend(TapGestureDetector.kt:255)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.DispatchedTaskKt.resume(DispatchedTask.kt:177)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.DispatchedTaskKt.dispatch(DispatchedTask.kt:166)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.CancellableContinuationImpl.dispatchResume(CancellableContinuationImpl.kt:474)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.CancellableContinuationImpl.resumeImpl(CancellableContinuationImpl.kt:508)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.CancellableContinuationImpl.resumeImpl$default(CancellableContinuationImpl.kt:497)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at kotlinx.coroutines.CancellableContinuationImpl.resumeWith(CancellableContinuationImpl.kt:368)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNodeImpl$PointerEventHandlerCoroutine.offerPointerEvent(SuspendingPointerInputFilter.kt:665)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNodeImpl.dispatchPointerEvent(SuspendingPointerInputFilter.kt:544)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNodeImpl.onPointerEvent-H0pRuoY(SuspendingPointerInputFilter.kt:566)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.foundation.AbstractClickablePointerInputNode.onPointerEvent-H0pRuoY(Clickable.kt:947)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.foundation.AbstractClickableNode.onPointerEvent-H0pRuoY(Clickable.kt:795)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.Node.dispatchMainEventPass(HitPathTracker.kt:317)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.Node.dispatchMainEventPass(HitPathTracker.kt:303)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.Node.dispatchMainEventPass(HitPathTracker.kt:303)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.NodeParent.dispatchMainEventPass(HitPathTracker.kt:185)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.HitPathTracker.dispatchChanges(HitPathTracker.kt:104)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.input.pointer.PointerInputEventProcessor.process-BIzXfog(PointerInputEventProcessor.kt:113)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.platform.AndroidComposeView.sendMotionEvent-8iAsVTc(AndroidComposeView.android.kt:1576)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.platform.AndroidComposeView.handleMotionEvent-8iAsVTc(AndroidComposeView.android.kt:1527)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at androidx.compose.ui.platform.AndroidComposeView.dispatchTouchEvent(AndroidComposeView.android.kt:1466)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTransformedTouchEvent(ViewGroup.java:3146)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTouchEvent(ViewGroup.java:2829)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTransformedTouchEvent(ViewGroup.java:3146)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTouchEvent(ViewGroup.java:2829)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTransformedTouchEvent(ViewGroup.java:3146)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTouchEvent(ViewGroup.java:2829)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTransformedTouchEvent(ViewGroup.java:3146)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at android.view.ViewGroup.dispatchTouchEvent(ViewGroup.java:2829)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at com.android.internal.policy.DecorView.superDispatchTouchEvent(DecorView.java:475)
+12-24 23:28:44.391 10538 10538 E FluxLinux: 	at com.android.internal.policy.PhoneWindow.superDispatchTouchEvent(PhoneWindow.java:2022)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.app.Activity.dispatchTouchEvent(Activity.java:4604)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at com.android.internal.policy.DecorView.dispatchTouchEvent(DecorView.java:433)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.View.dispatchPointerEvent(View.java:16938)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$ViewPostImeInputStage.processPointerEvent(ViewRootImpl.java:8259)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$ViewPostImeInputStage.onProcess(ViewRootImpl.java:8018)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.deliver(ViewRootImpl.java:7395)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.onDeliverToNext(ViewRootImpl.java:7452)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.forward(ViewRootImpl.java:7418)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$AsyncInputStage.forward(ViewRootImpl.java:7584)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.apply(ViewRootImpl.java:7426)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$AsyncInputStage.apply(ViewRootImpl.java:7641)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.deliver(ViewRootImpl.java:7399)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.onDeliverToNext(ViewRootImpl.java:7452)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.forward(ViewRootImpl.java:7418)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.apply(ViewRootImpl.java:7426)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$InputStage.deliver(ViewRootImpl.java:7399)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl.deliverInputEvent(ViewRootImpl.java:10563)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl.doProcessInputEvents(ViewRootImpl.java:10514)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl.enqueueInputEvent(ViewRootImpl.java:10482)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl.processRawInputEvent(ViewRootImpl.java:10927)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.ViewRootImpl$WindowInputEventReceiver.onInputEvent(ViewRootImpl.java:10685)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.view.InputEventReceiver.dispatchInputEvent(InputEventReceiver.java:306)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.os.MessageQueue.nativePollOnce(Native Method)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.os.MessageQueue.nextLegacy(MessageQueue.java:904)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.os.MessageQueue.next(MessageQueue.java:1016)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.os.Looper.loopOnce(Looper.java:196)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.os.Looper.loop(Looper.java:338)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at android.app.ActivityThread.main(ActivityThread.java:9080)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at java.lang.reflect.Method.invoke(Native Method)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:598)
+12-24 23:28:44.394 10538 10538 E FluxLinux: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+12-24 23:28:47.930  1622  2109 D ActivityManager: freezing 1920 com.google.android.apps.messaging
+12-24 23:28:49.027  1622  1667 I ActivityManager: Test idle passed
+12-24 23:28:53.536  1622  2109 D ActivityManager: freezing 998 com.android.vending:background
+12-24 23:28:53.543  1622  2109 D ActivityManager: freezing 712 com.android.vending
+12-24 23:28:57.160  1622  2109 D ActivityManager: freezing 2041 com.android.permissioncontroller
+12-24 23:28:58.821  1622  1667 I ActivityManager: Test idle passed
+12-24 23:29:03.824  1622  1667 I ActivityManager: Test idle passed
+12-24 23:29:06.452  1622  1668 I ActivityManager: Start proc 2775:com.resilio.sync/u0a538 for broadcast {com.resilio.sync/com.resilio.sync.core.DownCoreReceiver}
+12-24 23:29:06.452  1622  1668 I ActivityManager: ProcessObserver broadcast disabled
+12-24 23:29:08.380  1622  2109 D ActivityManager: freezing 27920 com.google.android.gms
+12-24 23:29:08.827  1622  1667 I ActivityManager: Test idle passed
+12-24 23:29:12.265  1622  2109 D ActivityManager: freezing 1933 org.omnirom.omnijaws
+12-24 23:29:13.829  1622  1667 I ActivityManager: Test idle passed
+12-24 23:29:17.024  1622  2109 D ActivityManager: freezing 2775 com.resilio.sync
+12-24 23:29:18.832  1622  1667 I ActivityManager: Test idle passed
