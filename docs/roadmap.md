@@ -27,11 +27,26 @@ Similar to *AnLinux* or *UserLAnd*, but with modern integrations.
 1.  **Phase 1: Foundation (The App)**
     *   Build Android App (Kotlin).
     *   Create `AssetManager` to store setup shell scripts (e.g., `setup_ubuntu.sh`, `start_xfce.sh`).
-2.  **Phase 2: The "Bridge"**
-    *   Implement `TermuxConnectionManager` class.
-    *   Action: Check for `RUN_COMMAND` permission.
-    *   Action: Automation to write `termux.properties` (using a one-time copy-paste script if needed, then switching to Intents).
-3.  **Phase 3: Distro Management**
-    *   UI: List of Distros.
-    *   Action(Install): Send Intent `proot-distro install <name>`.
-    *   Action(Launch): Send Intent `termux-x11 :0 ...`.
+## 2. Updated Implementation Roadmap
+
+Each phase has a detailed implementation guide. Click the links below to view them.
+
+### [UI Design System (Glassmorphism)](ui_design.md)
+*   **Goal:** Define the visual language (Blur, Translucency, Floating Nav).
+*   **Reference:** Based on uploaded concepts and modern Glassmorphism principles.
+
+### [Phase 1: Foundation & App Shell](phases/phase1_foundation.md)
+*   **Goal:** Build the basic Android App structure and Asset Management system.
+*   **Key Tasks:** Project setup, UI Dashboard, Script Vault logic.
+
+### [Phase 2: The Bridge (Termux Integration)](phases/phase2_bridge.md)
+*   **Goal:** Establish secure communication using **Intents**.
+*   **Key Tasks:** Permission handling (`RUN_COMMAND`), `TermuxIntentFactory`, Connection testing.
+
+### [Phase 3: Distro Management](phases/phase3_distro_management.md)
+*   **Goal:** The core user flow - Install, Start, Desktop.
+*   **Key Tasks:** Distro JSON definitions, Installation logic, complex "Launch Desktop" scripts.
+
+### [Phase 4: Advanced Features](phases/phase4_advanced.md)
+*   **Goal:** High-performance & "Wow" factors.
+*   **Key Tasks:** Hardware Acceleration (Virgl/Turnip), **Rooted Chroot** mode, Windows/Box64 emulation.
