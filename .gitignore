@@ -1,0 +1,13 @@
+# Android/Gradle
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+local.properties
+.DS_Store
+
+# FluxLinux Specific
+# (Add any generated script temp files here)
+tmp/
+scripts/generated/
