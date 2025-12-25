@@ -260,42 +260,6 @@ class MainActivity : ComponentActivity() {
                             }
 
                             Spacer(modifier = Modifier.height(20.dp))
-
-                            Text(
-                                text = "Prerequisites",
-                                color = Color.White,
-                                style = androidx.compose.material3.MaterialTheme.typography.titleMedium
-                            )
-                            
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Row {
-                                Button(
-                                    onClick = {
-                                        val url = "https://github.com/termux/termux-app/releases"
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                        startActivity(intent)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Get Termux", color = Color.White)
-                                }
-                                
-                                Spacer(modifier = Modifier.size(8.dp))
-                                
-                                Button(
-                                    onClick = {
-                                        val url = "https://github.com/termux/termux-x11/releases"
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                        startActivity(intent)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Get Termux:X11", color = Color.White)
-                                }
-                            }
                         }
                     }
                 }

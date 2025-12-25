@@ -13,7 +13,11 @@ pkg update -y && pkg upgrade -y
 # x11-repo: For graphical support
 # pulseaudio: For sound
 # wget: For downloading scripts
-pkg install -y proot-distro x11-repo pulseaudio wget
+# zsh: Enhanced shell (for Oh My Zsh)
+# fastfetch: System info display
+# git: Version control (for Oh My Zsh plugins)
+# unzip: For extracting fonts
+pkg install -y proot-distro x11-repo pulseaudio wget zsh fastfetch git unzip
 
 # 3. Install Termux:X11
 pkg install -y termux-x11-nightly
@@ -93,3 +97,38 @@ EOF
 chmod +x $HOME/flux_install.sh
 
 echo "FluxLinux: Setup Complete"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🎨 Optional: Enhance your Termux experience?"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "This will install:"
+echo "  • Oh My Zsh with plugins (autosuggestions, syntax-highlighting)"
+echo "  • Custom color schemes (GitHub Dark, Dracula, Gruvbox)"
+echo "  • Nerd Fonts (Meslo, FiraCode, JetBrainsMono)"
+echo "  • Fastfetch system info display"
+echo ""
+printf "Apply Termux tweaks? [y/N]: "
+read -r apply_tweaks
+
+if [ "$apply_tweaks" = "y" ] || [ "$apply_tweaks" = "Y" ]; then
+    echo ""
+    echo "🚀 Launching Termux Tweaks..."
+    # Copy the tweaks script from app to Termux if available
+    # Otherwise download from GitHub
+    if [ -f "/data/data/com.termux/files/home/termux_tweaks.sh" ]; then
+        bash /data/data/com.termux/files/home/termux_tweaks.sh
+    else
+        echo "📥 Downloading termux_tweaks.sh..."
+        curl -fsSL https://raw.githubusercontent.com/abhay-byte/fluxlinux/main/app/src/main/assets/scripts/termux_tweaks.sh -o $HOME/termux_tweaks.sh
+        chmod +x $HOME/termux_tweaks.sh
+        bash $HOME/termux_tweaks.sh
+    fi
+else
+    echo ""
+    echo "⏭️  Skipping tweaks. You can run them later with:"
+    echo "   bash ~/termux_tweaks.sh"
+fi
+
+echo ""
+echo "✅ FluxLinux initialization complete!"
