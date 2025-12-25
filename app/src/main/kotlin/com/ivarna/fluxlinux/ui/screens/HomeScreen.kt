@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.DistroRepository
@@ -124,15 +125,43 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         // Installed Distros Section
-        if (installedDistros.isNotEmpty()) {
-            Text(
-                text = "Installed Distros",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.titleMedium
-            )
-            
-            Spacer(modifier = Modifier.height(10.dp))
-            
+        Text(
+            text = "Installed Distros",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Show empty state or distro list
+        if (installedDistros.isEmpty()) {
+            // Empty state
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "No distros installed yet",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Install a distribution from the Distros tab",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            // Distro list
             installedDistros.forEach { distro ->
                 com.ivarna.fluxlinux.ui.components.DistroCard(
                     distro = distro,
@@ -174,11 +203,11 @@ fun HomeScreen(
                 )
             }
         }
+    }
 
 
         
         Spacer(modifier = Modifier.height(32.dp))
-    }
     
     if (distroToUninstall.value != null) {
         val distro = distroToUninstall.value!!

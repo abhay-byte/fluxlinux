@@ -210,18 +210,20 @@ fun DistroCard(
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Manual Sync Option
-                androidx.compose.material3.TextButton(
-                    onClick = onAlreadyInstalled,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text(
-                        "Already Installed?", 
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
+                // Manual Sync Option - only show for available distros
+                if (!distro.comingSoon) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    androidx.compose.material3.TextButton(
+                        onClick = onAlreadyInstalled,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            "Already Installed?", 
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             } else {
                 // Show CLI/GUI/Uninstall when installed
