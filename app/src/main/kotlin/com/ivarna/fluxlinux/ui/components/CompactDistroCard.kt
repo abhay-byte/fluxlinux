@@ -41,13 +41,7 @@ fun CompactDistroCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(12.dp))
-            .hazeChild(
-                state = hazeState,
-                style = HazeStyle(
-                    backgroundColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                    tint = null
-                )
-            )
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
             .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(12.dp))
     ) {
         Row(

@@ -55,13 +55,7 @@ fun DistroCard(
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
-            .hazeChild(
-                state = hazeState,
-                style = HazeStyle(
-                    backgroundColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                    tint = null
-                )
-            )
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
             .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(16.dp))
     ) {
         Column(
