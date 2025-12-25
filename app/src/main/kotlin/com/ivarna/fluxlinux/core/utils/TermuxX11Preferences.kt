@@ -134,6 +134,7 @@ object TermuxX11Preferences {
             // We use 'termux-x11-preference' tool which comes with the package
             val prefCommand = buildString {
                 append("termux-x11-preference ")
+                append("\"displayScale\"=\"${prefs.getInt(KEY_DISPLAY_SCALE, 200)}\" ")
                 append("\"fullscreen\"=\"${prefs.getBoolean(KEY_FULLSCREEN, true)}\" ")
                 append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\" ")
                 append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\" ")
@@ -150,7 +151,14 @@ object TermuxX11Preferences {
                 # Auto-generated Termux:X11 preferences
                 # Applied by FluxLinux
                 
+                echo "Current Preferences (Before Apply):"
+                termux-x11-preference list
+                
+                echo "Applying Preferences:"
                 $prefCommand
+                
+                echo "Current Preferences (After Apply):"
+                termux-x11-preference list
             """.trimIndent()
             
             // Write to file using cat
