@@ -62,10 +62,11 @@ am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity > /dev/null 2>&1
 sleep 2
 
 # Apply stored X11 preferences
-# Passing as arguments as requested: termux-x11-preference key=value ...
+# Using direct restore method (< file) as verified in sabamdarif/termux-desktop
+# This correctly handles spaces in parameters (e.g. extra_keys_config) which $(cat) breaks
 if [ -f "$HOME/.fluxlinux/x11_preferences.list" ]; then
     echo "Applying X11 Preferences..."
-    termux-x11-preference $(cat "$HOME/.fluxlinux/x11_preferences.list")
+    termux-x11-preference < "$HOME/.fluxlinux/x11_preferences.list"
 fi
 
 # Login in PRoot Environment with proper environment setup
