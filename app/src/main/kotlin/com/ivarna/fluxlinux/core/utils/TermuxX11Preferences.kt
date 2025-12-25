@@ -139,10 +139,9 @@ object TermuxX11Preferences {
                 append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\" ")
                 append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\" ")
                 append("\"keepScreenOn\"=\"${prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)}\" ")
-                append("\"capturePointer\"=\"${prefs.getBoolean(KEY_CAPTURE_POINTER, true)}\" ")
-                append("\"showIME\"=\"${prefs.getBoolean(KEY_SHOW_IME, true)}\" ")
+                append("\"pointerCapture\"=\"${prefs.getBoolean(KEY_CAPTURE_POINTER, true)}\" ")
                 append("\"preferScancodes\"=\"${prefs.getBoolean(KEY_PREFER_SCANCODES, true)}\" ")
-                append("\"scancodeWorkaround\"=\"${prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true)}\" ")
+                append("\"hardwareKbdScancodesWorkaround\"=\"${prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true)}\" ")
             }
             
             // Create the script content
