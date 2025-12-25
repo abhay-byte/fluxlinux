@@ -160,7 +160,10 @@ fun FeatureCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(GlassWhiteLow)
-            .hazeChild(state = hazeState)
+            .hazeChild(
+                state = hazeState,
+                backgroundColor = GlassWhiteLow
+            )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

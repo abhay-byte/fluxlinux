@@ -49,7 +49,10 @@ fun DistroCard(
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(GlassWhiteLow)
-            .hazeChild(state = hazeState)
+            .hazeChild(
+                state = hazeState,
+                backgroundColor = GlassWhiteLow
+            )
             .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(16.dp))
     ) {
         Column(
