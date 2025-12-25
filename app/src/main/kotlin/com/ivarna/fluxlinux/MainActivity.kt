@@ -90,39 +90,28 @@ class MainActivity : ComponentActivity() {
                     try { startActivity(intent) } catch (e: Exception) { android.util.Log.e("FluxLinux", "StartActivity failed", e) }
                 }
                 
-                // Helper to render content with Bottom Nav
                 @Composable
                 fun MainScreenContent(
                     tab: BottomTab,
-                    hazeState: HazeState,
-                    onNavigateToSettings: () -> Unit
+                    hazeState: HazeState
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when (tab) {
-                            BottomTab.HOME -> {
-                                com.ivarna.fluxlinux.ui.screens.HomeScreen(
-                                    permissionState = permissionState,
-                                    hazeState = hazeState,
-                                    onStartService = onStartServiceStub,
-                                    onStartActivity = onStartActivityStub
-                                )
-                            }
-                            BottomTab.DISTROS -> {
-                                com.ivarna.fluxlinux.ui.screens.DistroScreen(
-                                    permissionState = permissionState,
-                                    hazeState = hazeState,
-                                    onStartService = onStartServiceStub,
-                                    onStartActivity = onStartActivityStub
-                                )
-                            }
+                    when (tab) {
+                        BottomTab.HOME -> {
+                            com.ivarna.fluxlinux.ui.screens.HomeScreen(
+                                permissionState = permissionState,
+                                hazeState = hazeState,
+                                onStartService = onStartServiceStub,
+                                onStartActivity = onStartActivityStub
+                            )
                         }
-                        
-                        GlassBottomNavigation(
-                            selectedTab = currentTab,
-                            onTabSelected = { currentTab = it },
-                            hazeState = hazeState,
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
+                        BottomTab.DISTROS -> {
+                            com.ivarna.fluxlinux.ui.screens.DistroScreen(
+                                permissionState = permissionState,
+                                hazeState = hazeState,
+                                onStartService = onStartServiceStub,
+                                onStartActivity = onStartActivityStub
+                            )
+                        }
                     }
                 }
 
@@ -215,12 +204,18 @@ class MainActivity : ComponentActivity() {
                                     hazeState = hazeState,
                                     onSettingsClick = { currentScreen = Screen.SETTINGS }
                                 )
+                            },
+                            bottomBar = {
+                                GlassBottomNavigation(
+                                    selectedTab = currentTab,
+                                    onTabSelected = { currentTab = it },
+                                    hazeState = hazeState
+                                )
                             }
                         ) {
                             MainScreenContent(
                                 tab = currentTab,
-                                hazeState = hazeState,
-                                onNavigateToSettings = { currentScreen = Screen.SETTINGS }
+                                hazeState = hazeState
                             )
                         }
                     }
