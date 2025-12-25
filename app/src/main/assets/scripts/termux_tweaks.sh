@@ -183,3 +183,6 @@ configure_fastfetch
 echo ""
 echo "🎉 FluxLinux: Termux enhancement complete!"
 echo "🔄 Restart Termux to see all changes."
+
+# Create marker file to track tweaks application
+touch ~/.fluxlinux_tweaks_applied

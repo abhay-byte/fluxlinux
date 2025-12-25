@@ -8,6 +8,7 @@ val FluxBackgroundMid = Color(0xFF302B63)
 val FluxBackgroundEnd = Color(0xFF24243E)
 
 val GlassWhiteHigh = Color(0x26FFFFFF) // 15% White
+val GlassWhiteMedium = Color(0x1AFFFFFF) // 10% White
 val GlassWhiteLow = Color(0x0DFFFFFF)  // 5% White
 val GlassBorder = Color(0x4DFFFFFF)    // 30% White
 

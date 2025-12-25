@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -44,32 +47,97 @@ class MainActivity : ComponentActivity() {
                                 permission = "com.termux.permission.RUN_COMMAND"
                             )
 
-                            // Initial Setup (Restored)
-                            Button(
-                                onClick = {
-                                    if (permissionState.status.isGranted) {
-                                        android.util.Log.d("FluxLinux", "Running Initial Setup...")
-                                        val scriptManager = com.fluxlinux.app.core.data.ScriptManager(this@MainActivity)
-                                        val script = scriptManager.getScriptContent("setup_termux.sh")
-                                        val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildRunCommandIntent(script)
-                                        try {
-                                            startService(intent)
-                                            android.widget.Toast.makeText(this@MainActivity, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            android.util.Log.e("FluxLinux", "Setup failed", e)
-                                        }
-                                    } else {
-                                        permissionState.launchPermissionRequest()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = com.fluxlinux.app.ui.theme.FluxAccentCyan
-                                ),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                            ) {
-                                Text("Initialize Environment (Setup)", color = com.fluxlinux.app.ui.theme.FluxBackgroundStart)
+                            // Setup State Tracking
+                            val setupCompleted = androidx.compose.runtime.remember {
+                                androidx.compose.runtime.mutableStateOf(com.fluxlinux.app.core.utils.StateManager.isTermuxInitialized(this@MainActivity))
+                            }
+                            val setupExpanded = androidx.compose.runtime.remember {
+                                androidx.compose.runtime.mutableStateOf(!setupCompleted.value)
                             }
                             
+                            // Refresh setup state
+                            androidx.compose.runtime.LaunchedEffect(Unit) {
+                                setupCompleted.value = com.fluxlinux.app.core.utils.StateManager.isTermuxInitialized(this@MainActivity)
+                                if (setupCompleted.value) {
+                                    setupExpanded.value = false
+                                }
+                            }
+                            
+                            // Setup Section (Collapsible)
+                            if (!setupCompleted.value || setupExpanded.value) {
+                                Button(
+                                    onClick = {
+                                        if (permissionState.status.isGranted) {
+                                            val scriptManager = com.fluxlinux.app.core.data.ScriptManager(this@MainActivity)
+                                            val setupScript = scriptManager.getScriptContent("setup_termux.sh")
+                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildRunCommandIntent(setupScript)
+                                            try {
+                                                startService(intent)
+                                                // Mark as initialized
+                                                com.fluxlinux.app.core.utils.StateManager.setTermuxInitialized(this@MainActivity, true)
+                                                setupCompleted.value = true
+                                                setupExpanded.value = false
+                                                android.widget.Toast.makeText(this@MainActivity, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("FluxLinux", "Setup failed", e)
+                                            }
+                                        } else {
+                                            permissionState.launchPermissionRequest()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = com.fluxlinux.app.ui.theme.FluxAccentCyan
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                                ) {
+                                    Text("Initialize Environment (Setup)", color = com.fluxlinux.app.ui.theme.FluxBackgroundStart)
+                                }
+                                
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                // Apply Tweaks Button (only show if initialized)
+                                if (setupCompleted.value) {
+                                    Button(
+                                        onClick = {
+                                            if (permissionState.status.isGranted) {
+                                                val scriptManager = com.fluxlinux.app.core.data.ScriptManager(this@MainActivity)
+                                                val tweaksScript = scriptManager.getScriptContent("termux_tweaks.sh")
+                                                
+                                                val copyCmd = "cat > \$HOME/termux_tweaks.sh << 'TWEAKS_EOF'\n$tweaksScript\nTWEAKS_EOF\nchmod +x \$HOME/termux_tweaks.sh && bash \$HOME/termux_tweaks.sh"
+                                                val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildRunCommandIntent(copyCmd)
+                                                
+                                                try {
+                                                    startService(intent)
+                                                    com.fluxlinux.app.core.utils.StateManager.setTweaksApplied(this@MainActivity, true)
+                                                    android.widget.Toast.makeText(this@MainActivity, "Applying Termux Tweaks...", android.widget.Toast.LENGTH_LONG).show()
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("FluxLinux", "Tweaks failed", e)
+                                                }
+                                            } else {
+                                                permissionState.launchPermissionRequest()
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.FluxAccentMagenta),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                                    ) {
+                                        Text("🎨 Apply Termux Tweaks", color = Color.White)
+                                    }
+                                }
+                            }
+                            
+                            // Show/Hide Setup Toggle
+                            if (setupCompleted.value) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                androidx.compose.material3.TextButton(
+                                    onClick = { setupExpanded.value = !setupExpanded.value }
+                                ) {
+                                    Text(
+                                        if (setupExpanded.value) "▲ Hide Setup" else "▼ Show Setup",
+                                        color = com.fluxlinux.app.ui.theme.GlassWhiteMedium
+                                    )
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(24.dp))
 
                             // Prerequisites (Downloads)
@@ -80,11 +148,25 @@ class MainActivity : ComponentActivity() {
                             )
                             
                             Spacer(modifier = Modifier.height(10.dp))
-
+                            
                             // Scope for installs
                             val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
                             val context = androidx.compose.ui.platform.LocalContext.current
                             val installer = androidx.compose.runtime.remember { com.fluxlinux.app.core.utils.ApkInstaller(context) }
+                            
+                            // Package Detection
+                            val termuxInstalled = androidx.compose.runtime.remember { 
+                                androidx.compose.runtime.mutableStateOf(com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context))
+                            }
+                            val x11Installed = androidx.compose.runtime.remember { 
+                                androidx.compose.runtime.mutableStateOf(com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context))
+                            }
+                            
+                            // Refresh package detection on composition
+                            androidx.compose.runtime.LaunchedEffect(Unit) {
+                                termuxInstalled.value = com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context)
+                                x11Installed.value = com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context)
+                            }
                             
                             // Download States
                             val termuxProgress = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0f) }
@@ -92,64 +174,122 @@ class MainActivity : ComponentActivity() {
 
                             Row(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Button(
-                                        onClick = {
-                                            android.widget.Toast.makeText(context, "Downloading Termux...", android.widget.Toast.LENGTH_SHORT).show()
-                                            coroutineScope.launch {
-                                                val url = "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk"
-                                                installer.downloadAndInstall(url, "termux.apk") { progress, status ->
-                                                    termuxProgress.value = progress
-                                                    android.util.Log.d("FluxLinux", status)
+                                    if (!termuxInstalled.value) {
+                                        Button(
+                                            onClick = {
+                                                android.widget.Toast.makeText(context, "Downloading Termux...", android.widget.Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    val url = "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk"
+                                                    installer.downloadAndInstall(url, "termux.apk") { progress, status ->
+                                                        termuxProgress.value = progress
+                                                        android.util.Log.d("FluxLinux", status)
+                                                    }
+                                                    termuxProgress.value = 0f
+                                                    // Recheck installation status
+                                                    termuxInstalled.value = com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context)
                                                 }
-                                                termuxProgress.value = 0f // Reset after done
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Install Termux", color = Color.White)
+                                        }
+                                        
+                                        if (termuxProgress.value > 0f) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            androidx.compose.material3.LinearProgressIndicator(
+                                                progress = { termuxProgress.value },
+                                                modifier = Modifier.fillMaxWidth().height(4.dp),
+                                                color = com.fluxlinux.app.ui.theme.FluxAccentCyan,
+                                                trackColor = com.fluxlinux.app.ui.theme.GlassWhiteLow,
+                                            )
+                                        }
+                                    } else {
+                                        // Show status indicator
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(8.dp),
+                                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        ) {
+                                            androidx.compose.material3.Icon(
+                                                imageVector = androidx.compose.material.icons.Icons.Default.CheckCircle,
+                                                contentDescription = "Installed",
+                                                tint = Color(0xFF50fa7b),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Termux ✓", color = Color.White, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                                                Text(
+                                                    com.fluxlinux.app.core.utils.StateManager.getTermuxVersion(context),
+                                                    color = com.fluxlinux.app.ui.theme.GlassWhiteMedium,
+                                                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                                                )
                                             }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Install Termux", color = Color.White)
-                                    }
-                                    
-                                    if (termuxProgress.value > 0f) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        androidx.compose.material3.LinearProgressIndicator(
-                                            progress = { termuxProgress.value },
-                                            modifier = Modifier.fillMaxWidth().height(4.dp),
-                                            color = com.fluxlinux.app.ui.theme.FluxAccentCyan,
-                                            trackColor = com.fluxlinux.app.ui.theme.GlassWhiteLow,
-                                        )
+                                        }
                                     }
                                 }
                                 
                                 Spacer(modifier = Modifier.size(8.dp))
                                 
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Button(
-                                        onClick = {
-                                            android.widget.Toast.makeText(context, "Downloading Termux:X11...", android.widget.Toast.LENGTH_SHORT).show()
-                                            coroutineScope.launch {
-                                                val url = "https://github.com/termux/termux-x11/releases/download/nightly/app-arm64-v8a-debug.apk"
-                                                installer.downloadAndInstall(url, "termux-x11.apk") { progress, status ->
-                                                    x11Progress.value = progress
-                                                    android.util.Log.d("FluxLinux", status)
+                                    if (!x11Installed.value) {
+                                        Button(
+                                            onClick = {
+                                                android.widget.Toast.makeText(context, "Downloading Termux:X11...", android.widget.Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    val url = "https://github.com/termux/termux-x11/releases/download/nightly/app-arm64-v8a-debug.apk"
+                                                    installer.downloadAndInstall(url, "termux-x11.apk") { progress, status ->
+                                                        x11Progress.value = progress
+                                                        android.util.Log.d("FluxLinux", status)
+                                                    }
+                                                    x11Progress.value = 0f
+                                                    // Recheck installation status
+                                                    x11Installed.value = com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context)
                                                 }
-                                                x11Progress.value = 0f // Reset after done
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Install X11", color = Color.White)
+                                        }
+                                        
+                                        if (x11Progress.value > 0f) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            androidx.compose.material3.LinearProgressIndicator(
+                                                progress = { x11Progress.value },
+                                                modifier = Modifier.fillMaxWidth().height(4.dp),
+                                                color = com.fluxlinux.app.ui.theme.FluxAccentMagenta,
+                                                trackColor = com.fluxlinux.app.ui.theme.GlassWhiteLow,
+                                            )
+                                        }
+                                    } else {
+                                        // Show status indicator
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(8.dp),
+                                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        ) {
+                                            androidx.compose.material3.Icon(
+                                                imageVector = androidx.compose.material.icons.Icons.Default.CheckCircle,
+                                                contentDescription = "Installed",
+                                                tint = Color(0xFF50fa7b),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Termux:X11 ✓", color = Color.White, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                                                Text(
+                                                    com.fluxlinux.app.core.utils.StateManager.getTermuxX11Version(context),
+                                                    color = com.fluxlinux.app.ui.theme.GlassWhiteMedium,
+                                                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                                                )
                                             }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Install X11", color = Color.White)
-                                    }
-                                    
-                                    if (x11Progress.value > 0f) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        androidx.compose.material3.LinearProgressIndicator(
-                                            progress = { x11Progress.value },
-                                            modifier = Modifier.fillMaxWidth().height(4.dp),
-                                            color = com.fluxlinux.app.ui.theme.FluxAccentMagenta,
-                                            trackColor = com.fluxlinux.app.ui.theme.GlassWhiteLow,
-                                        )
+                                        }
                                     }
                                 }
                             }
