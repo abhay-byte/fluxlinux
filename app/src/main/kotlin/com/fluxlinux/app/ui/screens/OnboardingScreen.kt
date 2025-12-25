@@ -161,7 +161,9 @@ fun FeatureCard(
             .clip(RoundedCornerShape(12.dp))
             .hazeChild(
                 state = hazeState,
-                style = HazeMaterials.thin()
+                style = HazeMaterials.thin(
+                    containerColor = GlassWhiteLow
+                )
             )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
