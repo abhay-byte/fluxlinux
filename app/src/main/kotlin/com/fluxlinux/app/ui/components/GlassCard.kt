@@ -31,6 +31,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeChild
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
+import dev.chrisbanes.haze.HazeStyle
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -48,10 +49,12 @@ fun DistroCard(
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(GlassWhiteLow)
             .hazeChild(
                 state = hazeState,
-                backgroundColor = GlassWhiteLow
+                style = HazeStyle(
+                    backgroundColor = GlassWhiteLow,
+                    tint = null
+                )
             )
             .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(16.dp))
     ) {

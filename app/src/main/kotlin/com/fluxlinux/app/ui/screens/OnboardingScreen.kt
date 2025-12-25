@@ -28,6 +28,7 @@ import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
+import dev.chrisbanes.haze.HazeStyle
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -159,10 +160,12 @@ fun FeatureCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(GlassWhiteLow)
             .hazeChild(
                 state = hazeState,
-                backgroundColor = GlassWhiteLow
+                style = HazeStyle(
+                    backgroundColor = GlassWhiteLow,
+                    tint = null
+                )
             )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
