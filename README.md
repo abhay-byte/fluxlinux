@@ -1,6 +1,7 @@
-# FluxLinux - Linux On Android
-
-<img src="assets/logo/logo.webp" width="150" align="center" />
+<div align="center">
+  <img src="assets/logo/logo.webp" width="180" />
+  <h1>FluxLinux</h1>
+</div>
 
 **FluxLinux** is an advanced orchestrator application that transforms your Android device into a versatile Linux workstation. It seamlessly integrates **Termux**, **PRoot**, and **Termux:X11** to provide a full desktop experience (CLI & GUI) without requiring root access, while offering high-performance acceleration for rooted devices.
 
