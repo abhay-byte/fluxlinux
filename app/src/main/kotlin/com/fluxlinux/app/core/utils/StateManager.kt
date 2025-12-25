@@ -127,4 +127,38 @@ object StateManager {
             .map { it.removePrefix("distro_").removeSuffix("_installed") }
             .toSet()
     }
+    
+    /**
+     * Check if onboarding has been completed
+     */
+    fun isOnboardingComplete(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        return prefs.getBoolean("onboarding_complete", false)
+    }
+    
+    /**
+     * Mark onboarding as complete
+     */
+    fun setOnboardingComplete(context: Context, complete: Boolean) {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("onboarding_complete", complete).apply()
+        android.util.Log.d("StateManager", "Onboarding completion set to: $complete")
+    }
+    
+    /**
+     * Check if Termux connection fix has been applied
+     */
+    fun isConnectionFixed(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        return prefs.getBoolean("connection_fixed", false)
+    }
+    
+    /**
+     * Mark connection fix as applied
+     */
+    fun setConnectionFixed(context: Context, fixed: Boolean) {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("connection_fixed", fixed).apply()
+        android.util.Log.d("StateManager", "Connection fix status set to: $fixed")
+    }
 }

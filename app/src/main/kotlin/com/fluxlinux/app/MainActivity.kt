@@ -347,6 +347,9 @@ class MainActivity : ComponentActivity() {
                                             val launchIntent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
                                             if (launchIntent != null) {
                                                 startActivity(launchIntent)
+                                                // Mark as installed (optimistic update)
+                                                com.fluxlinux.app.core.utils.StateManager.setDistroInstalled(this@MainActivity, distro.id, true)
+                                                distroInstalled.value = true
                                             } else {
                                                 android.widget.Toast.makeText(this@MainActivity, "Termux not found!", android.widget.Toast.LENGTH_SHORT).show()
                                             }
@@ -361,6 +364,9 @@ class MainActivity : ComponentActivity() {
                                             val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildUninstallIntent(distro.id)
                                             try {
                                                 startService(intent)
+                                                // Clear installed state
+                                                com.fluxlinux.app.core.utils.StateManager.setDistroInstalled(this@MainActivity, distro.id, false)
+                                                distroInstalled.value = false
                                                 android.widget.Toast.makeText(this@MainActivity, "Uninstalling ${distro.name}...", android.widget.Toast.LENGTH_SHORT).show()
                                             } catch (e: Exception) {
                                                 android.util.Log.e("FluxLinux", "Uninstall failed", e)
