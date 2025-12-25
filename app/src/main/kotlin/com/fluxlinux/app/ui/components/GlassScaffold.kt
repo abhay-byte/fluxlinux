@@ -14,11 +14,7 @@ import com.fluxlinux.app.ui.theme.FluxBackgroundMid
 import com.fluxlinux.app.ui.theme.FluxBackgroundStart
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.materials.HazeMaterials
 
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun GlassScaffold(
     bottomBar: @Composable () -> Unit = {},
@@ -46,19 +42,12 @@ fun GlassScaffold(
                 .haze(state = hazeState)
         )
         
-        // Content layer with blur effect
+        // Content layer - no blur here, components handle their own
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = bottomBar,
             content = { paddingValues ->
-                Box(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .hazeChild(
-                            state = hazeState,
-                            style = HazeMaterials.thin()
-                        )
-                ) {
+                Box(modifier = Modifier.padding(paddingValues)) {
                     content(hazeState)
                 }
             }
