@@ -43,6 +43,17 @@ fun DistroScreen(
     
     // Refresh mechanism to check install status
     val refreshKey = remember { mutableStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                refreshKey.value++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     
     Column(
         modifier = Modifier
@@ -146,9 +157,9 @@ fun DistroScreen(
                         if (launchIntent != null) {
                             try {
                                 onStartActivity(launchIntent)
-                                // Optimistic update
-                                StateManager.setDistroInstalled(context, distro.id, true)
-                                refreshKey.value++
+                                // Optimistic update removed - relying on script callback
+                                // StateManager.setDistroInstalled(context, distro.id, true)
+                                // refreshKey.value++ 
                                 android.widget.Toast.makeText(context, "Command Copied! Paste in Termux.", android.widget.Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
                                 android.util.Log.e("FluxLinux", "Failed to open Termux", e)

@@ -185,4 +185,5 @@ echo "🎉 FluxLinux: Termux enhancement complete!"
 echo "🔄 Restart Termux to see all changes."
 
 # Create marker file to track tweaks application
-touch ~/.fluxlinux_tweaks_applied
+touch "$HOME/.fluxlinux/termux_tweaks.done"
+am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=termux_tweaks"

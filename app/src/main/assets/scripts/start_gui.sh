@@ -5,6 +5,11 @@
 
 # Kill open X11 processes
 kill -9 $(pgrep -f "termux.x11") 2>/dev/null
+pkill -f com.termux.x11 2>/dev/null
+
+# Kill previous XFCE sessions to prevent zombies/conflicts
+pkill -f startxfce4 2>/dev/null
+pkill -f xfce4-session 2>/dev/null
 
 # Enable PulseAudio over Network
 pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1
@@ -19,6 +24,12 @@ sleep 3
 # Launch Termux X11 main activity (CRITICAL for display)
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity > /dev/null 2>&1
 sleep 1
+
+# Apply stored X11 preferences if they exist
+if [ -f "$HOME/.fluxlinux/x11_preferences.sh" ]; then
+    echo "Applying X11 Preferences..."
+    bash "$HOME/.fluxlinux/x11_preferences.sh"
+fi
 
 # Login in PRoot Environment with proper environment setup
 # Usage: ./start_gui.sh <distro_alias>

@@ -25,7 +25,7 @@ object TermuxX11Preferences {
     // Display Settings
     fun getDisplayScale(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getInt(KEY_DISPLAY_SCALE, 100)
+        return prefs.getInt(KEY_DISPLAY_SCALE, 200)
     }
     
     fun setDisplayScale(context: Context, scale: Int) {
@@ -124,22 +124,50 @@ object TermuxX11Preferences {
     }
     
     /**
-     * Apply preferences to Termux:X11 via termux-x11-preference command
+     * Apply preferences by writing them to a script that start_gui.sh will execute.
      */
-    private fun applyPreferences(context: Context) {
+    fun applyPreferences(context: Context) {
         try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             
             // Build preference command
+            // We use 'termux-x11-preference' tool which comes with the package
             val prefCommand = buildString {
                 append("termux-x11-preference ")
+                append("-s ") // Silent mode if available, or just key values
                 append("\"fullscreen\"=\"${prefs.getBoolean(KEY_FULLSCREEN, true)}\" ")
                 append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\" ")
-                // Add more preferences as needed
+                append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\" ")
+                append("\"keepScreenOn\"=\"${prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)}\" ")
+                append("\"capturePointer\"=\"${prefs.getBoolean(KEY_CAPTURE_POINTER, true)}\" ")
+                append("\"showIME\"=\"${prefs.getBoolean(KEY_SHOW_IME, true)}\" ")
+                append("\"preferScancodes\"=\"${prefs.getBoolean(KEY_PREFER_SCANCODES, true)}\" ")
+                append("\"scancodeWorkaround\"=\"${prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true)}\" ")
             }
             
-            android.util.Log.d("TermuxX11Prefs", "Applying preferences: $prefCommand")
-            // Note: This would need to be executed via TermuxIntentFactory
+            // Create the script content
+            val scriptContent = """
+                #!/bin/bash
+                # Auto-generated Termux:X11 preferences
+                # Applied by FluxLinux
+                
+                # Check if Termux:X11 is running before applying
+                if pgrep -f "termux.x11" > /dev/null; then
+                    $prefCommand
+                fi
+            """.trimIndent()
+            
+            // Write to file using cat
+            // We escape the content properly for bash
+            val escapedContent = scriptContent.replace("$", "\\$")
+            val writeCmd = "mkdir -p \$HOME/.fluxlinux && cat << 'EOF_PREFS' > \$HOME/.fluxlinux/x11_preferences.sh\n$scriptContent\nEOF_PREFS\nchmod +x \$HOME/.fluxlinux/x11_preferences.sh"
+            
+            // Send command Intent
+            // Force background execution to prevent Termux from stealing focus
+            val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildRunCommandIntent(writeCmd, runInBackground = true)
+            context.startService(intent)
+            
+            android.util.Log.d("TermuxX11Prefs", "Updated preference script")
         } catch (e: Exception) {
             android.util.Log.e("TermuxX11Prefs", "Failed to apply preferences", e)
         }

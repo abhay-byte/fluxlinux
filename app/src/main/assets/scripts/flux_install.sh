@@ -35,9 +35,11 @@ if [ $EXIT_CODE -eq 0 ]; then
     touch ~/.fluxlinux_distro_${DISTRO}_installed
     
     # Return to FluxLinux app
+    # Return to FluxLinux app
     echo "Returning to FluxLinux..."
-    am start -n com.fluxlinux.app/.MainActivity
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=distro_install_${DISTRO}"
 else
     echo "FluxLinux: Install Failed with code $EXIT_CODE!"
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=failure&name=distro_install_${DISTRO}"
     exit 1
 fi

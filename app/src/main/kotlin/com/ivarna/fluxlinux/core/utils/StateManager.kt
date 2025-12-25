@@ -276,4 +276,21 @@ object StateManager {
         }
         return size
     }
+
+    /**
+     * Check if a script has been successfully executed
+     */
+    fun getScriptStatus(context: Context, scriptName: String): Boolean {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        return prefs.getBoolean("script_${scriptName}_success", false)
+    }
+
+    /**
+     * Set script execution status
+     */
+    fun setScriptStatus(context: Context, scriptName: String, success: Boolean) {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("script_${scriptName}_success", success).apply()
+        android.util.Log.d("StateManager", "Script $scriptName status set to: $success")
+    }
 }

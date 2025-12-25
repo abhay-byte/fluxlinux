@@ -2,7 +2,18 @@
 # debian_setup.sh
 # Post-install configuration for FluxLinux Debian
 
-export DEBIAN_FRONTEND=noninteractive
+MARKER_FILE="$HOME/.fluxlinux/debian_setup.done"
+mkdir -p "$HOME/.fluxlinux"
+
+if [ -f "$MARKER_FILE" ]; then
+    echo "FluxLinux: Debian Setup already completed. Skipping."
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=debian_setup"
+    exit 0
+fi
+
+# Trap errors
+set -e
+trap 'am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=failure&name=debian_setup"' ERR
 
 echo "FluxLinux: Configuring Debian..."
 
@@ -25,3 +36,5 @@ mkdir -p /etc/sudoers.d
 echo "flux ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
 
 echo "FluxLinux: Configuration Complete!"
+touch "$MARKER_FILE"
+am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=debian_setup"

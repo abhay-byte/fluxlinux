@@ -8,6 +8,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -166,23 +167,22 @@ fun SettingsScreen(
                             )
 
                             // Setup State Tracking
-                            val setupCompleted = remember { mutableStateOf(StateManager.isTermuxInitialized(context)) }
+                            val setupCompleted = remember(refreshKey.value) { mutableStateOf(StateManager.isTermuxInitialized(context) || StateManager.getScriptStatus(context, "setup_termux")) }
+                            val tweaksApplied = remember(refreshKey.value) { mutableStateOf(StateManager.getScriptStatus(context, "termux_tweaks")) }
                             
-                            // Refresh setup state
-                            LaunchedEffect(Unit) {
-                                setupCompleted.value = StateManager.isTermuxInitialized(context)
-                            }
+                            val FluxGreen = Color(0xFF50fa7b)
                             
+                            // Setup Environment Button
                             Button(
                                 onClick = {
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
                                         val setupScript = scriptManager.getScriptContent("setup_termux.sh")
-                                        val intent = TermuxIntentFactory.buildRunCommandIntent(setupScript)
+                                        // Force re-run by removing marker
+                                        val forceSetupScript = "rm -f \$HOME/.fluxlinux/setup_termux.done\n" + setupScript
+                                        val intent = TermuxIntentFactory.buildRunCommandIntent(forceSetupScript)
                                         try {
                                             onStartService(intent)
-                                            StateManager.setTermuxInitialized(context, true)
-                                            setupCompleted.value = true
                                             android.widget.Toast.makeText(context, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
                                             android.util.Log.e("FluxLinux", "Setup failed", e)
@@ -191,10 +191,29 @@ fun SettingsScreen(
                                         permissionState.launchPermissionRequest()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentCyan),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (setupCompleted.value) Color(0x2250fa7b) else FluxAccentCyan,
+                                    contentColor = if (setupCompleted.value) FluxGreen else FluxBackgroundStart
+                                ),
+                                border = if (setupCompleted.value) BorderStroke(1.dp, FluxGreen) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Initialize Environment (Setup)", color = FluxBackgroundStart)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    if (setupCompleted.value) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Environment Initialized", fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Text("Initialize Environment (Setup)")
+                                    }
+                                }
                             }
                             
                             Spacer(modifier = Modifier.height(12.dp))
@@ -205,11 +224,13 @@ fun SettingsScreen(
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
                                         val tweaksScript = scriptManager.getScriptContent("termux_tweaks.sh")
-                                        val copyCmd = "cat > \$HOME/termux_tweaks.sh << 'TWEAKS_EOF'\n$tweaksScript\nTWEAKS_EOF\nchmod +x \$HOME/termux_tweaks.sh && bash \$HOME/termux_tweaks.sh"
+                                        // Force re-run by removing marker
+                                        val forceTweaksScript = "rm -f \$HOME/.fluxlinux/termux_tweaks.done\n" + tweaksScript
+                                        // Tweaks script handles its own callback and marker now
+                                        val copyCmd = "cat > \$HOME/termux_tweaks.sh << 'TWEAKS_EOF'\n$forceTweaksScript\nTWEAKS_EOF\nchmod +x \$HOME/termux_tweaks.sh && bash \$HOME/termux_tweaks.sh"
                                         val intent = TermuxIntentFactory.buildRunCommandIntent(copyCmd)
                                         try {
                                             onStartService(intent)
-                                            StateManager.setTweaksApplied(context, true)
                                             android.widget.Toast.makeText(context, "Applying Termux Tweaks...", android.widget.Toast.LENGTH_LONG).show()
                                         } catch (e: Exception) {
                                             android.util.Log.e("FluxLinux", "Tweaks failed", e)
@@ -218,10 +239,29 @@ fun SettingsScreen(
                                         permissionState.launchPermissionRequest()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (tweaksApplied.value) Color(0x2250fa7b) else FluxAccentMagenta,
+                                    contentColor = if (tweaksApplied.value) FluxGreen else Color.White
+                                ),
+                                border = if (tweaksApplied.value) BorderStroke(1.dp, FluxGreen) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("🎨 Apply Termux Tweaks", color = Color.White)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    if (tweaksApplied.value) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Tweaks Applied", fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Text("🎨 Apply Termux Tweaks")
+                                    }
+                                }
                             }
                         }
                     }

@@ -3,6 +3,19 @@
 # Core initialization script for FluxLinux
 # Installs necessary dependencies in Termux
 
+MARKER_FILE="$HOME/.fluxlinux/setup_termux.done"
+mkdir -p "$HOME/.fluxlinux"
+
+if [ -f "$MARKER_FILE" ]; then
+    echo "FluxLinux: Termux Setup already completed. Skipping."
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=setup_termux"
+    exit 0
+fi
+
+# Trap errors
+set -e
+trap 'am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=failure&name=setup_termux"' ERR
+
 echo "FluxLinux: Initializing Termux Environment..."
 
 # 1. Update Packages
@@ -28,6 +41,11 @@ cat <<'EOF' > $HOME/start_gui.sh
 
 # Kill open X11 processes
 kill -9 $(pgrep -f "termux.x11") 2>/dev/null
+pkill -f com.termux.x11 2>/dev/null
+
+# Kill previous XFCE sessions to prevent zombies/conflicts
+pkill -f startxfce4 2>/dev/null
+pkill -f xfce4-session 2>/dev/null
 
 # Enable PulseAudio over Network
 pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1
@@ -42,6 +60,12 @@ sleep 3
 # Launch Termux X11 main activity (CRITICAL for display)
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity > /dev/null 2>&1
 sleep 1
+
+# Apply stored X11 preferences if they exist
+if [ -f "$HOME/.fluxlinux/x11_preferences.sh" ]; then
+    echo "Applying X11 Preferences..."
+    bash "$HOME/.fluxlinux/x11_preferences.sh"
+fi
 
 # Login in PRoot Environment with proper environment setup
 # Usage: ./start_gui.sh <distro_alias>
@@ -88,9 +112,10 @@ if [ $EXIT_CODE -eq 0 ]; then
     
     # Return to FluxLinux app
     echo "Returning to FluxLinux..."
-    am start -n com.fluxlinux.app/.MainActivity
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=distro_install_${DISTRO}"
 else
     echo "FluxLinux: Install Failed with code $EXIT_CODE!"
+    am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=failure&name=distro_install_${DISTRO}"
     exit 1
 fi
 EOF
@@ -101,4 +126,5 @@ echo ""
 echo "📝 Optional: Run 'bash ~/termux_tweaks.sh' for enhanced terminal experience"
 
 # Create marker file to track initialization
-touch ~/.fluxlinux_initialized
+touch "$MARKER_FILE"
+am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=setup_termux"

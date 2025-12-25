@@ -43,6 +43,45 @@ enum class Screen {
 }
 
 class MainActivity : ComponentActivity() {
+    
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleScriptCallback(intent)
+    }
+
+    private fun handleScriptCallback(intent: android.content.Intent) {
+        // Handle Deep Link: fluxlinux://callback?result=success&name=setup_termux
+        if (intent.action == android.content.Intent.ACTION_VIEW && intent.data?.scheme == "fluxlinux") {
+            val uri = intent.data
+            val result = uri?.getQueryParameter("result")
+            val scriptName = uri?.getQueryParameter("name") ?: "unknown"
+            
+            if (result == "success") {
+                 StateManager.setScriptStatus(this, scriptName, true)
+                 android.widget.Toast.makeText(this, "Script '$scriptName' completed! ✅", android.widget.Toast.LENGTH_LONG).show()
+                 
+                 // If setup_termux just finished, ensure X11 preferences are written
+                 if (scriptName == "setup_termux") {
+                     com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyPreferences(this)
+                 }
+            } else {
+                 android.widget.Toast.makeText(this, "Script '$scriptName' failed! ❌", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        // Fallback for Extras (Legacy)
+        else if (intent.hasExtra("script_result")) {
+             val result = intent.getStringExtra("script_result")
+             val scriptName = intent.getStringExtra("script_name") ?: "unknown"
+             
+             if (result == "success") {
+                 StateManager.setScriptStatus(this, scriptName, true)
+                 android.widget.Toast.makeText(this, "Script '$scriptName' completed successfully! ✅", android.widget.Toast.LENGTH_LONG).show()
+             } else {
+                 android.widget.Toast.makeText(this, "Script '$scriptName' failed! ❌", android.widget.Toast.LENGTH_LONG).show()
+             }
+        }
+    }
+
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
