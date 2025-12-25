@@ -171,29 +171,72 @@ class MainActivity : ComponentActivity() {
                                     distro = distro,
                                     onInstall = {
                                         if (permissionState.status.isGranted) {
-                                            android.util.Log.d("FluxLinux", "Installing ${distro.name}")
-                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildInstallIntent(distro.id)
+                                            android.util.Log.d("FluxLinux", "Preparing Install Command for ${distro.name}")
+                                            
+                                            // Load setup script
+                                            val scriptManager = com.fluxlinux.app.core.data.ScriptManager(this@MainActivity)
+                                            val setupScript = scriptManager.getScriptContent("debian_setup.sh")
+                                            
+                                            // Generate Command
+                                            val command = com.fluxlinux.app.core.data.TermuxIntentFactory.getInstallCommand(distro.id, setupScript)
+                                            
+                                            // 1. Copy to Clipboard
+                                            val clipboard = android.content.Context.CLIPBOARD_SERVICE
+                                            val clipboardManager = getSystemService(clipboard) as android.content.ClipboardManager
+                                            val clip = android.content.ClipData.newPlainText("FluxLinux Install", command)
+                                            clipboardManager.setPrimaryClip(clip)
+                                            
+                                            // 2. Notify User
+                                            android.widget.Toast.makeText(this@MainActivity, "Command Copied! Paste in Termux to Install.", android.widget.Toast.LENGTH_LONG).show()
+                                            
+                                            // 3. Open Termux
+                                            val launchIntent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
+                                            if (launchIntent != null) {
+                                                startActivity(launchIntent)
+                                            } else {
+                                                android.widget.Toast.makeText(this@MainActivity, "Termux not found!", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                            
+                                        } else {
+                                            permissionState.launchPermissionRequest()
+                                        }
+                                    },
+                                    onUninstall = {
+                                        if (permissionState.status.isGranted) {
+                                            android.util.Log.d("FluxLinux", "Uninstalling ${distro.name}")
+                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildUninstallIntent(distro.id)
                                             try {
                                                 startService(intent)
-                                                android.widget.Toast.makeText(this@MainActivity, "Installing ${distro.name}...", android.widget.Toast.LENGTH_SHORT).show()
+                                                android.widget.Toast.makeText(this@MainActivity, "Uninstalling ${distro.name}...", android.widget.Toast.LENGTH_SHORT).show()
                                             } catch (e: Exception) {
-                                                android.util.Log.e("FluxLinux", "Install failed", e)
-                                                android.widget.Toast.makeText(this@MainActivity, "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                                                android.util.Log.e("FluxLinux", "Uninstall failed", e)
                                             }
                                         } else {
                                             permissionState.launchPermissionRequest()
                                         }
                                     },
-                                    onLaunch = {
+                                    onLaunchCli = {
                                         if (permissionState.status.isGranted) {
-                                            android.util.Log.d("FluxLinux", "Launching ${distro.name}")
-                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildLaunchIntent(distro.id)
+                                            android.util.Log.d("FluxLinux", "Launching CLI ${distro.name}")
+                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildLaunchCliIntent(distro.id)
                                             try {
                                                 startService(intent)
-                                                android.widget.Toast.makeText(this@MainActivity, "Launching ${distro.name}...", android.widget.Toast.LENGTH_SHORT).show()
                                             } catch (e: Exception) {
-                                                android.util.Log.e("FluxLinux", "Launch failed", e)
-                                                android.widget.Toast.makeText(this@MainActivity, "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                                                android.util.Log.e("FluxLinux", "Launch CLI failed", e)
+                                            }
+                                        } else {
+                                            permissionState.launchPermissionRequest()
+                                        }
+                                    },
+                                    onLaunchGui = {
+                                        if (permissionState.status.isGranted) {
+                                            android.util.Log.d("FluxLinux", "Launching GUI ${distro.name}")
+                                            val intent = com.fluxlinux.app.core.data.TermuxIntentFactory.buildLaunchGuiIntent(distro.id)
+                                            try {
+                                                startService(intent)
+                                                android.widget.Toast.makeText(this@MainActivity, "Launching XFCE...", android.widget.Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("FluxLinux", "Launch GUI failed", e)
                                             }
                                         } else {
                                             permissionState.launchPermissionRequest()

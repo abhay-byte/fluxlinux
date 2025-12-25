@@ -32,7 +32,9 @@ import com.fluxlinux.app.ui.theme.GlassWhiteLow
 fun DistroCard(
     distro: Distro,
     onInstall: () -> Unit,
-    onLaunch: () -> Unit
+    onUninstall: () -> Unit,
+    onLaunchCli: () -> Unit,
+    onLaunchGui: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -57,12 +59,28 @@ fun DistroCard(
                 
                 Spacer(modifier = Modifier.size(12.dp))
                 
-                Text(
-                    text = distro.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+                Column {
+                    Text(
+                        text = distro.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = distro.id,
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Uninstall Action (Text Button)
+                androidx.compose.material3.TextButton(
+                    onClick = onUninstall
+                ) {
+                    Text("Uninstall", color = Color.Red.copy(alpha = 0.8f))
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -87,12 +105,24 @@ fun DistroCard(
                 
                 Spacer(modifier = Modifier.size(8.dp))
                 
+                // CLI Button
                 Button(
-                    onClick = onLaunch,
-                    colors = ButtonDefaults.buttonColors(containerColor = distro.color),
-                    modifier = Modifier.weight(1f)
+                    onClick = onLaunchCli,
+                    colors = ButtonDefaults.buttonColors(containerColor = distro.color.copy(alpha = 0.7f)),
+                    modifier = Modifier.weight(0.5f)
                 ) {
-                    Text("Launch", color = Color.White)
+                    Text("CLI", color = Color.White)
+                }
+                
+                Spacer(modifier = Modifier.size(8.dp))
+
+                // GUI Button
+                Button(
+                    onClick = onLaunchGui,
+                    colors = ButtonDefaults.buttonColors(containerColor = distro.color),
+                    modifier = Modifier.weight(0.5f)
+                ) {
+                    Text("GUI", color = Color.White)
                 }
             }
         }

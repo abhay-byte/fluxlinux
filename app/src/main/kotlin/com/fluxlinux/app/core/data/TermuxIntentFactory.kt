@@ -40,18 +40,70 @@ object TermuxIntentFactory {
     }
 
     /**
-     * Installs a specific distro using proot-distro.
+     * Generates the install command string for manual execution.
      */
-    fun buildInstallIntent(distroId: String): Intent {
-        val command = "proot-distro install $distroId && echo 'FluxLinux: $distroId Installed!' && sleep 5"
+    fun getInstallCommand(distroId: String, setupScript: String? = null): String {
+        val setupB64 = if (!setupScript.isNullOrEmpty()) {
+            android.util.Base64.encodeToString(setupScript.toByteArray(), android.util.Base64.NO_WRAP)
+        } else {
+            "null"
+        }
+        return "bash \$HOME/flux_install.sh $distroId \"$setupB64\""
+    }
+
+    /**
+     * Just opens Termux (launcher intent).
+     */
+    fun buildOpenTermuxIntent(context: android.content.Context): Intent? {
+        return context.packageManager.getLaunchIntentForPackage("com.termux")
+    }
+
+    /**
+     * Installs a specific distro... (Deprecated: User Manual Fallback Preferred)
+     */
+    fun buildInstallIntent(distroId: String, setupScript: String? = null): Intent {
+        // Use the native helper script we created in setup_termux.sh
+        // Usage: bash ~/flux_install.sh <distro> <base64_setup>
+        
+        val setupB64 = if (!setupScript.isNullOrEmpty()) {
+            android.util.Base64.encodeToString(setupScript.toByteArray(), android.util.Base64.NO_WRAP)
+        } else {
+            "null"
+        }
+        
+        val command = "bash $TERMUX_HOME_DIR/flux_install.sh $distroId \"$setupB64\""
         return buildRunCommandIntent(command)
     }
 
     /**
-     * Launches a specific distro.
+     * Uninstalls/Removes a specific distro.
      */
-    fun buildLaunchIntent(distroId: String): Intent {
-        val command = "proot-distro login $distroId"
+    fun buildUninstallIntent(distroId: String): Intent {
+        // proot-distro remove <distro>
+        // echo to confirm
+        val command = "proot-distro remove $distroId && echo 'FluxLinux: $distroId Uninstalled.' && sleep 3"
+        return buildRunCommandIntent(command)
+    }
+
+    /**
+     * Launches a specific distro in CLI mode (login as flux user).
+     */
+    fun buildLaunchCliIntent(distroId: String): Intent {
+        // Default to 'flux' user if setup, fallback to root if not (proot-distro handles login)
+        // Ideally we check, but for now let's assume 'flux' if we ran setup. 
+        // Safer: just login, it defaults to root, then user can su.
+        // User requested CLI option. Let's try to login as flux if possible or just standard login.
+        // Standard: proot-distro login <distro> is safest.
+        val command = "proot-distro login $distroId --user flux"
         return buildRunCommandIntent(command, runInBackground = false)
+    }
+
+    /**
+     * Launches a specific distro in GUI mode (XFCE4).
+     */
+    fun buildLaunchGuiIntent(distroId: String): Intent {
+        // Execute the helper script created during setup
+        val command = "bash $TERMUX_HOME_DIR/start_gui.sh $distroId"
+        return buildRunCommandIntent(command, runInBackground = true)
     }
 }
