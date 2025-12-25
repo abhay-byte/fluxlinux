@@ -35,7 +35,7 @@ fun GlassBottomNavigation(
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val blurBackgroundColor = remember(surfaceColor) {
-        surfaceColor.copy(alpha = 0.2f)
+        surfaceColor.copy(alpha = 0.7f)
     }
 
     Box(
@@ -50,8 +50,8 @@ fun GlassBottomNavigation(
             .clip(RoundedCornerShape(percent = 50))
             .hazeChild(state = hazeState) {
                 backgroundColor = blurBackgroundColor
-                blurRadius = 30.dp
-                noiseFactor = 0.05f
+                blurRadius = 100.dp
+                noiseFactor = 0.1f
             }
             .border(
                 border = BorderStroke(
