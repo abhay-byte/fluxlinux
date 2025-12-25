@@ -27,10 +27,16 @@ import androidx.compose.ui.unit.sp
 import com.fluxlinux.app.core.data.Distro
 import com.fluxlinux.app.ui.theme.GlassBorder
 import com.fluxlinux.app.ui.theme.GlassWhiteLow
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun DistroCard(
     distro: Distro,
+    hazeState: HazeState,
     isInstalled: Boolean = false,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
@@ -42,7 +48,10 @@ fun DistroCard(
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(GlassWhiteLow)
+            .hazeChild(
+                state = hazeState,
+                style = HazeMaterials.regular()
+            )
             .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(16.dp))
     ) {
         Column(

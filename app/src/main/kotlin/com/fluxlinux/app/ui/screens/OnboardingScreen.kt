@@ -23,11 +23,19 @@ import com.fluxlinux.app.R
 import com.fluxlinux.app.ui.theme.FluxAccentCyan
 import com.fluxlinux.app.ui.theme.GlassWhiteLow
 import com.fluxlinux.app.ui.theme.GlassBorder
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun OnboardingScreen(
     onGetStarted: () -> Unit
 ) {
+    val hazeState = androidx.compose.runtime.remember { HazeState() }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -41,6 +49,13 @@ fun OnboardingScreen(
                 )
             )
     ) {
+        // Background layer for blur
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .haze(state = hazeState)
+        )
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,6 +86,7 @@ fun OnboardingScreen(
             
             // Feature Cards
             FeatureCard(
+                hazeState = hazeState,
                 icon = "🐧",
                 title = "Multiple Distros",
                 description = "Debian, Ubuntu, Arch and more"
@@ -79,6 +95,7 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             FeatureCard(
+                hazeState = hazeState,
                 icon = "🖥️",
                 title = "Full Desktop Environment",
                 description = "XFCE4 with complete GUI support"
@@ -87,6 +104,7 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             FeatureCard(
+                hazeState = hazeState,
                 icon = "⚡",
                 title = "No Root Required",
                 description = "PRoot mode works on any device"
@@ -129,8 +147,10 @@ fun OnboardingScreen(
     }
 }
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun FeatureCard(
+    hazeState: HazeState,
     icon: String,
     title: String,
     description: String
@@ -139,7 +159,10 @@ fun FeatureCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(GlassWhiteLow)
+            .hazeChild(
+                state = hazeState,
+                style = HazeMaterials.thin()
+            )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

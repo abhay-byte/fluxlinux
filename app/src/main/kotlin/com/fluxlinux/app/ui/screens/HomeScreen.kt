@@ -316,6 +316,7 @@ fun HomeScreen(
             
             com.fluxlinux.app.ui.components.DistroCard(
                 distro = distro,
+                hazeState = hazeState,
                 isInstalled = distroInstalled.value,
                 onInstall = {
                     if (permissionState.status.isGranted) {
