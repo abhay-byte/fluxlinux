@@ -30,6 +30,11 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.material.icons.filled.Refresh
+import android.widget.Toast
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -58,6 +63,26 @@ fun PrerequisitesScreen(
     val permissionState = rememberPermissionState(
         permission = "com.termux.permission.RUN_COMMAND"
     )
+
+    // Function to re-check status
+    val checkStatus = {
+        termuxInstalled.value = StateManager.isTermuxInstalled(context)
+        x11Installed.value = StateManager.isTermuxX11Installed(context)
+    }
+
+    // Refresh when app resumes
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                checkStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -103,6 +128,7 @@ fun PrerequisitesScreen(
                     x11Installed = x11Installed,
                     termuxProgress = termuxProgress,
                     x11Progress = x11Progress,
+                    onRefresh = checkStatus,
                     onContinue = {
                         if (termuxInstalled.value && x11Installed.value) {
                             currentStep = 2
@@ -136,6 +162,7 @@ fun PackageInstallationStep(
     x11Installed: MutableState<Boolean>,
     termuxProgress: MutableState<Float>,
     x11Progress: MutableState<Float>,
+    onRefresh: () -> Unit,
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
@@ -146,12 +173,26 @@ fun PackageInstallationStep(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Step 1: Install Required Apps",
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Step 1: Install Required Apps",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            
+            IconButton(onClick = onRefresh) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = FluxAccentCyan
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         

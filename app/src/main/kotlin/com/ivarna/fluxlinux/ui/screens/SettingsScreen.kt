@@ -49,6 +49,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ivarna.fluxlinux.ui.theme.FluxAccentCyan
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 import com.ivarna.fluxlinux.ui.theme.FluxBackgroundStart
@@ -137,6 +140,20 @@ fun SettingsScreen(
                     val context = LocalContext.current
                     val coroutineScope = rememberCoroutineScope()
                     val refreshKey = remember { mutableStateOf(0) } // For refreshing status
+                    
+                    // Refresh when app resumes to catch installation changes
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                refreshKey.value++
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
+                        }
+                    }
                     
                     GlassSettingCard(hazeState = hazeState) {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
