@@ -36,15 +36,35 @@ import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.ui.components.GlassSettingCard
 import com.ivarna.fluxlinux.core.utils.ThemePreferences
 import com.ivarna.fluxlinux.core.utils.ThemeMode
+import com.ivarna.fluxlinux.core.utils.TermuxX11Preferences
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
 import com.ivarna.fluxlinux.ui.theme.FluxLinuxTheme
 import com.ivarna.fluxlinux.ui.theme.GlassBorder
+import com.ivarna.fluxlinux.core.data.ScriptManager
+import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
+import com.ivarna.fluxlinux.core.utils.ApkInstaller
+import com.ivarna.fluxlinux.core.utils.StateManager
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.isGranted
+import kotlinx.coroutines.launch
+import com.ivarna.fluxlinux.ui.theme.FluxAccentCyan
+import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
+import com.ivarna.fluxlinux.ui.theme.FluxBackgroundStart
+import com.ivarna.fluxlinux.ui.theme.GlassWhiteLow
+import com.ivarna.fluxlinux.ui.theme.GlassWhiteMedium
+import android.content.ClipboardManager
+import android.content.ClipData
 
-@OptIn(ExperimentalMaterial3Api::class)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    permissionState: PermissionState,
+    onStartService: (Intent) -> Unit,
+    onStartActivity: (Intent) -> Unit,
     onNavigateToOnboarding: (() -> Unit)? = null,
     onNavigateToTroubleshooting: (() -> Unit)? = null,
     onNavigateToRootCheck: (() -> Unit)? = null,
@@ -112,8 +132,241 @@ fun SettingsScreen(
                 ) {
                     
                     // =====================================================================
-                    // 1. APP SETTINGS (General + Advanced)
+                    // 0. ENVIRONMENT SETUP & PRE-REQUISITES (MOVED FROM HOME)
                     // =====================================================================
+                    val context = LocalContext.current
+                    val coroutineScope = rememberCoroutineScope()
+                    val refreshKey = remember { mutableStateOf(0) } // For refreshing status
+                    
+                    GlassSettingCard(hazeState = hazeState) {
+                        Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                            Text(
+                                "Environment Setup",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+
+                            // Setup State Tracking
+                            val setupCompleted = remember { mutableStateOf(StateManager.isTermuxInitialized(context)) }
+                            
+                            // Refresh setup state
+                            LaunchedEffect(Unit) {
+                                setupCompleted.value = StateManager.isTermuxInitialized(context)
+                            }
+                            
+                            Button(
+                                onClick = {
+                                    if (permissionState.status.isGranted) {
+                                        val scriptManager = ScriptManager(context)
+                                        val setupScript = scriptManager.getScriptContent("setup_termux.sh")
+                                        val intent = TermuxIntentFactory.buildRunCommandIntent(setupScript)
+                                        try {
+                                            onStartService(intent)
+                                            StateManager.setTermuxInitialized(context, true)
+                                            setupCompleted.value = true
+                                            android.widget.Toast.makeText(context, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("FluxLinux", "Setup failed", e)
+                                        }
+                                    } else {
+                                        permissionState.launchPermissionRequest()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentCyan),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Initialize Environment (Setup)", color = FluxBackgroundStart)
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // Tweaks Button
+                             Button(
+                                onClick = {
+                                    if (permissionState.status.isGranted) {
+                                        val scriptManager = ScriptManager(context)
+                                        val tweaksScript = scriptManager.getScriptContent("termux_tweaks.sh")
+                                        val copyCmd = "cat > \$HOME/termux_tweaks.sh << 'TWEAKS_EOF'\n$tweaksScript\nTWEAKS_EOF\nchmod +x \$HOME/termux_tweaks.sh && bash \$HOME/termux_tweaks.sh"
+                                        val intent = TermuxIntentFactory.buildRunCommandIntent(copyCmd)
+                                        try {
+                                            onStartService(intent)
+                                            StateManager.setTweaksApplied(context, true)
+                                            android.widget.Toast.makeText(context, "Applying Termux Tweaks...", android.widget.Toast.LENGTH_LONG).show()
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("FluxLinux", "Tweaks failed", e)
+                                        }
+                                    } else {
+                                        permissionState.launchPermissionRequest()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🎨 Apply Termux Tweaks", color = Color.White)
+                            }
+                        }
+                    }
+
+                    // PREREQUISITES CARD
+                    GlassSettingCard(hazeState = hazeState) {
+                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                            Text(
+                                "Prerequisites",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            val installer = remember { ApkInstaller(context) }
+                            val termuxInstalled = remember(refreshKey.value) { mutableStateOf(StateManager.isTermuxInstalled(context)) }
+                            val x11Installed = remember(refreshKey.value) { mutableStateOf(StateManager.isTermuxX11Installed(context)) }
+                            val termuxProgress = remember { mutableStateOf(0f) }
+                            val x11Progress = remember { mutableStateOf(0f) }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                // Termux
+                                Column(modifier = Modifier.weight(1f)) {
+                                    if (!termuxInstalled.value) {
+                                        Button(
+                                            onClick = {
+                                                android.widget.Toast.makeText(context, "Downloading Termux...", android.widget.Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    val url = "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk"
+                                                    installer.downloadAndInstall(url, "termux.apk") { progress, status ->
+                                                        termuxProgress.value = progress
+                                                    }
+                                                    termuxProgress.value = 0f
+                                                    refreshKey.value++
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GlassBorder),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Install Termux", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                                        }
+                                        if (termuxProgress.value > 0f) {
+                                            LinearProgressIndicator(progress = { termuxProgress.value }, modifier = Modifier.fillMaxWidth().height(4.dp), color = FluxAccentCyan)
+                                        }
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF50fa7b), modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Termux ✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                Text(StateManager.getTermuxVersion(context), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // X11
+                                Column(modifier = Modifier.weight(1f)) {
+                                    if (!x11Installed.value) {
+                                        Button(
+                                            onClick = {
+                                                android.widget.Toast.makeText(context, "Downloading Termux:X11...", android.widget.Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    val url = "https://github.com/termux/termux-x11/releases/download/nightly/app-arm64-v8a-debug.apk"
+                                                    installer.downloadAndInstall(url, "termux-x11.apk") { progress, status ->
+                                                        x11Progress.value = progress
+                                                    }
+                                                    x11Progress.value = 0f
+                                                    refreshKey.value++
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GlassBorder),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Install X11", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                                        }
+                                        if (x11Progress.value > 0f) {
+                                            LinearProgressIndicator(progress = { x11Progress.value }, modifier = Modifier.fillMaxWidth().height(4.dp), color = FluxAccentCyan)
+                                        }
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF50fa7b), modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Termux:X11 ✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                Text(StateManager.getTermuxX11Version(context), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // CONNECTION FIX CARD
+                    GlassSettingCard(hazeState = hazeState) {
+                        Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                            Text(
+                                "Troubleshooting",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            Text("Fix Termux Connection", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Run this if distros fail to install or launch.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            val fixCommand = "mkdir -p ~/.termux && echo \"allow-external-apps = true\" >> ~/.termux/termux.properties && termux-reload-settings"
+                            
+                             Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF1E1E1E), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = fixCommand,
+                                    color = Color(0xFF50fa7b),
+                                    fontSize = 12.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Termux Fix", fixCommand)
+                                        clipboard.setPrimaryClip(clip)
+                                        val launchIntent = context.packageManager.getLaunchIntentForPackage("com.termux")
+                                        if (launchIntent != null) {
+                                            onStartActivity(launchIntent)
+                                            android.widget.Toast.makeText(context, "Copied! Opening Termux...", android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Copy & Open Termux", fontSize = 12.sp, color = Color.White)
+                                }
+                                
+                                Button(
+                                    onClick = {
+                                        StateManager.setConnectionFixed(context, true)
+                                        android.widget.Toast.makeText(context, "Marked as fixed", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = GlassBorder),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Mark Resolved", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+                    }
+
+                    Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 20.dp))
                     GlassSettingCard(hazeState = hazeState) {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
@@ -322,6 +575,263 @@ fun SettingsScreen(
                                 ) {
                                     Text("Reset All", fontSize = 12.sp, color = Color(0xFFFF6B6B))
                                 }
+                            }
+                        }
+                    }
+                    
+                    Divider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                    )
+
+                    // =====================================================================
+                    // TERMUX:X11 CONFIGURATION
+                    // =====================================================================
+                    GlassSettingCard(hazeState = hazeState) {
+                        Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Termux:X11 Configuration",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                IconButton(
+                                    onClick = { TermuxX11Preferences.openTermuxX11Preferences(context) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Open Termux:X11 Settings",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Display Settings
+                            Text(
+                                "Display",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            // Display Scale Slider
+                            var displayScale by remember { mutableStateOf(TermuxX11Preferences.getDisplayScale(context).toFloat()) }
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Display Scale", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("${displayScale.toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                }
+                                Slider(
+                                    value = displayScale,
+                                    onValueChange = { displayScale = it },
+                                    onValueChangeFinished = {
+                                        TermuxX11Preferences.setDisplayScale(context, displayScale.toInt())
+                                    },
+                                    valueRange = 50f..300f,
+                                    steps = 24,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = MaterialTheme.colorScheme.primary,
+                                        activeTrackColor = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Fullscreen
+                            var fullscreen by remember { mutableStateOf(TermuxX11Preferences.getFullscreen(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Fullscreen", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Toggle immersive mode", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = fullscreen,
+                                    onCheckedChange = {
+                                        fullscreen = it
+                                        TermuxX11Preferences.setFullscreen(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Hide Display Cutout
+                            var hideCutout by remember { mutableStateOf(TermuxX11Preferences.getHideCutout(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Hide Display Cutout", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Hide notch/cutout area", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = hideCutout,
+                                    onCheckedChange = {
+                                        hideCutout = it
+                                        TermuxX11Preferences.setHideCutout(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Keep Screen On
+                            var keepScreenOn by remember { mutableStateOf(TermuxX11Preferences.getKeepScreenOn(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Keep Screen On", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Prevent screen timeout", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = keepScreenOn,
+                                    onCheckedChange = {
+                                        keepScreenOn = it
+                                        TermuxX11Preferences.setKeepScreenOn(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Input Settings
+                            Text(
+                                "Input",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            // Capture Pointer
+                            var capturePointer by remember { mutableStateOf(TermuxX11Preferences.getCapturePointer(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Capture External Pointer", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Intercept hardware pointer events", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = capturePointer,
+                                    onCheckedChange = {
+                                        capturePointer = it
+                                        TermuxX11Preferences.setCapturePointer(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Show Additional Keyboard
+                            var showAdditionalKbd by remember { mutableStateOf(TermuxX11Preferences.getShowAdditionalKeyboard(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Show Additional Keyboard", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Extra keyboard with special keys", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = showAdditionalKbd,
+                                    onCheckedChange = {
+                                        showAdditionalKbd = it
+                                        TermuxX11Preferences.setShowAdditionalKeyboard(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Show IME with External Keyboard
+                            var showIME by remember { mutableStateOf(TermuxX11Preferences.getShowIME(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Show IME with External Keyboard", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Software keyboard with hardware keyboard", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = showIME,
+                                    onCheckedChange = {
+                                        showIME = it
+                                        TermuxX11Preferences.setShowIME(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Prefer Scancodes
+                            var preferScancodes by remember { mutableStateOf(TermuxX11Preferences.getPreferScancodes(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Prefer Scancodes", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Let X server handle keyboard layout", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = preferScancodes,
+                                    onCheckedChange = {
+                                        preferScancodes = it
+                                        TermuxX11Preferences.setPreferScancodes(context, it)
+                                    }
+                                )
+                            }
+                            
+                            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                            
+                            // Scancode Workaround
+                            var scancodeWorkaround by remember { mutableStateOf(TermuxX11Preferences.getScancodeWorkaround(context)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Hardware Keyboard Scancodes Workaround", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Text("Fix scancodes on some devices", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                                Switch(
+                                    checked = scancodeWorkaround,
+                                    onCheckedChange = {
+                                        scancodeWorkaround = it
+                                        TermuxX11Preferences.setScancodeWorkaround(context, it)
+                                    }
+                                )
                             }
                         }
                     }

@@ -47,6 +47,7 @@ To run PC apps (Steam, Wine, classic games) on ARM phones.
 *   **Adreno (Turnip/Zink):** [github.com/K11MCH1/AdrenoToolsDrivers/releases](https://github.com/K11MCH1/AdrenoToolsDrivers/releases)
 *   **Mali (Bionic Vulkan):** [github.com/leegao/bionic-vulkan-wrapper/releases](https://github.com/leegao/bionic-vulkan-wrapper/releases)
 *   **Virgl Renderer:** [gitlab.freedesktop.org/virgl/virglrenderer](https://gitlab.freedesktop.org/virgl/virglrenderer)
+*   **Pipetto Crypto Vulkan Wrapper:** [pipetto-crypto-vulkan-wrapper-android_25.0.0-1_aarch64.deb](https://github.com/sabamdarif/termux-desktop/releases/download/pipetto-crypto-vulkan-wrapper-android/pipetto-crypto-vulkan-wrapper-android_25.0.0-1_aarch64.deb)
 *   **HW Acceleration Guide:** [enable-hw-acceleration](https://github.com/sabamdarif/termux-desktop/blob/main/enable-hw-acceleration)
 
 ### 5.3 Emulation (x86 -> ARM64)

@@ -60,89 +60,75 @@ fun DistroScreen(
         Spacer(modifier = Modifier.height(20.dp))
         
         // Distro List
-        DistroRepository.supportedDistros.forEach { distro ->
-             // Check if distro is installed
-            val distroInstalled = remember(refreshKey.value) {
-                mutableStateOf(
-                    StateManager.isDistroInstalled(context, distro.id)
+        val installedDistroIds = remember(refreshKey.value) {
+            StateManager.getInstalledDistros(context)
+        }
+        
+        val availableDistros = DistroRepository.supportedDistros.filter { 
+            !installedDistroIds.contains(it.id)
+        }
+        
+        if (availableDistros.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "All available distros are installed!",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
-            
-            DistroCard(
-                distro = distro,
-                hazeState = hazeState,
-                isInstalled = distroInstalled.value,
-                onInstall = {
-                    if (permissionState.status.isGranted) {
-                        // Load setup script
-                        val scriptManager = ScriptManager(context)
-                        val setupScript = scriptManager.getScriptContent("debian_setup.sh")
-                        
-                        // Generate Command
-                        val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript)
-                        
-                        // 1. Copy to Clipboard
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("FluxLinux Install", command)
-                        clipboard.setPrimaryClip(clip)
-                        
-                        // 2. Notify User
-                        android.widget.Toast.makeText(context, "Command Copied! Paste in Termux to Install.", android.widget.Toast.LENGTH_LONG).show()
-                        
-                        // 3. Open Termux
-                        val launchIntent = TermuxIntentFactory.buildOpenTermuxIntent(context)
-                        if (launchIntent != null) {
-                            onStartActivity(launchIntent)
-                            // Mark as installed (optimistic update)
-                            StateManager.setDistroInstalled(context, distro.id, true)
-                            distroInstalled.value = true
-                            refreshKey.value++
+        } else {
+            availableDistros.forEach { distro ->
+                DistroCard(
+                    distro = distro,
+                    hazeState = hazeState,
+                    isInstalled = false, // Always false here since we filtered
+                    onInstall = {
+                        if (permissionState.status.isGranted) {
+                            // Load setup script
+                            val scriptManager = ScriptManager(context)
+                            val setupScript = scriptManager.getScriptContent("debian_setup.sh")
+                            
+                            // Generate Command
+                            val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript)
+                            
+                            // 1. Copy to Clipboard
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("FluxLinux Install", command)
+                            clipboard.setPrimaryClip(clip)
+                            
+                            // 2. Notify User
+                            android.widget.Toast.makeText(context, "Command Copied! Paste in Termux to Install.", android.widget.Toast.LENGTH_LONG).show()
+                            
+                            // 3. Open Termux
+                            val launchIntent = TermuxIntentFactory.buildOpenTermuxIntent(context)
+                            if (launchIntent != null) {
+                                onStartActivity(launchIntent)
+                                // Mark as installed (optimistic update)
+                                StateManager.setDistroInstalled(context, distro.id, true)
+                                refreshKey.value++
+                            } else {
+                                android.widget.Toast.makeText(context, "Termux not found!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                         } else {
-                            android.widget.Toast.makeText(context, "Termux not found!", android.widget.Toast.LENGTH_SHORT).show()
+                            permissionState.launchPermissionRequest()
                         }
-                    } else {
-                        permissionState.launchPermissionRequest()
+                    },
+                    onUninstall = { /* Can't uninstall from here */ },
+                    onLaunchCli = { /* Can't launch from here */ },
+                    onLaunchGui = { /* Can't launch from here */ },
+                    onAlreadyInstalled = {
+                        // Manually mark as installed
+                        StateManager.setDistroInstalled(context, distro.id, true)
+                        refreshKey.value++
+                        android.widget.Toast.makeText(context, "Marked as Installed", android.widget.Toast.LENGTH_SHORT).show()
                     }
-                },
-                onUninstall = {
-                    if (permissionState.status.isGranted) {
-                        distroToUninstall.value = distro
-                    } else {
-                        permissionState.launchPermissionRequest()
-                    }
-                },
-                onLaunchCli = {
-                    if (permissionState.status.isGranted) {
-                        val intent = TermuxIntentFactory.buildLaunchCliIntent(distro.id)
-                        try {
-                            onStartService(intent)
-                        } catch (e: Exception) {
-                            android.util.Log.e("FluxLinux", "Launch CLI failed", e)
-                        }
-                    } else {
-                        permissionState.launchPermissionRequest()
-                    }
-                },
-                onLaunchGui = {
-                    if (permissionState.status.isGranted) {
-                        val intent = TermuxIntentFactory.buildLaunchGuiIntent(distro.id)
-                        try {
-                            onStartService(intent)
-                        } catch (e: Exception) {
-                            android.util.Log.e("FluxLinux", "Launch GUI failed", e)
-                        }
-                    } else {
-                        permissionState.launchPermissionRequest()
-                    }
-                },
-                onAlreadyInstalled = {
-                    // Manually mark as installed
-                    StateManager.setDistroInstalled(context, distro.id, true)
-                    distroInstalled.value = true
-                    refreshKey.value++
-                    android.widget.Toast.makeText(context, "Marked as Installed", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            )
+                )
+            }
         }
         
         Spacer(modifier = Modifier.height(100.dp)) // Spacing for Bottom Nav
