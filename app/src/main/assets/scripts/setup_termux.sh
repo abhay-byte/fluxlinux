@@ -59,12 +59,20 @@ sleep 3
 
 # Launch Termux X11 main activity (CRITICAL for display)
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity > /dev/null 2>&1
-sleep 1
+sleep 2
 
-# Apply stored X11 preferences if they exist
+# Apply stored X11 preferences (Retro-Loop Strategy)
+# We attempt to apply preferences multiple times in the background
+# This ensures that we catch the X11 Activity whenever it becomes ready
 if [ -f "$HOME/.fluxlinux/x11_preferences.sh" ]; then
-    echo "Applying X11 Preferences..."
-    bash "$HOME/.fluxlinux/x11_preferences.sh"
+    echo "Starting X11 Preference Syncer..."
+    (
+        for i in {1..5}; do
+            sleep 1
+            echo "Attempt $i: Applying Preferences..."
+            bash "$HOME/.fluxlinux/x11_preferences.sh" >/dev/null 2>&1
+        done
+    ) &
 fi
 
 # Login in PRoot Environment with proper environment setup

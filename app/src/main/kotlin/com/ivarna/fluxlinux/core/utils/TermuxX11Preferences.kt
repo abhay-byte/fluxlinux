@@ -134,7 +134,6 @@ object TermuxX11Preferences {
             // We use 'termux-x11-preference' tool which comes with the package
             val prefCommand = buildString {
                 append("termux-x11-preference ")
-                append("-s ") // Silent mode if available, or just key values
                 append("\"fullscreen\"=\"${prefs.getBoolean(KEY_FULLSCREEN, true)}\" ")
                 append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\" ")
                 append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\" ")
@@ -151,10 +150,7 @@ object TermuxX11Preferences {
                 # Auto-generated Termux:X11 preferences
                 # Applied by FluxLinux
                 
-                # Check if Termux:X11 is running before applying
-                if pgrep -f "termux.x11" > /dev/null; then
-                    $prefCommand
-                fi
+                $prefCommand
             """.trimIndent()
             
             // Write to file using cat
