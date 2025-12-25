@@ -19,10 +19,12 @@ import dev.chrisbanes.haze.haze
 
 @Composable
 fun GlassScaffold(
+    hazeState: HazeState,
+    topBar: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    content: @Composable (HazeState) -> Unit
+    content: @Composable () -> Unit
 ) {
-    val hazeState = androidx.compose.runtime.remember { HazeState() }
+    // val hazeState = androidx.compose.runtime.remember { HazeState() } // Lifted up
     
     Box(
         modifier = Modifier
@@ -39,10 +41,11 @@ fun GlassScaffold(
         // Content layer - no blur here, components handle their own
         Scaffold(
             containerColor = Color.Transparent,
+            topBar = topBar,
             bottomBar = bottomBar,
             content = { paddingValues ->
                 Box(modifier = Modifier.padding(paddingValues)) {
-                    content(hazeState)
+                    content()
                 }
             }
         )

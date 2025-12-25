@@ -44,7 +44,6 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     permissionState: PermissionState,
     hazeState: HazeState,
-    onNavigateToSettings: () -> Unit,
     onStartService: (android.content.Intent) -> Unit,
     onStartActivity: (android.content.Intent) -> Unit
 ) {
@@ -65,49 +64,6 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        
-    // Header with Settings Icon
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = com.ivarna.fluxlinux.R.drawable.ic_logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "FluxLinux",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (StateManager.isTermuxInstalled(LocalContext.current)) {
-                   Text(
-                       text = StateManager.getPackageSize(LocalContext.current, "com.termux"),
-                       style = MaterialTheme.typography.labelSmall,
-                       color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                       modifier = Modifier.padding(end = 8.dp)
-                   )
-                }
-                
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            }
-        }
         
         Spacer(modifier = Modifier.height(24.dp))
         

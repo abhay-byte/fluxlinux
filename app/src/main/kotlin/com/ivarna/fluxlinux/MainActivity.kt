@@ -3,22 +3,31 @@ package com.ivarna.fluxlinux
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberPermissionState
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import com.ivarna.fluxlinux.ui.components.BottomTab
 import com.ivarna.fluxlinux.ui.components.GlassBottomNavigation
-import androidx.compose.ui.platform.LocalContext
 import com.ivarna.fluxlinux.ui.components.GlassScaffold
 import com.ivarna.fluxlinux.ui.theme.FluxLinuxTheme
+import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.core.utils.ThemePreferences
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 
 // Screen navigation enum
 enum class Screen {
@@ -31,19 +40,19 @@ enum class Screen {
 }
 
 class MainActivity : ComponentActivity() {
-    @OptIn(ExperimentalPermissionsApi::class)
+    @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             // Watch Theme Preference
             val context = LocalContext.current
-            val themePrefs = remember { com.ivarna.fluxlinux.core.utils.ThemePreferences(context) }
+            val themePrefs = remember { ThemePreferences(context) }
             
             // Lift state up
             var currentThemeMode by remember { mutableStateOf(themePrefs.getThemeMode()) }
 
             FluxLinuxTheme(themeMode = currentThemeMode) {
-                val onboardingComplete = com.ivarna.fluxlinux.core.utils.StateManager.isOnboardingComplete(this@MainActivity)
+                val onboardingComplete = StateManager.isOnboardingComplete(this@MainActivity)
                 
                 // Permission State (Lifted for Settings and Home access)
                 val permissionState = rememberPermissionState(
@@ -69,7 +78,7 @@ class MainActivity : ComponentActivity() {
                 @Composable
                 fun MainScreenContent(
                     tab: BottomTab,
-                    hazeState: dev.chrisbanes.haze.HazeState,
+                    hazeState: HazeState,
                     onNavigateToSettings: () -> Unit
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -78,7 +87,6 @@ class MainActivity : ComponentActivity() {
                                 com.ivarna.fluxlinux.ui.screens.HomeScreen(
                                     permissionState = permissionState,
                                     hazeState = hazeState,
-                                    onNavigateToSettings = onNavigateToSettings,
                                     onStartService = onStartServiceStub,
                                     onStartActivity = onStartActivityStub
                                 )
@@ -101,6 +109,69 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+
+                // Helper for Top Bar
+                @Composable
+                fun TopBar(
+                    hazeState: HazeState,
+                    onSettingsClick: () -> Unit
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .hazeChild(
+                                state = hazeState,
+                                style = HazeStyle(
+                                    backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+                                    blurRadius = 20.dp,
+                                    tint = null
+                                )
+                            )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .windowInsetsPadding(WindowInsets.statusBars),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_logo),
+                                    contentDescription = "Logo",
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "FluxLinux",
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (StateManager.isTermuxInstalled(LocalContext.current)) {
+                                   Text(
+                                       text = StateManager.getPackageSize(LocalContext.current, "com.termux"),
+                                       style = MaterialTheme.typography.labelSmall,
+                                       color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                       modifier = Modifier.padding(end = 8.dp)
+                                   )
+                                }
+                                
+                                IconButton(onClick = onSettingsClick) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // Show appropriate screen based on state
                 when (currentScreen) {
@@ -113,14 +184,23 @@ class MainActivity : ComponentActivity() {
                         } else {
                             com.ivarna.fluxlinux.ui.screens.PrerequisitesScreen(
                                 onComplete = {
-                                    com.ivarna.fluxlinux.core.utils.StateManager.setOnboardingComplete(this@MainActivity, true)
+                                    StateManager.setOnboardingComplete(this@MainActivity, true)
                                     currentScreen = Screen.HOME
                                 }
                             )
                         }
                     }
                     Screen.HOME -> {
-                        GlassScaffold { hazeState ->
+                        val hazeState = remember { HazeState() }
+                        GlassScaffold(
+                            hazeState = hazeState,
+                            topBar = {
+                                TopBar(
+                                    hazeState = hazeState,
+                                    onSettingsClick = { currentScreen = Screen.SETTINGS }
+                                )
+                            }
+                        ) {
                             MainScreenContent(
                                 tab = currentTab,
                                 hazeState = hazeState,
@@ -135,7 +215,7 @@ class MainActivity : ComponentActivity() {
                             onStartService = onStartServiceStub,
                             onStartActivity = onStartActivityStub,
                             onNavigateToOnboarding = {
-                                com.ivarna.fluxlinux.core.utils.StateManager.setOnboardingComplete(this@MainActivity, false)
+                                StateManager.setOnboardingComplete(this@MainActivity, false)
                                 currentScreen = Screen.ONBOARDING
                             },
                             onNavigateToTroubleshooting = { currentScreen = Screen.TROUBLESHOOTING },
