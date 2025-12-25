@@ -20,38 +20,32 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             FluxLinuxTheme {
-                // Navigation State
-                val onboardingComplete = remember {
-                    mutableStateOf(
-                        com.fluxlinux.app.core.utils.StateManager.isOnboardingComplete(this@MainActivity)
-                    )
-                }
-                
-                val prerequisitesComplete = remember {
-                    mutableStateOf(
-                        com.fluxlinux.app.core.utils.StateManager.isTermuxInitialized(this@MainActivity) ||
-                        com.fluxlinux.app.core.utils.StateManager.isOnboardingComplete(this@MainActivity)
-                    )
-                }
+                // Check if onboarding has been completed (persisted state)
+                val onboardingComplete = com.fluxlinux.app.core.utils.StateManager.isOnboardingComplete(this@MainActivity)
                 
                 // Show appropriate screen based on state
                 when {
-                    !onboardingComplete.value -> {
-                        // Show Onboarding
-                        com.fluxlinux.app.ui.screens.OnboardingScreen(
-                            onGetStarted = {
-                                onboardingComplete.value = true
-                            }
-                        )
-                    }
-                    onboardingComplete.value && !prerequisitesComplete.value -> {
-                        // Show Prerequisites
-                        com.fluxlinux.app.ui.screens.PrerequisitesScreen(
-                            onComplete = {
-                                com.fluxlinux.app.core.utils.StateManager.setOnboardingComplete(this@MainActivity, true)
-                                prerequisitesComplete.value = true
-                            }
-                        )
+                    !onboardingComplete -> {
+                        // Show Onboarding → Prerequisites flow
+                        val showPrerequisites = remember { mutableStateOf(false) }
+                        
+                        if (!showPrerequisites.value) {
+                            // Show Onboarding
+                            com.fluxlinux.app.ui.screens.OnboardingScreen(
+                                onGetStarted = {
+                                    showPrerequisites.value = true
+                                }
+                            )
+                        } else {
+                            // Show Prerequisites
+                            com.fluxlinux.app.ui.screens.PrerequisitesScreen(
+                                onComplete = {
+                                    // Mark onboarding as complete and recreate to show home
+                                    com.fluxlinux.app.core.utils.StateManager.setOnboardingComplete(this@MainActivity, true)
+                                    recreate()
+                                }
+                            )
+                        }
                     }
                     else -> {
                         // Show Home Screen
