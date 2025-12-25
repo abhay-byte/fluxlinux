@@ -98,4 +98,33 @@ object StateManager {
         val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("tweaks_applied", applied).apply()
     }
+    
+    /**
+     * Check if a distro is installed
+     */
+    fun isDistroInstalled(context: Context, distroId: String): Boolean {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        return prefs.getBoolean("distro_${distroId}_installed", false)
+    }
+    
+    /**
+     * Mark a distro as installed
+     */
+    fun setDistroInstalled(context: Context, distroId: String, installed: Boolean) {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("distro_${distroId}_installed", installed).apply()
+        android.util.Log.d("StateManager", "Distro $distroId installation status set to: $installed")
+    }
+    
+    /**
+     * Get all installed distros
+     */
+    fun getInstalledDistros(context: Context): Set<String> {
+        val prefs = context.getSharedPreferences("fluxlinux_state", Context.MODE_PRIVATE)
+        return prefs.all.keys
+            .filter { it.startsWith("distro_") && it.endsWith("_installed") }
+            .filter { prefs.getBoolean(it, false) }
+            .map { it.removePrefix("distro_").removeSuffix("_installed") }
+            .toSet()
+    }
 }

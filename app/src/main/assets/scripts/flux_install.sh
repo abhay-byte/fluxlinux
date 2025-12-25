@@ -31,6 +31,9 @@ if [ $EXIT_CODE -eq 0 ]; then
         echo "FluxLinux: Configuration Complete!"
     fi
     
+    # Create marker file to track installation
+    touch ~/.fluxlinux_distro_${DISTRO}_installed
+    
     # Return to FluxLinux app
     echo "Returning to FluxLinux..."
     am start -n com.fluxlinux.app/.MainActivity

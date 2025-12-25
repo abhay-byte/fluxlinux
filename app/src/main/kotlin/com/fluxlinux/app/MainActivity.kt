@@ -313,8 +313,16 @@ class MainActivity : ComponentActivity() {
                             
                             // Distro List
                             com.fluxlinux.app.core.data.DistroRepository.supportedDistros.forEach { distro ->
+                                // Check if distro is installed
+                                val distroInstalled = androidx.compose.runtime.remember(refreshKey.value) {
+                                    androidx.compose.runtime.mutableStateOf(
+                                        com.fluxlinux.app.core.utils.StateManager.isDistroInstalled(this@MainActivity, distro.id)
+                                    )
+                                }
+                                
                                 com.fluxlinux.app.ui.components.DistroCard(
                                     distro = distro,
+                                    isInstalled = distroInstalled.value,
                                     onInstall = {
                                         if (permissionState.status.isGranted) {
                                             android.util.Log.d("FluxLinux", "Preparing Install Command for ${distro.name}")
