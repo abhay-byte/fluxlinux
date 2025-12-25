@@ -14,8 +14,13 @@ object StateManager {
     fun isPackageInstalled(context: Context, packageName: String): Boolean {
         return try {
             context.packageManager.getPackageInfo(packageName, 0)
+            android.util.Log.d("StateManager", "Package $packageName is installed")
             true
         } catch (e: PackageManager.NameNotFoundException) {
+            android.util.Log.d("StateManager", "Package $packageName not found: ${e.message}")
+            false
+        } catch (e: Exception) {
+            android.util.Log.e("StateManager", "Error checking package $packageName", e)
             false
         }
     }
@@ -43,7 +48,9 @@ object StateManager {
      * Check if Termux:X11 is installed
      */
     fun isTermuxX11Installed(context: Context): Boolean {
-        return isPackageInstalled(context, "com.termux.x11")
+        val result = isPackageInstalled(context, "com.termux.x11")
+        android.util.Log.d("StateManager", "isTermuxX11Installed: $result")
+        return result
     }
     
     /**

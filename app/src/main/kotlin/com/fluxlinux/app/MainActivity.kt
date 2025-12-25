@@ -153,19 +153,25 @@ class MainActivity : ComponentActivity() {
                             val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
                             val context = androidx.compose.ui.platform.LocalContext.current
                             val installer = androidx.compose.runtime.remember { com.fluxlinux.app.core.utils.ApkInstaller(context) }
+                            // Refresh key to trigger recomposition
+                            val refreshKey = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
+                            
+                            // Trigger initial refresh on mount
+                            androidx.compose.runtime.LaunchedEffect(Unit) {
+                                android.util.Log.d("FluxLinux", "Triggering initial refresh, refreshKey=${refreshKey.value}")
+                                refreshKey.value++
+                            }
                             
                             // Package Detection
-                            val termuxInstalled = androidx.compose.runtime.remember { 
-                                androidx.compose.runtime.mutableStateOf(com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context))
+                            val termuxInstalled = androidx.compose.runtime.remember(refreshKey.value) { 
+                                val installed = com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context)
+                                android.util.Log.d("FluxLinux", "Creating termuxInstalled state: $installed (refreshKey=${refreshKey.value})")
+                                androidx.compose.runtime.mutableStateOf(installed)
                             }
-                            val x11Installed = androidx.compose.runtime.remember { 
-                                androidx.compose.runtime.mutableStateOf(com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context))
-                            }
-                            
-                            // Refresh package detection on composition
-                            androidx.compose.runtime.LaunchedEffect(Unit) {
-                                termuxInstalled.value = com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context)
-                                x11Installed.value = com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context)
+                            val x11Installed = androidx.compose.runtime.remember(refreshKey.value) { 
+                                val installed = com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context)
+                                android.util.Log.d("FluxLinux", "Creating x11Installed state: $installed (refreshKey=${refreshKey.value})")
+                                androidx.compose.runtime.mutableStateOf(installed)
                             }
                             
                             // Download States
@@ -185,8 +191,8 @@ class MainActivity : ComponentActivity() {
                                                         android.util.Log.d("FluxLinux", status)
                                                     }
                                                     termuxProgress.value = 0f
-                                                    // Recheck installation status
-                                                    termuxInstalled.value = com.fluxlinux.app.core.utils.StateManager.isTermuxInstalled(context)
+                                                    // Trigger refresh
+                                                    refreshKey.value++
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
@@ -246,8 +252,8 @@ class MainActivity : ComponentActivity() {
                                                         android.util.Log.d("FluxLinux", status)
                                                     }
                                                     x11Progress.value = 0f
-                                                    // Recheck installation status
-                                                    x11Installed.value = com.fluxlinux.app.core.utils.StateManager.isTermuxX11Installed(context)
+                                                    // Trigger refresh
+                                                    refreshKey.value++
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = com.fluxlinux.app.ui.theme.GlassBorder),
