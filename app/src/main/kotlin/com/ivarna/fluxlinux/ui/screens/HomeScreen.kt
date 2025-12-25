@@ -162,7 +162,7 @@ fun HomeScreen(
 
 
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(100.dp))
     
     if (distroToUninstall.value != null) {
         val distro = distroToUninstall.value!!

@@ -32,17 +32,24 @@ fun GlassScaffold(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = topBar,
-            bottomBar = bottomBar,
             content = { paddingValues ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .haze(state = hazeState)
-                        .padding(paddingValues)
+                        .padding(top = paddingValues.calculateTopPadding()) // Only respect top padding from Scaffold
                 ) {
                     content()
                 }
             }
         )
+        
+        // Overlay Floating Bottom Bar
+        Box(
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.BottomCenter)
+        ) {
+            bottomBar()
+        }
     }
 }
