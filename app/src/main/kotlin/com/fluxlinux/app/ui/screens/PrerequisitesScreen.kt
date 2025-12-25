@@ -24,8 +24,12 @@ import androidx.compose.ui.unit.sp
 import com.fluxlinux.app.core.utils.ApkInstaller
 import com.fluxlinux.app.core.utils.StateManager
 import com.fluxlinux.app.ui.theme.*
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PrerequisitesScreen(
     onComplete: () -> Unit
@@ -47,6 +51,11 @@ fun PrerequisitesScreen(
     
     // Configuration state
     var configDone by remember { mutableStateOf(false) }
+    
+    // Permission state
+    val permissionState = rememberPermissionState(
+        permission = "com.termux.permission.RUN_COMMAND"
+    )
     
     Box(
         modifier = Modifier
@@ -119,6 +128,7 @@ fun PrerequisitesScreen(
                 )
                 
                 3 -> PermissionRequestStep(
+                    permissionState = permissionState,
                     onComplete = onComplete
                 )
             }
@@ -340,8 +350,10 @@ fun TermuxConfigurationStep(
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionRequestStep(
+    permissionState: com.google.accompanist.permissions.PermissionState,
     onComplete: () -> Unit
 ) {
     Column(
@@ -370,11 +382,59 @@ fun PermissionRequestStep(
             fontSize = 14.sp
         )
         
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Permission status
+        if (permissionState.status.isGranted) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF50fa7b).copy(alpha = 0.2f))
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Granted",
+                    tint = Color(0xFF50fa7b),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Permission Granted ✓",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        } else {
+            // Request Permission Button
+            Button(
+                onClick = {
+                    permissionState.launchPermissionRequest()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "Grant Permission",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        
         Spacer(modifier = Modifier.weight(1f))
         
         // Complete Button
         Button(
             onClick = onComplete,
+            enabled = permissionState.status.isGranted,
             colors = ButtonDefaults.buttonColors(containerColor = FluxAccentCyan),
             modifier = Modifier
                 .fillMaxWidth()
