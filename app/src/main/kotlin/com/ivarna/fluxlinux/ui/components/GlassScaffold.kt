@@ -24,27 +24,22 @@ fun GlassScaffold(
     bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
-    // val hazeState = androidx.compose.runtime.remember { HazeState() } // Lifted up
-    
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
     ) {
-        // Background layer - source for blur
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .haze(state = hazeState)
-        )
-        
-        // Content layer - no blur here, components handle their own
         Scaffold(
             containerColor = Color.Transparent,
             topBar = topBar,
             bottomBar = bottomBar,
             content = { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .haze(state = hazeState)
+                        .padding(paddingValues)
+                ) {
                     content()
                 }
             }
