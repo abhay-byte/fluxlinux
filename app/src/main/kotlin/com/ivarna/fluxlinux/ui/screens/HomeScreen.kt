@@ -121,7 +121,6 @@ fun HomeScreen(
             installedDistros.forEach { distro ->
                 com.ivarna.fluxlinux.ui.components.DistroCard(
                     distro = distro,
-                    hazeState = hazeState,
                     isInstalled = true,
                     onInstall = {}, // Won't be clicked
                     onUninstall = {

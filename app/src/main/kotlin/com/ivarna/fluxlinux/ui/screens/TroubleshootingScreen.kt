@@ -72,7 +72,7 @@ fun TroubleshootingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(issues) { issue ->
-                    ExpandableIssueCard(issue, hazeState)
+                    ExpandableIssueCard(issue)
                 }
                 item { Spacer(modifier = Modifier.height(32.dp)) }
             }
@@ -81,11 +81,10 @@ fun TroubleshootingScreen(
 }
 
 @Composable
-fun ExpandableIssueCard(issue: TroubleshootingItem, hazeState: HazeState) {
+fun ExpandableIssueCard(issue: TroubleshootingItem) {
     var expanded by remember { mutableStateOf(false) }
 
     GlassSettingCard(
-        hazeState = hazeState, 
         onClick = { expanded = !expanded }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

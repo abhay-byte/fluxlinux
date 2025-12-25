@@ -155,7 +155,7 @@ fun SettingsScreen(
                         }
                     }
                     
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
                                 "Environment Setup",
@@ -227,7 +227,7 @@ fun SettingsScreen(
                     }
 
                     // PREREQUISITES CARD
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                          Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
                                 "Prerequisites",
@@ -318,7 +318,7 @@ fun SettingsScreen(
                     }
 
                     // CONNECTION FIX CARD
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
                                 "Troubleshooting",
@@ -384,7 +384,7 @@ fun SettingsScreen(
                     }
 
                     Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 20.dp))
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
                                 "General Settings",
@@ -567,7 +567,7 @@ fun SettingsScreen(
                     // =====================================================================
                     // 2. STORAGE MANAGEMENT
                     // =====================================================================
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                              Text(
                                 "Storage Management",
@@ -606,7 +606,7 @@ fun SettingsScreen(
                     // =====================================================================
                     // TERMUX:X11 CONFIGURATION
                     // =====================================================================
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -863,7 +863,7 @@ fun SettingsScreen(
                     // =====================================================================
                     // 2. APP VERSION CARD
                     // =====================================================================
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                          Column(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -893,7 +893,7 @@ fun SettingsScreen(
                     // =====================================================================
                     // 3. SPECIAL THANKS
                     // =====================================================================
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text(
                                 "Special Thanks",
@@ -928,7 +928,7 @@ fun SettingsScreen(
                     // =====================================================================
                     // 4. MY CARDS (Profile + Socials)
                     // =====================================================================
-                    GlassSettingCard(hazeState = hazeState, onClick = { openUrl(context, "https://github.com/abhay-byte") }) {
+                    GlassSettingCard(onClick = { openUrl(context, "https://github.com/abhay-byte") }) {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
@@ -958,7 +958,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    GlassSettingCard(hazeState = hazeState) {
+                    GlassSettingCard {
                         Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
                             Text("Connect With Me", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 12.dp))
                             
@@ -987,7 +987,6 @@ fun SettingsScreen(
                     // 5. STAR THIS REPO
                     // =====================================================================
                     GlassSettingCard(
-                        hazeState = hazeState,
                         onClick = { openUrl(context, "https://github.com/abhay-byte/FluxLinux") }
                     ) {
                         Row(

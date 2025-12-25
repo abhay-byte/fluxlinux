@@ -24,17 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.ui.theme.GlassBorder
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.hazeChild
 
 // Compact Distro Card for Coming Soon distros
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun CompactDistroCard(
-    distro: Distro,
-    hazeState: HazeState
+    distro: Distro
 ) {
     Box(
         modifier = Modifier

@@ -32,26 +32,20 @@ import com.ivarna.fluxlinux.ui.theme.GlassBorder
 import com.ivarna.fluxlinux.ui.theme.GlassWhiteLow
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.remember
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeChild
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.materials.HazeMaterials
-import dev.chrisbanes.haze.HazeStyle
 
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun DistroCard(
     distro: Distro,
-    hazeState: HazeState,
     isInstalled: Boolean = false,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
     onLaunchCli: () -> Unit,
     onLaunchGui: () -> Unit,
-    onAlreadyInstalled: () -> Unit
+    onAlreadyInstalled: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
@@ -256,14 +250,12 @@ fun DistroCard(
         }
     }
 }
-@OptIn(ExperimentalHazeMaterialsApi::class)
+
 @Composable
 fun GlassSettingCard(
     modifier: Modifier = Modifier,
     delayMillis: Int = 0,
     onClick: (() -> Unit)? = null,
-    // Add hazeState parameter to receive shared state
-    hazeState: HazeState = remember { HazeState() },
     content: @Composable () -> Unit
 ) {
     val shape = RoundedCornerShape(24.dp)
@@ -278,15 +270,6 @@ fun GlassSettingCard(
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             )
-            /*.hazeChild(
-                state = hazeState,
-                style = HazeStyle(
-                    backgroundColor = Color(0xFF1E1E1E).copy(alpha = 0.4f), // Darker safe glass
-                    tint = null,
-                    blurRadius = 15.dp, // Slightly reduced blur for stability
-                    noiseFactor = 0.05f
-                )
-            )*/
             .border(
                 1.dp,
                 androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),

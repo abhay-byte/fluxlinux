@@ -88,14 +88,12 @@ fun DistroScreen(
                 if (distro.comingSoon) {
                     // Use compact card for coming soon distros
                     com.ivarna.fluxlinux.ui.components.CompactDistroCard(
-                        distro = distro,
-                        hazeState = hazeState
+                        distro = distro
                     )
                 } else {
                     // Use full card for available distros
                     com.ivarna.fluxlinux.ui.components.DistroCard(
                         distro = distro,
-                        hazeState = hazeState,
                         isInstalled = false,
                         onInstall = {
                             if (permissionState.status.isGranted) {
