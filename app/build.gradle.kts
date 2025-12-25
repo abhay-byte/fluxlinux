@@ -59,6 +59,7 @@ dependencies {
     
     // Glassmorphism FX
     implementation(libs.haze)
+    implementation(libs.haze.materials)
     
     // Permissions
     implementation(libs.accompanist.permissions)

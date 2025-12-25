@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                     }
                     else -> {
                         // Show Home Screen
-                        GlassScaffold {
+                        GlassScaffold { hazeState ->
                             Box(modifier = Modifier.fillMaxSize()) {
                                 val permissionState = rememberPermissionState(
                                     permission = "com.termux.permission.RUN_COMMAND"
@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
                                 
                                 com.fluxlinux.app.ui.screens.HomeScreen(
                                     permissionState = permissionState,
+                                    hazeState = hazeState,
                                     onStartService = { intent ->
                                         try {
                                             startService(intent)

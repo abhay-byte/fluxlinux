@@ -8,15 +8,24 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import com.fluxlinux.app.ui.theme.FluxBackgroundEnd
 import com.fluxlinux.app.ui.theme.FluxBackgroundMid
 import com.fluxlinux.app.ui.theme.FluxBackgroundStart
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun GlassScaffold(
     bottomBar: @Composable () -> Unit = {},
-    content: @Composable () -> Unit
+    content: @Composable (HazeState) -> Unit
 ) {
+    val hazeState = androidx.compose.runtime.remember { HazeState() }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -30,12 +39,27 @@ fun GlassScaffold(
                 )
             )
     ) {
+        // Background layer - source for blur
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .haze(state = hazeState)
+        )
+        
+        // Content layer with blur effect
         Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent, // Critical for gradient visibility
+            containerColor = Color.Transparent,
             bottomBar = bottomBar,
             content = { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) {
-                    content()
+                Box(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .hazeChild(
+                            state = hazeState,
+                            style = HazeMaterials.thin()
+                        )
+                ) {
+                    content(hazeState)
                 }
             }
         )
