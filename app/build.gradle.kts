@@ -62,6 +62,9 @@ dependencies {
     
     // Permissions
     implementation(libs.accompanist.permissions)
+    
+    // Networking
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

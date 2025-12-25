@@ -38,4 +38,20 @@ object TermuxIntentFactory {
     fun buildTestConnectionIntent(): Intent {
         return buildRunCommandIntent("echo 'FluxLinux: Connection Established!' && sleep 2")
     }
+
+    /**
+     * Installs a specific distro using proot-distro.
+     */
+    fun buildInstallIntent(distroId: String): Intent {
+        val command = "proot-distro install $distroId && echo 'FluxLinux: $distroId Installed!' && sleep 5"
+        return buildRunCommandIntent(command)
+    }
+
+    /**
+     * Launches a specific distro.
+     */
+    fun buildLaunchIntent(distroId: String): Intent {
+        val command = "proot-distro login $distroId"
+        return buildRunCommandIntent(command, runInBackground = false)
+    }
 }
