@@ -37,7 +37,7 @@ if [ -f "$HOME/.fluxlinux/x11_preferences.sh" ]; then
         for i in {1..5}; do
             sleep 1
             echo "Attempt $i: Applying Preferences..."
-            bash "$HOME/.fluxlinux/x11_preferences.sh" >/dev/null 2>&1
+            bash "$HOME/.fluxlinux/x11_preferences.sh"
         done
     ) &
 fi
