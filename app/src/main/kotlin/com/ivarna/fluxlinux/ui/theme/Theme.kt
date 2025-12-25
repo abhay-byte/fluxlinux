@@ -69,7 +69,13 @@ fun FluxLinuxTheme(
             WindowCompat.setDecorFitsSystemWindows(window, false)
             
             // Update status bar icons visibility
-            val isDark = colorScheme == DarkColorScheme
+            val isDark = when (themeMode) {
+                com.ivarna.fluxlinux.core.utils.ThemeMode.DARK -> true
+                com.ivarna.fluxlinux.core.utils.ThemeMode.LIGHT -> false
+                com.ivarna.fluxlinux.core.utils.ThemeMode.SYSTEM -> systemDark
+                else -> true // All custom themes (Gruvbox, Nord, etc.) are treated as Dark
+            }
+            
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
             WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
         }

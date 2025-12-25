@@ -56,6 +56,18 @@ fun OnboardingScreen(
                 .fillMaxSize()
                 .haze(state = hazeState)
         )
+
+        // Footer Image (Step 1 only)
+        if (currentStep == 0) {
+             Image(
+                painter = painterResource(id = R.drawable.onboarding_bg_1),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                contentScale = ContentScale.FillWidth
+            )
+        }
         
         Column(
             modifier = Modifier
@@ -163,30 +175,72 @@ fun OnboardingScreen(
                          
                          Spacer(modifier = Modifier.height(24.dp))
                          
-                         // Action Button
-                         Button(
-                             onClick = { 
-                                 try {
-                                     val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                                     intent.data = android.net.Uri.parse("package:com.termux")
-                                     context.startActivity(intent)
-                                 } catch (e: Exception) {
-                                     // Fallback if specific package intent fails
-                                      try {
-                                         val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                                         context.startActivity(intent)
-                                     } catch (e2: Exception) {
-                                         android.widget.Toast.makeText(context, "Could not open settings", android.widget.Toast.LENGTH_SHORT).show()
-                                     }
-                                 }
-                             },
-                             colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
-                             modifier = Modifier.fillMaxWidth()
+                         // Action Buttons
+                         Row(
+                             modifier = Modifier.fillMaxWidth(),
+                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                          ) {
-                             Text("Open Settings", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary)
+                             // Overlay Settings Button
+                             Button(
+                                 onClick = { 
+                                     try {
+                                         val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                         intent.data = android.net.Uri.parse("package:com.termux")
+                                         context.startActivity(intent)
+                                     } catch (e: Exception) {
+                                          try {
+                                             val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                             context.startActivity(intent)
+                                         } catch (e2: Exception) {
+                                             android.widget.Toast.makeText(context, "Could not open settings", android.widget.Toast.LENGTH_SHORT).show()
+                                         }
+                                     }
+                                 },
+                                 colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
+                                 modifier = Modifier.weight(1f),
+                                 shape = RoundedCornerShape(12.dp)
+                             ) {
+                                 Text("Enable Overlay", fontSize = 13.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, textAlign = TextAlign.Center, lineHeight = 16.sp)
+                             }
+                             
+                             // App Info Button
+                             Button(
+                                 onClick = { 
+                                     try {
+                                         val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                         intent.data = android.net.Uri.parse("package:com.termux")
+                                         context.startActivity(intent)
+                                     } catch (e: Exception) {
+                                         android.widget.Toast.makeText(context, "Could not open App Info", android.widget.Toast.LENGTH_SHORT).show()
+                                     }
+                                 },
+                                 colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondary),
+                                 modifier = Modifier.weight(1f),
+                                 shape = RoundedCornerShape(12.dp)
+                             ) {
+                                 Text("App Info", fontSize = 13.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSecondary, textAlign = TextAlign.Center, lineHeight = 16.sp)
+                             }
                          }
                          
-                         Spacer(modifier = Modifier.height(24.dp))
+                         Spacer(modifier = Modifier.height(16.dp))
+
+                         // Help Link
+                         androidx.compose.material3.TextButton(
+                             onClick = { 
+                                 val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://support.google.com/android/answer/12623953?hl=en"))
+                                 context.startActivity(browserIntent)
+                             }
+                         ) {
+                             Text(
+                                 "How to allow restricted settings on Android devices",
+                                 color = FluxAccentCyan,
+                                 fontSize = 13.sp,
+                                 textAlign = TextAlign.Center,
+                                 textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                             )
+                         }
+                         
+                         Spacer(modifier = Modifier.height(8.dp))
                          
                          // Mandatory Checkbox
                          var isChecked by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -216,7 +270,7 @@ fun OnboardingScreen(
                          
                          Spacer(modifier = Modifier.height(32.dp))
                          
-                         // Finish Button
+                         // Next Button
                          Button(
                             onClick = onGetStarted,
                             enabled = isChecked,
@@ -230,7 +284,7 @@ fun OnboardingScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                "Finish Setup",
+                                "Next",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
