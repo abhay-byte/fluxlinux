@@ -62,10 +62,10 @@ am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity > /dev/null 2>&1
 sleep 2
 
 # Apply stored X11 preferences
-# User verified preference keys, so direct application should work
-if [ -f "$HOME/.fluxlinux/x11_preferences.sh" ]; then
+# Using direct restore method: termux-x11-preference < file
+if [ -f "$HOME/.fluxlinux/x11_preferences.list" ]; then
     echo "Applying X11 Preferences..."
-    bash "$HOME/.fluxlinux/x11_preferences.sh"
+    termux-x11-preference < "$HOME/.fluxlinux/x11_preferences.list"
 fi
 
 # Login in PRoot Environment with proper environment setup

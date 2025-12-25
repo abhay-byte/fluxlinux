@@ -130,40 +130,23 @@ object TermuxX11Preferences {
         try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             
-            // Build preference command
-            // We use 'termux-x11-preference' tool which comes with the package
-            val prefCommand = buildString {
-                append("termux-x11-preference ")
-                append("\"displayScale\"=\"${prefs.getInt(KEY_DISPLAY_SCALE, 200)}\" ")
-                append("\"fullscreen\"=\"${prefs.getBoolean(KEY_FULLSCREEN, true)}\" ")
-                append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\" ")
-                append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\" ")
-                append("\"keepScreenOn\"=\"${prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)}\" ")
-                append("\"pointerCapture\"=\"${prefs.getBoolean(KEY_CAPTURE_POINTER, true)}\" ")
-                append("\"preferScancodes\"=\"${prefs.getBoolean(KEY_PREFER_SCANCODES, true)}\" ")
-                append("\"hardwareKbdScancodesWorkaround\"=\"${prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true)}\" ")
+            // Build preference content (New Line separated key=value)
+            // Format verified from 'termux-x11-preference list'
+            val prefsContent = buildString {
+                append("\"displayResolutionMode\"=\"scaled\"\n")
+                append("\"displayScale\"=\"${prefs.getInt(KEY_DISPLAY_SCALE, 200)}\"\n")
+                append("\"fullscreen\"=\"${prefs.getBoolean(KEY_FULLSCREEN, true)}\"\n")
+                append("\"showAdditionalKbd\"=\"${prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false)}\"\n")
+                append("\"hideCutout\"=\"${prefs.getBoolean(KEY_HIDE_CUTOUT, true)}\"\n")
+                append("\"keepScreenOn\"=\"${prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)}\"\n")
+                append("\"pointerCapture\"=\"${prefs.getBoolean(KEY_CAPTURE_POINTER, true)}\"\n")
+                append("\"preferScancodes\"=\"${prefs.getBoolean(KEY_PREFER_SCANCODES, true)}\"\n")
+                append("\"hardwareKbdScancodesWorkaround\"=\"${prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true)}\"\n")
             }
             
-            // Create the script content
-            val scriptContent = """
-                #!/bin/bash
-                # Auto-generated Termux:X11 preferences
-                # Applied by FluxLinux
-                
-                echo "Current Preferences (Before Apply):"
-                termux-x11-preference list
-                
-                echo "Applying Preferences:"
-                $prefCommand
-                
-                echo "Current Preferences (After Apply):"
-                termux-x11-preference list
-            """.trimIndent()
-            
             // Write to file using cat
-            // We escape the content properly for bash
-            val escapedContent = scriptContent.replace("$", "\\$")
-            val writeCmd = "mkdir -p \$HOME/.fluxlinux && cat << 'EOF_PREFS' > \$HOME/.fluxlinux/x11_preferences.sh\n$scriptContent\nEOF_PREFS\nchmod +x \$HOME/.fluxlinux/x11_preferences.sh"
+            // We write to x11_preferences.list
+            val writeCmd = "mkdir -p \$HOME/.fluxlinux && cat << 'EOF_PREFS' > \$HOME/.fluxlinux/x11_preferences.list\n$prefsContent\nEOF_PREFS"
             
             // Send command Intent
             // Force background execution to prevent Termux from stealing focus
