@@ -153,6 +153,7 @@ fun DistroScreen(
                         } else {
                             val scriptName = when (distro.configuration?.family) {
                                 com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"
+                                com.ivarna.fluxlinux.core.model.DistroFamily.ARCH -> "common/setup_arch_family.sh"
                                 else -> "debian/setup.sh"
                             }
                             scriptManager.getScriptContent(scriptName)

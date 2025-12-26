@@ -56,12 +56,12 @@ object DistroRepository {
             chrootSupported = true
         ),
         Distro(
-            id = "arch",
+            id = "archlinux",
             name = "Arch Linux",
             description = "A simple, lightweight Linux distribution.",
             color = Color(0xFF1793D1),
             iconRes = R.drawable.distro_arch,
-            comingSoon = true,
+            comingSoon = false,
             prootSupported = true,
             chrootSupported = true
         ),
