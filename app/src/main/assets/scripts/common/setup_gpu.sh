@@ -12,7 +12,7 @@ pkg update -y
 # mesa-zink: Zink driver
 # virglrenderer*: Virtualized rendering
 # vulkan-loader-android: Vulkan
-pkg install -y mesa-zink virglrenderer-mesa-zink vulkan-loader-android virglrenderer-android
+pkg install -y mesa-zink virglrenderer-mesa-zink virglrenderer-android
 
 echo "FluxLinux: GPU Dependencies Installed."
 echo "Use 'ha <command>' to launch with acceleration."
