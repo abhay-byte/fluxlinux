@@ -11,7 +11,7 @@ pkg update -y
 # 1. Install packages
 # mesa-zink: Zink driver
 # virglrenderer*: Virtualized rendering
-# vulkan-loader-android: Vulkan
+
 pkg install -y mesa-zink virglrenderer-mesa-zink virglrenderer-android
 
 echo "FluxLinux: GPU Dependencies Installed."
