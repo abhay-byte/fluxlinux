@@ -143,8 +143,8 @@ fun DistroScreen(
                         // 1. Get Setup Script
                         val scriptManager = ScriptManager(context)
                         val scriptName = when (distro.configuration?.family) {
-                            com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "setup_debian_family.sh"
-                            else -> "debian_setup.sh" // Fallback / Default
+                            com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"
+                            else -> "debian/setup.sh" // Fallback / Default
                         }
                         val setupScript = scriptManager.getScriptContent(scriptName)
                         

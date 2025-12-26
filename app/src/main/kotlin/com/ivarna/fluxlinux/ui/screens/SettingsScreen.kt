@@ -177,10 +177,33 @@ fun SettingsScreen(
                                 onClick = {
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
-                                        val setupScript = scriptManager.getScriptContent("setup_termux.sh")
-                                        // Force re-run by removing marker
-                                        val forceSetupScript = "rm -f \$HOME/.fluxlinux/setup_termux.done\n" + setupScript
-                                        val intent = TermuxIntentFactory.buildRunCommandIntent(forceSetupScript)
+                                        
+                                        // 1. Read Components
+                                        val setupScript = scriptManager.getScriptContent("common/setup_termux.sh")
+                                        val fluxInstallScript = scriptManager.getScriptContent("common/flux_install.sh")
+                                        val startGuiScript = scriptManager.getScriptContent("debian/start_gui.sh") // Default to Debian/Shared for now
+                                        
+                                        // 2. Build Composite Command
+                                        // We write helper scripts first, then run setup
+                                        val compositeCommand = buildString {
+                                            // Write flux_install.sh
+                                            append("cat << 'EOF_FLUX' > \$HOME/flux_install.sh\n")
+                                            append(fluxInstallScript)
+                                            append("\nEOF_FLUX\n")
+                                            append("chmod +x \$HOME/flux_install.sh\n\n")
+                                            
+                                            // Write start_gui.sh
+                                            append("cat << 'EOF_GUI' > \$HOME/start_gui.sh\n")
+                                            append(startGuiScript)
+                                            append("\nEOF_GUI\n")
+                                            append("chmod +x \$HOME/start_gui.sh\n\n")
+                                            
+                                            // Run Setup (with force re-run logic)
+                                            append("rm -f \$HOME/.fluxlinux/setup_termux.done\n")
+                                            append(setupScript)
+                                        }
+                                        
+                                        val intent = TermuxIntentFactory.buildRunCommandIntent(compositeCommand)
                                         try {
                                             onStartService(intent)
                                             android.widget.Toast.makeText(context, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
@@ -223,7 +246,7 @@ fun SettingsScreen(
                                 onClick = {
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
-                                        val tweaksScript = scriptManager.getScriptContent("termux_tweaks.sh")
+                                        val tweaksScript = scriptManager.getScriptContent("common/termux_tweaks.sh")
                                         // Force re-run by removing marker
                                         val forceTweaksScript = "rm -f \$HOME/.fluxlinux/termux_tweaks.done\n" + tweaksScript
                                         // Tweaks script handles its own callback and marker now
