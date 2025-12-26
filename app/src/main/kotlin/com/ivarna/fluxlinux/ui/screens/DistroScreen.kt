@@ -160,8 +160,12 @@ fun DistroScreen(
                             scriptManager.getScriptContent(scriptName)
                         }
                         
+                        // 1b. Get Installer & GUI Scripts
+                        val installScript = scriptManager.getScriptContent("common/flux_install.sh")
+                        val guiScript = scriptManager.getScriptContent("common/start_gui.sh")
+                        
                         // 2. Generate Command
-                        val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript)
+                        val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript, installScript, guiScript)
                         
                         // 3. Copy to Clipboard
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

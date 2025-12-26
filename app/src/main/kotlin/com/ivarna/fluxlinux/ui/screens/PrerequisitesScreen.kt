@@ -810,10 +810,12 @@ fun EnvironmentSetupStep(
     val context = LocalContext.current
     val scriptManager = remember { ScriptManager(context) }
     
-    // State to track if scripts have been run logic (basic)
-    var setupInitiated by remember { mutableStateOf(false) }
+    // State to track if scripts have been run
+    // Initialize from StateManager to handle screen rotation/re-entry
+    var setupInitiated by remember { mutableStateOf(StateManager.getScriptStatus(context, "setup_termux")) }
     var isSetupLoading by remember { mutableStateOf(false) }
     var tweaksInitiated by remember { mutableStateOf(false) }
+    var tweaksCompleted by remember { mutableStateOf(StateManager.getScriptStatus(context, "termux_tweaks")) }
     
     // Poll for setup completion
     LaunchedEffect(isSetupLoading) {
@@ -831,14 +833,11 @@ fun EnvironmentSetupStep(
 
     // Poll for tweaks completion
     LaunchedEffect(tweaksInitiated) {
-        if (tweaksInitiated) {
-            while (tweaksInitiated) {
+        if (tweaksInitiated && !tweaksCompleted) {
+            while (!tweaksCompleted) {
                 delay(2000) // Check every 2 seconds
                 if (StateManager.getScriptStatus(context, "termux_tweaks")) {
-                     // Just trigger recomposition, button will handle UI based on StateManager checks or we update a local state
-                     // Ideally we should switch a local state to 'completed'
-                     // But let's just break loop. The UI below relies on 'tweaksInitiated'. 
-                     // Let's rely on StateManager for the 'completed' UI state.
+                     tweaksCompleted = true
                      break
                 }
             }
@@ -932,11 +931,11 @@ fun EnvironmentSetupStep(
                     Toast.makeText(context, "Failed to start service", Toast.LENGTH_SHORT).show()
                 }
             },
-            enabled = setupInitiated && !StateManager.getScriptStatus(context, "termux_tweaks"),
+            enabled = setupInitiated && !tweaksCompleted,
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta,
-                disabledContainerColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta.copy(alpha=0.5f),
-                disabledContentColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b) else TextWhite.copy(alpha = 0.5f)
+                containerColor = if (tweaksCompleted) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta,
+                disabledContainerColor = if (tweaksCompleted) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta.copy(alpha=0.5f),
+                disabledContentColor = if (tweaksCompleted) Color(0xFF50fa7b) else TextWhite.copy(alpha = 0.5f)
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -947,7 +946,7 @@ fun EnvironmentSetupStep(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                 if (StateManager.getScriptStatus(context, "termux_tweaks")) {
+                 if (tweaksCompleted) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

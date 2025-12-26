@@ -42,13 +42,31 @@ object TermuxIntentFactory {
     /**
      * Generates the install command string for manual execution.
      */
-    fun getInstallCommand(distroId: String, setupScript: String? = null): String {
+    fun getInstallCommand(distroId: String, setupScript: String? = null, installScriptContent: String, guiScriptContent: String): String {
+        // Enforce newline termination for safety
+        val safeInstallScript = if (!installScriptContent.endsWith("\n")) "$installScriptContent\n" else installScriptContent
+        val safeGuiScript = if (!guiScriptContent.endsWith("\n")) "$guiScriptContent\n" else guiScriptContent
+        
+        val installScriptB64 = android.util.Base64.encodeToString(safeInstallScript.toByteArray(), android.util.Base64.NO_WRAP)
+        val guiScriptB64 = android.util.Base64.encodeToString(safeGuiScript.toByteArray(), android.util.Base64.NO_WRAP)
+        
         val setupB64 = if (!setupScript.isNullOrEmpty()) {
             android.util.Base64.encodeToString(setupScript.toByteArray(), android.util.Base64.NO_WRAP)
         } else {
             "null"
         }
-        return "bash \$HOME/flux_install.sh $distroId \"$setupB64\""
+        
+        // Use Base64 decoding to write files. This avoids fragile 'cat << EOF' constructs in terminals
+        // and handles special characters safely.
+        return """
+            echo "$installScriptB64" | base64 -d > ${'$'}HOME/flux_install.sh
+            chmod +x ${'$'}HOME/flux_install.sh
+            
+            echo "$guiScriptB64" | base64 -d > ${'$'}HOME/start_gui.sh
+            chmod +x ${'$'}HOME/start_gui.sh
+            
+            bash ${'$'}HOME/flux_install.sh $distroId "$setupB64"
+        """.trimIndent()
     }
 
     /**

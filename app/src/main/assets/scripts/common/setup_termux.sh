@@ -32,7 +32,9 @@ echo "FluxLinux: Repairing package database..."
 dpkg --configure -a || true
 
 # 1. Update Packages
-pkg update -y && pkg upgrade -y
+# Use apt-get directly with options to keep old config files (Answer 'N' automatically)
+yes | pkg update -y
+yes | apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 
 # 2. Install Core Dependencies
 # proot-distro: For rootless containers
