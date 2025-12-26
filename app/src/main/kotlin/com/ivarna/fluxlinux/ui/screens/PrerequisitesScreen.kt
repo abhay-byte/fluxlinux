@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.utils.ApkInstaller
 import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.core.utils.RootUtils
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.ui.theme.*
@@ -51,7 +52,7 @@ fun PrerequisitesScreen(
     
     // Step tracking
     var currentStep by remember { mutableStateOf(1) }
-    val totalSteps = 6
+    val totalSteps = 7
     
     // Package states
     val termuxInstalled = remember { mutableStateOf(StateManager.isTermuxInstalled(context)) }
@@ -161,12 +162,16 @@ fun PrerequisitesScreen(
                 4 -> OverlayPermissionStep(
                     onContinue = { currentStep = 5 }
                 )
-                
-                5 -> EnvironmentSetupStep(
+
+                5 -> PhantomProcessStep(
                     onContinue = { currentStep = 6 }
                 )
                 
-                6 -> FinalInstructionsStep(
+                6 -> EnvironmentSetupStep(
+                    onContinue = { currentStep = 7 }
+                )
+                
+                7 -> FinalInstructionsStep(
                     onComplete = onComplete
                 )
             }
@@ -796,6 +801,207 @@ fun OverlayPermissionStep(
             Text(
                 "Next",
                 color = if (hasOverlayPermission || manualOverride) Color.Black else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun PhantomProcessStep(
+    onContinue: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    var rootAvailable by remember { mutableStateOf<Boolean?>(null) }
+    var fixApplied by remember { mutableStateOf(false) }
+    var checkingRoot by remember { mutableStateOf(false) }
+    
+    // Check root on init
+    LaunchedEffect(Unit) {
+        checkingRoot = true
+        kotlinx.coroutines.delay(500) // fake delay for UX
+        rootAvailable = RootUtils.isRootAvailable()
+        checkingRoot = false
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Step 5: Process Killer Fix",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Info Card
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "⚠️ Android 12+ Stability Issue",
+                    color = Color(0xFFFFB74D), // Orange
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Android 12 and higher kill background processes aggressively (Phantom Process Killer). This causes Termux to crash unexpectedly.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        if (checkingRoot) {
+            CircularProgressIndicator(color = FluxAccentCyan)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Checking for Root access...", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
+        } else if (fixApplied) {
+            // Success State
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF50fa7b).copy(alpha = 0.2f))
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Applied",
+                    tint = Color(0xFF50fa7b),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Fix Applied Successfully ✓",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        } else if (rootAvailable == true) {
+            // Root Available Action
+            Text(
+                "Root Access Detected ✅",
+                color = Color(0xFF50fa7b),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        val r1 = RootUtils.runRootCommand("/system/bin/device_config set_sync_disabled_for_tests persistent")
+                        val r2 = RootUtils.runRootCommand("/system/bin/device_config put activity_manager max_phantom_processes 2147483647")
+                        val r3 = RootUtils.runRootCommand("settings put global settings_enable_monitor_phantom_procs false")
+                        
+                        if (r1.isSuccess && r2.isSuccess && r3.isSuccess) {
+                           fixApplied = true 
+                        } else {
+                           Toast.makeText(context, "Failed to apply fix: ${r1.error}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                 shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Apply Fix (Grant Root)", color = TextWhite)
+            }
+        } else {
+            // No Root
+             Text(
+                "Root Access Not Detected ❌",
+                color = Color(0xFFFF6B6B),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "We cannot apply the fix automatically. Please run these commands from your PC via ADB:",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.7f),
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // ADB Commands Box
+            val commands = """
+                adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
+                adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
+                adb shell "settings put global settings_enable_monitor_phantom_procs false"
+            """.trimIndent()
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E1E1E))
+                    .border(1.dp, GlassBorder, RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+                    .clickable {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("ADB Commands", commands)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Commands copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+            ) {
+                Text(
+                    text = commands,
+                    color = Color(0xFF50fa7b),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 16.sp
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+             // Re-check Button
+             androidx.compose.material3.OutlinedButton(
+                 onClick = { 
+                     checkingRoot = true
+                     coroutineScope.launch {
+                         kotlinx.coroutines.delay(500)
+                         rootAvailable = RootUtils.isRootAvailable()
+                         checkingRoot = false
+                     }
+                 },
+                 modifier = Modifier.fillMaxWidth()
+             ) {
+                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                 Spacer(modifier = Modifier.width(8.dp))
+                 Text("Check Root Again")
+             }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Continue / Skip
+        Button(
+            onClick = onContinue,
+            // Always enabled, user can skip if they want/have to
+            enabled = true,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (fixApplied) FluxAccentCyan else androidx.compose.material3.MaterialTheme.colorScheme.secondary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                if (fixApplied) "Next" else "Skip (Use ADB instead)",
+                color = if (fixApplied) Color.Black else TextWhite,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
