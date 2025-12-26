@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.utils.ApkInstaller
 import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
+import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.ui.theme.*
 import com.ivarna.fluxlinux.ui.theme.TextWhite
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -35,6 +38,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.material.icons.filled.Refresh
 import android.widget.Toast
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -46,7 +51,7 @@ fun PrerequisitesScreen(
     
     // Step tracking
     var currentStep by remember { mutableStateOf(1) }
-    val totalSteps = 3
+    val totalSteps = 6
     
     // Package states
     val termuxInstalled = remember { mutableStateOf(StateManager.isTermuxInstalled(context)) }
@@ -92,6 +97,7 @@ fun PrerequisitesScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -149,6 +155,18 @@ fun PrerequisitesScreen(
                 
                 3 -> PermissionRequestStep(
                     permissionState = permissionState,
+                    onContinue = { currentStep = 4 }
+                )
+                
+                4 -> OverlayPermissionStep(
+                    onContinue = { currentStep = 5 }
+                )
+                
+                5 -> EnvironmentSetupStep(
+                    onContinue = { currentStep = 6 }
+                )
+                
+                6 -> FinalInstructionsStep(
                     onComplete = onComplete
                 )
             }
@@ -389,7 +407,7 @@ fun TermuxConfigurationStep(
 @Composable
 fun PermissionRequestStep(
     permissionState: com.google.accompanist.permissions.PermissionState,
-    onComplete: () -> Unit
+    onContinue: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -466,9 +484,9 @@ fun PermissionRequestStep(
         
         Spacer(modifier = Modifier.weight(1f))
         
-        // Complete Button
+        // Continue Button
         Button(
-            onClick = onComplete,
+            onClick = onContinue,
             enabled = permissionState.status.isGranted,
             colors = ButtonDefaults.buttonColors(containerColor = FluxAccentCyan),
             modifier = Modifier
@@ -477,7 +495,7 @@ fun PermissionRequestStep(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                "Complete Setup",
+                "Next",
                 color = Color.Black,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
@@ -577,6 +595,485 @@ fun StepIndicator(currentStep: Int, totalSteps: Int) {
             if (step < totalSteps) {
                 Spacer(modifier = Modifier.width(8.dp))
             }
+        }
+    }
+}
+
+@Composable
+fun OverlayPermissionStep(
+    onContinue: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    // Check overlay permission
+    var hasOverlayPermission by remember { 
+        mutableStateOf(android.provider.Settings.canDrawOverlays(context)) 
+    }
+    
+    // Manual override
+    var manualOverride by remember { mutableStateOf(false) }
+    
+    // Refresh permission status on resume
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasOverlayPermission = android.provider.Settings.canDrawOverlays(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Step 4: Display Overlay",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+         // Permission Info Card
+         androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(16.dp))
+         ) {
+             Column(modifier = Modifier.padding(20.dp)) {
+                 Text(
+                    "⚠️ Critical Permission",
+                    color = Color(0xFFFFB74D), // Warning Orange
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                 )
+                 Spacer(modifier = Modifier.height(8.dp))
+                 Text(
+                    "To display the Linux desktop (X11) on your screen, Termux needs the 'Display over other apps' permission.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                 )
+             }
+         }
+         
+         Spacer(modifier = Modifier.height(24.dp))
+         
+         if (hasOverlayPermission) {
+             // Success State
+             Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF50fa7b).copy(alpha = 0.2f))
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Granted",
+                    tint = Color(0xFF50fa7b),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Permission Granted ✓",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+         } else {
+             // Action Buttons
+             Row(
+                 modifier = Modifier.fillMaxWidth(),
+                 horizontalArrangement = Arrangement.spacedBy(12.dp)
+             ) {
+                 // Overlay Settings Button
+                 Button(
+                     onClick = { 
+                         try {
+                             val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                             intent.data = android.net.Uri.parse("package:com.termux")
+                             context.startActivity(intent)
+                         } catch (e: Exception) {
+                              try {
+                                 val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                 context.startActivity(intent)
+                             } catch (e2: Exception) {
+                                 Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                             }
+                         }
+                     },
+                     colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
+                     modifier = Modifier.weight(1f),
+                     shape = RoundedCornerShape(12.dp)
+                 ) {
+                     Text("Enable Overlay", fontSize = 13.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, textAlign = TextAlign.Center, lineHeight = 16.sp)
+                 }
+                 
+                 // App Info Button
+                 Button(
+                     onClick = { 
+                         try {
+                             val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                             intent.data = android.net.Uri.parse("package:com.termux")
+                             context.startActivity(intent)
+                         } catch (e: Exception) {
+                             Toast.makeText(context, "Could not open App Info", Toast.LENGTH_SHORT).show()
+                         }
+                     },
+                     colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondary),
+                     modifier = Modifier.weight(1f),
+                     shape = RoundedCornerShape(12.dp)
+                 ) {
+                     Text("App Info", fontSize = 13.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSecondary, textAlign = TextAlign.Center, lineHeight = 16.sp)
+                 }
+             }
+             
+             Spacer(modifier = Modifier.height(16.dp))
+
+             // Help Link
+             androidx.compose.material3.TextButton(
+                 onClick = { 
+                     val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://support.google.com/android/answer/12623953?hl=en"))
+                     context.startActivity(browserIntent)
+                 }
+             ) {
+                 Text(
+                     "How to allow restricted settings on Android devices",
+                     color = FluxAccentCyan,
+                     fontSize = 13.sp,
+                     textAlign = TextAlign.Center,
+                     textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                 )
+             }
+             
+             Spacer(modifier = Modifier.height(16.dp))
+             
+             // Manual Override Checkbox
+             Row(
+                 verticalAlignment = Alignment.CenterVertically,
+                 modifier = Modifier
+                     .fillMaxWidth()
+                     .clickable { manualOverride = !manualOverride }
+                     .padding(8.dp)
+             ) {
+                 Checkbox(
+                     checked = manualOverride,
+                     onCheckedChange = { manualOverride = it },
+                     colors = CheckboxDefaults.colors(
+                         checkedColor = FluxAccentCyan,
+                         uncheckedColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)
+                     )
+                 )
+                 Text(
+                     "I have enabled this manually",
+                     fontSize = 14.sp,
+                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                     modifier = Modifier.padding(start = 8.dp)
+                 )
+             }
+         }
+         
+         Spacer(modifier = Modifier.weight(1f))
+         
+         // Continue Button
+         Button(
+            onClick = onContinue,
+            enabled = hasOverlayPermission || manualOverride,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = FluxAccentCyan,
+                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                "Next",
+                color = if (hasOverlayPermission || manualOverride) Color.Black else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun EnvironmentSetupStep(
+    onContinue: () -> Unit
+) {
+    val context = LocalContext.current
+    val scriptManager = remember { ScriptManager(context) }
+    
+    // State to track if scripts have been run logic (basic)
+    var setupInitiated by remember { mutableStateOf(false) }
+    var isSetupLoading by remember { mutableStateOf(false) }
+    var tweaksInitiated by remember { mutableStateOf(false) }
+    
+    // Poll for setup completion
+    LaunchedEffect(isSetupLoading) {
+        if (isSetupLoading) {
+            while (isSetupLoading) {
+                delay(2000) // Check every 2 seconds
+                if (StateManager.getScriptStatus(context, "setup_termux")) {
+                    isSetupLoading = false
+                    setupInitiated = true
+                    Toast.makeText(context, "Environment Initialized Successfully!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // Poll for tweaks completion
+    LaunchedEffect(tweaksInitiated) {
+        if (tweaksInitiated) {
+            while (tweaksInitiated) {
+                delay(2000) // Check every 2 seconds
+                if (StateManager.getScriptStatus(context, "termux_tweaks")) {
+                     // Just trigger recomposition, button will handle UI based on StateManager checks or we update a local state
+                     // Ideally we should switch a local state to 'completed'
+                     // But let's just break loop. The UI below relies on 'tweaksInitiated'. 
+                     // Let's rely on StateManager for the 'completed' UI state.
+                     break
+                }
+            }
+        }
+    }
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Step 5: Environment Setup",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Setup Button (Background)
+        Button(
+            onClick = {
+                val script = scriptManager.getScriptContent("common/setup_termux.sh")
+                // Reset status first
+                StateManager.setScriptStatus(context, "setup_termux", false)
+                
+                val intent = TermuxIntentFactory.buildRunCommandIntent(script, runInBackground = false)
+                try {
+                    context.startService(intent)
+                    isSetupLoading = true
+                    Toast.makeText(context, "Opening Termux...", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to start service", Toast.LENGTH_SHORT).show()
+                }
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (setupInitiated) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentCyan,
+                contentColor = if (setupInitiated) Color(0xFF50fa7b) else Color.Black
+            ),
+            enabled = !isSetupLoading && !setupInitiated,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (isSetupLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "Initializing... (Takes a few mins)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else if (setupInitiated) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Environment Initialized",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Text(
+                        "Initialize Environment (Setup)",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Tweaks Button (Foreground)
+        Button(
+            onClick = {
+                val script = scriptManager.getScriptContent("common/termux_tweaks.sh")
+                val intent = TermuxIntentFactory.buildRunCommandIntent(script, runInBackground = false)
+                try {
+                    context.startService(intent)
+                    tweaksInitiated = true
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to start service", Toast.LENGTH_SHORT).show()
+                }
+            },
+            enabled = setupInitiated && !StateManager.getScriptStatus(context, "termux_tweaks"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta,
+                disabledContainerColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b).copy(alpha=0.2f) else FluxAccentMagenta.copy(alpha=0.5f),
+                disabledContentColor = if (StateManager.getScriptStatus(context, "termux_tweaks")) Color(0xFF50fa7b) else TextWhite.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                 if (StateManager.getScriptStatus(context, "termux_tweaks")) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Tweaks Applied",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "Apply Termux Tweaks",
+                            color = TextWhite,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (tweaksInitiated) {
+                             Text(
+                                "(Opened in Termux)",
+                                color = TextWhite.copy(alpha=0.7f),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Continue Button
+        Button(
+            onClick = onContinue,
+            // Logic: Only enable if both are initiated? Or just allow user to skip? 
+            // User request usually implies they want to run it. Let's allow skip but maybe warn? 
+            // For now, let's enable it always to not block if they already did it.
+            enabled = true, 
+            colors = ButtonDefaults.buttonColors(containerColor = GlassBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                "Next",
+                color = TextWhite,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun FinalInstructionsStep(
+    onComplete: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Step 6: Almost Done!",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Warning Card
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = Color(0xFFff5555).copy(alpha = 0.2f)
+            ),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFff5555), RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        "Important Note",
+                        color = Color(0xFFff5555),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "FluxLinux runs on top of Termux.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "You must keep Termux running in the background. Do not swipe close Termux from your recent apps!",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Complete Button
+        Button(
+            onClick = onComplete,
+            colors = ButtonDefaults.buttonColors(containerColor = FluxAccentCyan),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                "Complete Setup",
+                color = Color.Black,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

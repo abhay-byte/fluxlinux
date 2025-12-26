@@ -18,6 +18,19 @@ trap 'am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=fai
 
 echo "FluxLinux: Initializing Termux Environment..."
 
+# Force clear any deadlocks from background updates
+echo "FluxLinux: Clearing potential locks..."
+pkill -9 apt || true
+pkill -9 apt-get || true
+pkill -9 dpkg || true
+rm -rf "$PREFIX/var/lib/dpkg/lock"
+rm -rf "$PREFIX/var/lib/dpkg/lock-frontend"
+rm -rf "$PREFIX/var/cache/apt/archives/lock"
+
+# Repair any interrupted installations
+echo "FluxLinux: Repairing package database..."
+dpkg --configure -a || true
+
 # 1. Update Packages
 pkg update -y && pkg upgrade -y
 
