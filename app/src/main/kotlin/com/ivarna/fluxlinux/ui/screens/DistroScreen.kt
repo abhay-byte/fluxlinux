@@ -80,7 +80,7 @@ fun DistroScreen(
         
         val availableDistros = DistroRepository.supportedDistros.filter { 
             !installedDistroIds.contains(it.id)
-        }
+        }.sortedBy { it.comingSoon }
         
         if (availableDistros.isEmpty()) {
             Box(
@@ -152,9 +152,10 @@ fun DistroScreen(
                             "$baseInstall\n$appsInstall\n$themeInstall\n$gpuInstall\n$haInstallCmd"
                         } else {
                             val scriptName = when (distro.configuration?.family) {
-                                com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"
+                                com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "common/setup_debian_family.sh"
                                 com.ivarna.fluxlinux.core.model.DistroFamily.ARCH -> "common/setup_arch_family.sh"
-                                else -> "debian/setup.sh"
+                                com.ivarna.fluxlinux.core.model.DistroFamily.FEDORA -> "common/setup_fedora_family.sh"
+                                else -> "common/setup_debian_family.sh"
                             }
                             scriptManager.getScriptContent(scriptName)
                         }
