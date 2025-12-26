@@ -143,7 +143,13 @@ fun DistroScreen(
                             val baseInstall = scriptManager.getScriptContent("termux/install.sh")
                             val appsInstall = scriptManager.getScriptContent("termux/install_apps.sh")
                             val themeInstall = scriptManager.getScriptContent("termux/setup_theme.sh")
-                            "$baseInstall\n$appsInstall\n$themeInstall"
+                            val gpuInstall = scriptManager.getScriptContent("common/setup_gpu.sh")
+                            val haWrapperContent = scriptManager.getScriptContent("common/ha")
+                            
+                            // Create header to write HA wrapper
+                            val haInstallCmd = "cat << 'EOF_HA' > /data/data/com.termux/files/usr/bin/ha\n$haWrapperContent\nEOF_HA\nchmod +x /data/data/com.termux/files/usr/bin/ha\n"
+                            
+                            "$baseInstall\n$appsInstall\n$themeInstall\n$gpuInstall\n$haInstallCmd"
                         } else {
                             val scriptName = when (distro.configuration?.family) {
                                 com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"

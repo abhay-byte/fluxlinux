@@ -1,0 +1,56 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ha - Hardware Acceleration Wrapper
+# Usage: ha <command> [args...]
+
+CMD=$@
+if [ -z "$CMD" ]; then
+    echo "Usage: ha <command>"
+    exit 1
+fi
+
+# Detect GPU Vendor
+GPU_VENDOR=$(vulkaninfo --summary 2>/dev/null | grep -i "deviceName" | grep -i "Adreno")
+
+if [ ! -z "$GPU_VENDOR" ]; then
+    MODE="ADRENO"
+else
+    MODE="GENERIC"
+fi
+
+echo "FluxLinux: GPU Mode detected: $MODE"
+
+# Function to ensure server is running
+ensure_server() {
+    if ! pgrep -f "virgl_test_server" >/dev/null; then
+        echo "Starting Virgl Server..."
+        # ZINK Server flags (Universal for Zink backend)
+        export MESA_NO_ERROR=1 
+        export MESA_GL_VERSION_OVERRIDE=4.3COMPAT 
+        export MESA_GLES_VERSION_OVERRIDE=3.2 
+        export GALLIUM_DRIVER=zink 
+        export ZINK_DESCRIPTORS=lazy 
+        
+        virgl_test_server --use-egl-surfaceless --use-gles &
+        sleep 1
+    fi
+}
+
+if [ "$MODE" == "ADRENO" ]; then
+    # Adreno Optimization (ZINK)
+    ensure_server
+    echo "Running with ZINK (Vulkan)..."
+    export GALLIUM_DRIVER=zink 
+    export MESA_GL_VERSION_OVERRIDE=4.0
+    
+    # Execute
+    $CMD
+else
+    # Generic/Mali Fallback (Virpipe/Virgl)
+    ensure_server
+    echo "Running with VIRGL (Virpipe)..."
+    export GALLIUM_DRIVER=virpipe 
+    export MESA_GL_VERSION_OVERRIDE=4.0
+    
+    # Execute
+    $CMD
+fi
