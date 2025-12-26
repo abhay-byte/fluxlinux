@@ -167,33 +167,46 @@ if [ -f "$DEB_FILE" ]; then
     # POST-INSTALL FIXES (Since we skipped dpkg)
     echo "FluxLinux: Applying Runtime Fixes..."
     
-    # 1. Create Wrapper Script (Fixes libffmpeg.so not found & Sandbox)
-    # We use a wrapper instead of a symlink so we can set LD_LIBRARY_PATH
+    # 1. Create Wrapper Script (Fixes path issues, libffmpeg, Sandbox, & Crash)
     cat <<EOF > /usr/bin/antigravity
 #!/bin/bash
-export LD_LIBRARY_PATH="/usr/share/antigravity:\$LD_LIBRARY_PATH"
+
+# DYNAMIC PATH DETECTION
+# The package might install to /opt/Antigravity (ARM64 standard) or /usr/share/antigravity (older/x86).
+if [ -d "/opt/Antigravity" ]; then
+    ANTIGRAVITY_PATH="/opt/Antigravity"
+elif [ -d "/usr/share/antigravity" ]; then
+    ANTIGRAVITY_PATH="/usr/share/antigravity"
+else
+    echo "Error: Antigravity installation not found in /opt or /usr/share."
+    exit 1
+fi
+
+export LD_LIBRARY_PATH="\$ANTIGRAVITY_PATH:\$LD_LIBRARY_PATH"
 
 # FIX: Memory Crash (MmapAligned / SIGABRT)
-# The bundled tcmalloc assumes 48-bit address space, failing on some ARM64 kernels/Proot.
-# We force usage of the system's minimal tcmalloc which is correctly compiled for aarch64.
 if [ -f "/usr/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4" ]; then
     export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4"
 fi
 
-# Electron/Chromium flags for Proot/Termux stability:
-# --no-sandbox: Required for Proot (fixes crash)
-# --disable-gpu: Fixes blank screen/hangs (HW accel broken in Proot)
-# --disable-dev-shm-usage: Fixes shared memory crashes
-# --password-store=basic: Fixes "Agent Server Crashed" (Auth failure due to missing Keyring/DBus)
+# WRAPPER: IPC and Auth Fixes
+# We execute the 'bin/antigravity' SCRIPT (detecting it inside the path)
+if [ -f "\$ANTIGRAVITY_PATH/bin/antigravity" ]; then
+    TARGET_BIN="\$ANTIGRAVITY_PATH/bin/antigravity"
+else
+    # Fallback to main binary if script is missing (unlikely)
+    TARGET_BIN="\$ANTIGRAVITY_PATH/antigravity"
+fi
 
-# NOTE: We execute the 'bin/antigravity' SCRIPT (not the binary directly) 
-# because it sets up internal VS Code environment variables (CLI, etc).
-# We wraps with 'dbus-launch' to fix "Agent server crashed" (IPC failures)
-exec dbus-launch --exit-with-session /usr/share/antigravity/bin/antigravity --no-sandbox --disable-gpu --disable-dev-shm-usage --password-store=basic "\$@"
+exec dbus-launch --exit-with-session "\$TARGET_BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage --password-store=basic "\$@"
 EOF
     chmod +x /usr/bin/antigravity
-    chmod +x /usr/share/antigravity/antigravity
-    chmod +x /usr/share/antigravity/bin/antigravity
+    
+    # Ensure all potential binaries are executable
+    chmod +x /opt/Antigravity/antigravity 2>/dev/null
+    chmod +x /opt/Antigravity/bin/antigravity 2>/dev/null
+    chmod +x /usr/share/antigravity/antigravity 2>/dev/null
+    chmod +x /usr/share/antigravity/bin/antigravity 2>/dev/null
     
     # 2. (Alias no longer needed since wrapper handles --no-sandbox)
     
