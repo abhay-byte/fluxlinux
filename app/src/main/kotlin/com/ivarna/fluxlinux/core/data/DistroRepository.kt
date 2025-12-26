@@ -63,7 +63,8 @@ object DistroRepository {
             iconRes = R.drawable.distro_arch,
             comingSoon = false,
             prootSupported = true,
-            chrootSupported = true
+            chrootSupported = true,
+            configuration = SupportedDistro.ARCH
         ),
         Distro(
             id = "artix",
@@ -121,7 +122,7 @@ object DistroRepository {
             description = "Innovative platform for hardware, clouds, and containers.",
             color = Color(0xFF294172),
             iconRes = R.drawable.distro_fedora,
-            comingSoon = true,
+            comingSoon = false,
             prootSupported = true, // unstable
             chrootSupported = true
         ),

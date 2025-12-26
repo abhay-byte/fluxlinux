@@ -15,10 +15,17 @@ if [ "$DISTRO" == "termux" ]; then
     echo "FluxLinux: Native Termux Mode"
     EXIT_CODE=0
 else
-    # Use reset to handle both fresh install and reinstall cases
-    # This automatically removes existing installation if present
-    proot-distro reset $DISTRO 2>/dev/null || proot-distro install $DISTRO
-    EXIT_CODE=$?
+    # Check if distro is already installed by looking for its rootfs
+    DISTRO_ROOTFS="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/$DISTRO"
+    
+    if [ -d "$DISTRO_ROOTFS" ]; then
+        echo "FluxLinux: $DISTRO already installed. Skipping base installation."
+        EXIT_CODE=0
+    else
+        echo "FluxLinux: Installing $DISTRO base system..."
+        proot-distro install $DISTRO
+        EXIT_CODE=$?
+    fi
 fi
 
 if [ $EXIT_CODE -eq 0 ]; then

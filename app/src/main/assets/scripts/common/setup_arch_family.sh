@@ -6,7 +6,7 @@ DISTRO=$1
 echo "FluxLinux: Setting up Arch Linux ($DISTRO)..."
 
 # 1. Update Pacman
-pacman -Sy --noconfirm
+pacman -Sy --noconfirm || exit 1
 
 # 2. Install XFCE4 and Essentials
 # xfce4: Desktop Environment
@@ -14,7 +14,7 @@ pacman -Sy --noconfirm
 # dbus: Required for XFCE
 # ttf-dejavu: Basic fonts
 # sudo: For user privileges
-pacman -S --noconfirm xfce4 tigervnc dbus ttf-dejavu sudo
+pacman -S --noconfirm xfce4 tigervnc dbus ttf-dejavu sudo || exit 1
 
 # 3. Create User if not exists (flux)
 if ! id "flux" &>/dev/null; then

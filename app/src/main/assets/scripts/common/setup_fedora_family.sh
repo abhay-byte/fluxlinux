@@ -7,9 +7,9 @@ DISTRO_NAME="${1:-fedora}"
 echo "FluxLinux: Configuring ${DISTRO_NAME} (Fedora Family)..."
 
 # 1. Update and Install Core Packages
-dnf update -y
-dnf groupinstall -y "Xfce Desktop"
-dnf install -y tigervnc-server dbus-x11 useradd sudo
+dnf update -y || exit 1
+dnf groupinstall -y "Xfce Desktop" || exit 1
+dnf install -y tigervnc-server dbus-x11 useradd sudo || exit 1
 
 # 2. Create User 'flux'
 if ! id "flux" &>/dev/null; then

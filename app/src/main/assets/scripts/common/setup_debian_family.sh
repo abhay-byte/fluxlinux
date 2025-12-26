@@ -8,8 +8,8 @@ echo "FluxLinux: Configuring ${DISTRO_NAME} (Debian Family)..."
 
 # 1. Update and Install Core Packages
 export DEBIAN_FRONTEND=noninteractive
-apt update -y
-apt install -y sudo xfce4 xfce4-goodies dbus-x11 tigervnc-standalone-server
+apt update -y || exit 1
+apt install -y sudo xfce4 xfce4-goodies dbus-x11 tigervnc-standalone-server || exit 1
 
 # 2. Create User 'flux'
 if ! id "flux" &>/dev/null; then
