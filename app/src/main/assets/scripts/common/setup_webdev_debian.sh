@@ -147,9 +147,35 @@ if [ -f "$DEB_FILE" ]; then
         
     elif [ -f data.tar.xz ]; then
         echo "FluxLinux: Using Python to extract xz archive (bypass tar crash)..."
-        python3 -c "import tarfile; t=tarfile.open('data.tar.xz'); t.extractall('/'); t.close()" || handle_error "Antigravity Extraction (Python/xz)"
+        # Extract to temp dir first to find where the files are hiding
+        mkdir -p /tmp/antigravity_pkg
+        python3 -c "import tarfile; t=tarfile.open('data.tar.xz'); t.extractall('/tmp/antigravity_pkg'); t.close()" || handle_error "Antigravity Extraction"
+        
+        # FIND THE APP: Search for the 'resources' folder (standard Electron app structure)
+        RESOURCES_DIR=$(find /tmp/antigravity_pkg -type d -name "resources" | head -n 1)
+        
+        if [ -z "$RESOURCES_DIR" ]; then
+             echo "Error: Could not find 'resources' folder in extracted package!"
+             echo "Debug Listing:"
+             find /tmp/antigravity_pkg
+             exit 1
+        fi
+        
+        # The App Root is the parent of 'resources'
+        APP_ROOT=$(dirname "$RESOURCES_DIR")
+        echo "FluxLinux: Detected App Root at $APP_ROOT"
+        
+        # STANDARDIZE: Move everything to /usr/share/antigravity (User Preference)
+        echo "FluxLinux: moving to /usr/share/antigravity..."
+        rm -rf /usr/share/antigravity
+        mkdir -p /usr/share/antigravity
+        mv "$APP_ROOT"/* /usr/share/antigravity/
+        
+        # Cleanup
+        rm -rf /tmp/antigravity_pkg
         
     elif [ -f data.tar.gz ]; then
+        # Logic for gz (less likely for deb, but handled similarly if needed)
         python3 -c "import tarfile; t=tarfile.open('data.tar.gz'); t.extractall('/'); t.close()" || handle_error "Antigravity Extraction (Python/gz)"
     else
         echo "Error: Unknown data archive format in .deb"
@@ -158,12 +184,6 @@ if [ -f "$DEB_FILE" ]; then
     
     rm -f "$DEB_FILE" debian-binary control.tar* data.tar*
     
-    # CLEANUP: Remove stale x86 installation if present (prevents confusion)
-    if [ -d "/usr/share/antigravity" ]; then
-        echo "FluxLinux: Removing stale x86 installation..."
-        rm -rf /usr/share/antigravity
-    fi
-    
     # POST-INSTALL FIXES (Since we skipped dpkg)
     echo "FluxLinux: Applying Runtime Fixes..."
     
@@ -171,16 +191,8 @@ if [ -f "$DEB_FILE" ]; then
     cat <<EOF > /usr/bin/antigravity
 #!/bin/bash
 
-# DYNAMIC PATH DETECTION
-# The package might install to /opt/Antigravity (ARM64 standard) or /usr/share/antigravity (older/x86).
-if [ -d "/opt/Antigravity" ]; then
-    ANTIGRAVITY_PATH="/opt/Antigravity"
-elif [ -d "/usr/share/antigravity" ]; then
-    ANTIGRAVITY_PATH="/usr/share/antigravity"
-else
-    echo "Error: Antigravity installation not found in /opt or /usr/share."
-    exit 1
-fi
+# STANDARD PATH: We moved files to /usr/share/antigravity during install
+ANTIGRAVITY_PATH="/usr/share/antigravity"
 
 export LD_LIBRARY_PATH="\$ANTIGRAVITY_PATH:\$LD_LIBRARY_PATH"
 
