@@ -165,7 +165,26 @@ fun DistroScreen(
                         val guiScript = scriptManager.getScriptContent("common/start_gui.sh")
                         
                         // 2. Generate Command
-                        val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript, installScript, guiScript)
+                        val command = if (distro.id == "debian_chroot") {
+                            // Specialized Root Command for Chroot
+                            // 1. Install Dependencies in Termux
+                            val depsCommand = "pkg update -y && pkg install -y x11-repo root-repo && pkg install -y termux-x11-nightly tsu pulseaudio"
+                            
+                            // 2. Prepare Root Script
+                            val chrootScript = scriptManager.getScriptContent("chroot/setup_debian_chroot.sh")
+                            val safeScript = if (!chrootScript.endsWith("\n")) "$chrootScript\n" else chrootScript
+                            val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
+                            
+                            """
+                                $depsCommand
+                                echo "$scriptB64" | base64 -d > ${'$'}HOME/setup_debian_chroot.sh
+                                chmod +x ${'$'}HOME/setup_debian_chroot.sh
+                                sudo sh ${'$'}HOME/setup_debian_chroot.sh
+                            """.trimIndent()
+                        } else {
+                            // Standard Proot Command
+                            TermuxIntentFactory.getInstallCommand(distro.id, setupScript, installScript, guiScript)
+                        }
                         
                         // 3. Copy to Clipboard
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

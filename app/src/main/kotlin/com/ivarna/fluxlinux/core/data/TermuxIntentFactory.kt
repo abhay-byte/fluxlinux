@@ -121,6 +121,19 @@ object TermuxIntentFactory {
      * Launches a specific distro in GUI mode (XFCE4).
      */
     fun buildLaunchGuiIntent(distroId: String): Intent {
+        if (distroId == "debian_chroot") {
+            // Launch the persistent chroot script as root
+            // We use 'tsu' if available (better termux root), otherwise 'su'
+            // But su in Termux usually requires 'tsu' package or generic 'su' (magisk) which acts as root.
+            // Using tsu -c allows environment preservation if needed, but standard su -c is safer for simple scripts.
+            // Let's use tsu since we installed it as a dependency.
+            // Using direct invocation 'tsu script' is safer than 'tsu -c "sh script"' which causes shell errors on some devices.
+            // Update: tsu [script] just opens shell. 'sudo' is the command runner in the tsu package.
+            val command = "sudo sh /data/local/tmp/start_debian.sh"
+            return buildRunCommandIntent(command, runInBackground = true)
+        }
+        
+        // Standard Proot Launch
         // Execute the helper script created during setup
         val command = "bash $TERMUX_HOME_DIR/start_gui.sh $distroId"
         return buildRunCommandIntent(command, runInBackground = true)
@@ -134,7 +147,17 @@ object TermuxIntentFactory {
         val safeScript = if (!scriptContent.endsWith("\n")) "$scriptContent\n" else scriptContent
         val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
         
-        // Command to run inside Termux:
+        if (distroId == "debian_chroot") {
+            // For Chroot, we run the script inside chroot as root (or drop to user if logic requires)
+            // But feature scripts (like webdev) assume standard user environment usually.
+            // Complex to convert standard scripts to chroot context automatically.
+            // For now, let's just run it as root inside chroot.
+            val innerCommand = "echo \"$scriptB64\" | base64 -d > /tmp/flux_feature.sh && bash /tmp/flux_feature.sh; rm -f /tmp/flux_feature.sh"
+            val command = "sudo busybox chroot /data/local/tmp/chrootDebian /bin/bash -c '$innerCommand'"
+            return buildRunCommandIntent(command, runInBackground = false)
+        }
+        
+        // Command to run inside Termux (Proot):
         // 1. Log into Distro
         // 2. Decode script to /tmp
         // 3. Run script

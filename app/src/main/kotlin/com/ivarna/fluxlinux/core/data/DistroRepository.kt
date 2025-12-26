@@ -33,6 +33,17 @@ object DistroRepository {
             chrootSupported = false,
             configuration = SupportedDistro.TERMUX
         ),
+        Distro(
+            id = "debian_chroot",
+            name = "Debian (Rooted)",
+            description = "High-performance Debian 12 environment running via Chroot (Requires Root).",
+            color = FluxAccentMagenta,
+            iconRes = R.drawable.distro_debian, // Reusing Debian icon
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.DEBIAN // Reusing family config for script mapping fallback
+        ),
         
         // Coming Soon - Sorted alphabetically
         Distro(
