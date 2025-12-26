@@ -142,7 +142,11 @@ fun DistroScreen(
                     onClick = {
                         // 1. Get Setup Script
                         val scriptManager = ScriptManager(context)
-                        val setupScript = scriptManager.getScriptContent("debian_setup.sh")
+                        val scriptName = when (distro.configuration?.family) {
+                            com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "setup_debian_family.sh"
+                            else -> "debian_setup.sh" // Fallback / Default
+                        }
+                        val setupScript = scriptManager.getScriptContent(scriptName)
                         
                         // 2. Generate Command
                         val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript)

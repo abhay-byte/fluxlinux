@@ -1,7 +1,4 @@
-package com.ivarna.fluxlinux.core.data
-
-import androidx.compose.ui.graphics.Color
-import androidx.annotation.DrawableRes
+import com.ivarna.fluxlinux.core.model.SupportedDistro
 
 data class Distro(
     val id: String,              // e.g. "debian" (used for proot-distro command)
@@ -11,5 +8,6 @@ data class Distro(
     @DrawableRes val iconRes: Int? = null,  // Drawable resource ID for logo
     val comingSoon: Boolean = false,  // If true, show "Coming Soon" badge
     val prootSupported: Boolean = true,  // PRoot compatibility
-    val chrootSupported: Boolean = true  // Chroot compatibility (requires root)
+    val chrootSupported: Boolean = true,  // Chroot compatibility (requires root)
+    val configuration: SupportedDistro? = null // Technical traits (Family, Manager, etc.)
 )

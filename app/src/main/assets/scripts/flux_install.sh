@@ -25,7 +25,7 @@ if [ $EXIT_CODE -eq 0 ]; then
         chmod +x $HOME/flux_setup_temp.sh
         
         # Move it to a shared location readable by proot
-        proot-distro login $DISTRO --shared-tmp -- bash -c "bash /data/data/com.termux/files/home/flux_setup_temp.sh"
+        proot-distro login $DISTRO --shared-tmp -- bash -c "bash /data/data/com.termux/files/home/flux_setup_temp.sh $DISTRO"
         
         rm $HOME/flux_setup_temp.sh
         echo "FluxLinux: Configuration Complete!"

@@ -1,5 +1,5 @@
-package com.ivarna.fluxlinux.core.data
 
+import com.ivarna.fluxlinux.core.model.SupportedDistro
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 import com.ivarna.fluxlinux.ui.theme.FluxAccentCyan
 import androidx.compose.ui.graphics.Color
@@ -17,7 +17,8 @@ object DistroRepository {
             iconRes = R.drawable.distro_debian,
             comingSoon = false,
             prootSupported = true,
-            chrootSupported = true
+            chrootSupported = true,
+            configuration = SupportedDistro.DEBIAN
         ),
         
         // Coming Soon - Sorted alphabetically
@@ -189,7 +190,8 @@ object DistroRepository {
             iconRes = R.drawable.distro_ubuntu,
             comingSoon = true,
             prootSupported = true, // no i686
-            chrootSupported = true
+            chrootSupported = true,
+            configuration = SupportedDistro.UBUNTU
         ),
         Distro(
             id = "void",
