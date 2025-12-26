@@ -41,6 +41,8 @@ fun DistroCard(
     onUninstall: () -> Unit,
     onLaunchCli: () -> Unit,
     onLaunchGui: () -> Unit,
+    onWebDevInstall: (() -> Unit)? = null,
+    webDevDescription: String? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -237,6 +239,29 @@ fun DistroCard(
                             color = Color.Black,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
+                        )
+                    }
+                }
+
+                if (onWebDevInstall != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onWebDevInstall,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2E7D32) // Forest Green
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Install Web Dev Tools", color = Color.White)
+                    }
+                    if (webDevDescription != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = webDevDescription,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp)
                         )
                     }
                 }

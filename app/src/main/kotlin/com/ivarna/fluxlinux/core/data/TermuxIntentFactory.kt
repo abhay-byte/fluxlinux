@@ -125,4 +125,26 @@ object TermuxIntentFactory {
         val command = "bash $TERMUX_HOME_DIR/start_gui.sh $distroId"
         return buildRunCommandIntent(command, runInBackground = true)
     }
+
+    /**
+     * Runs a specific feature script inside the distro.
+     * Uses Base64 injection to avoid quoting/escape issues.
+     */
+    fun buildRunFeatureScriptIntent(distroId: String, scriptContent: String): Intent {
+        val safeScript = if (!scriptContent.endsWith("\n")) "$scriptContent\n" else scriptContent
+        val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
+        
+        // Command to run inside Termux:
+        // 1. Log into Distro
+        // 2. Decode script to /tmp
+        // 3. Run script
+        // 4. Cleanup
+        
+        val innerCommand = "echo \"$scriptB64\" | base64 -d > /tmp/flux_feature.sh && bash /tmp/flux_feature.sh; rm -f /tmp/flux_feature.sh"
+        // We use --shared-tmp to access /tmp although proot handles it separately usually.
+        // Actually proot-distro login runs as root by default.
+        val command = "proot-distro login $distroId --shared-tmp -- bash -c '$innerCommand'"
+        
+        return buildRunCommandIntent(command, runInBackground = false) // Foreground to see progress
+    }
 }

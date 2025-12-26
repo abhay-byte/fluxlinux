@@ -155,6 +155,26 @@ fun HomeScreen(
                             permissionState.launchPermissionRequest()
                         }
                     },
+                    onWebDevInstall = if (distro.configuration?.family == com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN) {
+                        {
+                            if (permissionState.status.isGranted) {
+                                val scriptManager = ScriptManager(context)
+                                val scriptContent = scriptManager.getScriptContent("common/setup_webdev_debian.sh")
+                                val intent = TermuxIntentFactory.buildRunFeatureScriptIntent(distro.id, scriptContent)
+                                try {
+                                    onStartService(intent)
+                                    android.widget.Toast.makeText(context, "Starting Web Dev Setup...", android.widget.Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Failed to start setup", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                permissionState.launchPermissionRequest()
+                            }
+                        }
+                    } else null,
+                    webDevDescription = if (distro.configuration?.family == com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN) {
+                        "Includes: VS Code, Node.js (v20), Python 3, Firefox, Chromium, Git"
+                    } else null,
                 )
             }
         }
