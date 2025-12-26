@@ -41,7 +41,6 @@ fun DistroCard(
     onUninstall: () -> Unit,
     onLaunchCli: () -> Unit,
     onLaunchGui: () -> Unit,
-    onAlreadyInstalled: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -177,7 +176,7 @@ fun DistroCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action Buttons - Conditional based on installation status
+                // Action Buttons - Conditional based on installation status
             if (!isInstalled) {
                 // Show Install button when not installed
                 Button(
@@ -197,54 +196,63 @@ fun DistroCard(
                             androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
                     )
                 }
-                
-                // Manual Sync Option - only show for available distros
-                if (!distro.comingSoon) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    androidx.compose.material3.TextButton(
-                        onClick = onAlreadyInstalled,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    ) {
-                        Text(
-                            "Already Installed?", 
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
             } else {
                 // Show CLI/GUI/Uninstall when installed
                 Row(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
-                        onClick = onLaunchCli,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("CLI", color = Color.Black) // Cyan bg, black text is fine
+                    // CLI Button - Glass Style (Cyan)
+                    if (distro.id != "termux") {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF00E5FF)) // Vibrant Cyan
+                                .clickable(onClick = onLaunchCli)
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "CLI",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.size(8.dp))
-
-                    Button(
-                        onClick = onLaunchGui,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF00E6)),
-                        modifier = Modifier.weight(1f)
+                    // GUI Button - Glass Style (Magenta)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFFF00E6)) // Vibrant Magenta
+                            .clickable(onClick = onLaunchGui)
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("GUI", color = Color.Black) // Magenta bg, black text is fine
+                        Text(
+                            text = "GUI",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Uninstall Button
+                // Uninstall Button - Subtle Text Button aligned to end
                 androidx.compose.material3.TextButton(
                     onClick = onUninstall,
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Uninstall", color = Color(0xFFFF6B6B))
+                    Text(
+                        text = "Uninstall",
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 14.sp
+                    )
                 }
             }
         }

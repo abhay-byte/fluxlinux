@@ -1,3 +1,4 @@
+package com.ivarna.fluxlinux.core.data
 
 import com.ivarna.fluxlinux.core.model.SupportedDistro
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
@@ -19,6 +20,18 @@ object DistroRepository {
             prootSupported = true,
             chrootSupported = true,
             configuration = SupportedDistro.DEBIAN
+        ),
+        
+        Distro(
+            id = "termux",
+            name = "Termux Native",
+            description = "Run XFCE4 directly in Termux for max performance (No Proot).",
+            color = FluxAccentCyan,
+            iconRes = R.drawable.distro_termux,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = false,
+            configuration = SupportedDistro.TERMUX
         ),
         
         // Coming Soon - Sorted alphabetically

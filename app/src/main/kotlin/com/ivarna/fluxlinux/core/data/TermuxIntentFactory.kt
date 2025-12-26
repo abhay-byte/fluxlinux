@@ -79,9 +79,11 @@ object TermuxIntentFactory {
      * Uninstalls/Removes a specific distro.
      */
     fun buildUninstallIntent(distroId: String): Intent {
-        // proot-distro remove <distro>
-        // echo to confirm
-        val command = "proot-distro remove $distroId && echo 'FluxLinux: $distroId Uninstalled.' && sleep 3"
+        val command = if (distroId == "termux") {
+            "pkg uninstall -y xfce4 xfce4-terminal tigervnc && echo 'FluxLinux: Termux Native Desktop Removed.' && sleep 3"
+        } else {
+            "proot-distro remove $distroId && echo 'FluxLinux: $distroId Uninstalled.' && sleep 3"
+        }
         return buildRunCommandIntent(command)
     }
 
@@ -89,11 +91,10 @@ object TermuxIntentFactory {
      * Launches a specific distro in CLI mode (login as flux user).
      */
     fun buildLaunchCliIntent(distroId: String): Intent {
+        if (distroId == "termux") {
+             return buildRunCommandIntent("echo 'You are already in Termux Native environment!' && sleep 2")
+        }
         // Default to 'flux' user if setup, fallback to root if not (proot-distro handles login)
-        // Ideally we check, but for now let's assume 'flux' if we ran setup. 
-        // Safer: just login, it defaults to root, then user can su.
-        // User requested CLI option. Let's try to login as flux if possible or just standard login.
-        // Standard: proot-distro login <distro> is safest.
         val command = "proot-distro login $distroId --user flux"
         return buildRunCommandIntent(command, runInBackground = false)
     }

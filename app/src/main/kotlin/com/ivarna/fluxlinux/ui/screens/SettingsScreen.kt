@@ -177,28 +177,21 @@ fun SettingsScreen(
                                 onClick = {
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
-                                        
-                                        // 1. Read Components
                                         val setupScript = scriptManager.getScriptContent("common/setup_termux.sh")
                                         val fluxInstallScript = scriptManager.getScriptContent("common/flux_install.sh")
-                                        val startGuiScript = scriptManager.getScriptContent("debian/start_gui.sh") // Default to Debian/Shared for now
+                                        val startGuiScript = scriptManager.getScriptContent("common/start_gui.sh")
                                         
-                                        // 2. Build Composite Command
-                                        // We write helper scripts first, then run setup
                                         val compositeCommand = buildString {
-                                            // Write flux_install.sh
                                             append("cat << 'EOF_FLUX' > \$HOME/flux_install.sh\n")
                                             append(fluxInstallScript)
                                             append("\nEOF_FLUX\n")
                                             append("chmod +x \$HOME/flux_install.sh\n\n")
                                             
-                                            // Write start_gui.sh
                                             append("cat << 'EOF_GUI' > \$HOME/start_gui.sh\n")
                                             append(startGuiScript)
                                             append("\nEOF_GUI\n")
                                             append("chmod +x \$HOME/start_gui.sh\n\n")
                                             
-                                            // Run Setup (with force re-run logic)
                                             append("rm -f \$HOME/.fluxlinux/setup_termux.done\n")
                                             append(setupScript)
                                         }
@@ -214,12 +207,13 @@ fun SettingsScreen(
                                         permissionState.launchPermissionRequest()
                                     }
                                 },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (setupCompleted.value) Color(0x2250fa7b) else FluxAccentCyan,
+                                    containerColor = if (setupCompleted.value) Color.Transparent else FluxAccentCyan,
                                     contentColor = if (setupCompleted.value) FluxGreen else FluxBackgroundStart
                                 ),
                                 border = if (setupCompleted.value) BorderStroke(1.dp, FluxGreen) else null,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().height(50.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -234,12 +228,12 @@ fun SettingsScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("Environment Initialized", fontWeight = FontWeight.Bold)
                                     } else {
-                                        Text("Initialize Environment (Setup)")
+                                        Text("Initialize Environment (Setup)", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             
                             // Tweaks Button
                              Button(
@@ -247,9 +241,7 @@ fun SettingsScreen(
                                     if (permissionState.status.isGranted) {
                                         val scriptManager = ScriptManager(context)
                                         val tweaksScript = scriptManager.getScriptContent("common/termux_tweaks.sh")
-                                        // Force re-run by removing marker
                                         val forceTweaksScript = "rm -f \$HOME/.fluxlinux/termux_tweaks.done\n" + tweaksScript
-                                        // Tweaks script handles its own callback and marker now
                                         val copyCmd = "cat > \$HOME/termux_tweaks.sh << 'TWEAKS_EOF'\n$forceTweaksScript\nTWEAKS_EOF\nchmod +x \$HOME/termux_tweaks.sh && bash \$HOME/termux_tweaks.sh"
                                         val intent = TermuxIntentFactory.buildRunCommandIntent(copyCmd)
                                         try {
@@ -262,12 +254,13 @@ fun SettingsScreen(
                                         permissionState.launchPermissionRequest()
                                     }
                                 },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (tweaksApplied.value) Color(0x2250fa7b) else FluxAccentMagenta,
+                                    containerColor = if (tweaksApplied.value) Color.Transparent else FluxAccentMagenta,
                                     contentColor = if (tweaksApplied.value) FluxGreen else Color.White
                                 ),
                                 border = if (tweaksApplied.value) BorderStroke(1.dp, FluxGreen) else null,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().height(50.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -282,7 +275,7 @@ fun SettingsScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("Tweaks Applied", fontWeight = FontWeight.Bold)
                                     } else {
-                                        Text("🎨 Apply Termux Tweaks")
+                                        Text("Apply Termux Tweaks", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

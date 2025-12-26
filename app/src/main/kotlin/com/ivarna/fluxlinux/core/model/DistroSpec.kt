@@ -11,6 +11,7 @@ enum class DistroFamily {
     ALPINE,
     VOID,
     SUSE,
+    TERMUX,
     OTHER
 }
 
@@ -24,6 +25,7 @@ enum class PackageManager {
     APK,
     XBPS,
     ZYPPER,
+    PKG,
     OTHER
 }
 
@@ -72,6 +74,13 @@ enum class SupportedDistro(
         id = "archlinux",
         family = DistroFamily.ARCH,
         packageManager = PackageManager.PACMAN,
+        releaseType = ReleaseType.ROLLING
+    ),
+
+    TERMUX(
+        id = "termux",
+        family = DistroFamily.TERMUX,
+        packageManager = PackageManager.PKG,
         releaseType = ReleaseType.ROLLING
     )
 }

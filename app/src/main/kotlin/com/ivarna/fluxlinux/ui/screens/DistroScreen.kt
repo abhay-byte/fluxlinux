@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ivarna.fluxlinux.core.data.DistroRepository
+import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.utils.StateManager
@@ -115,12 +116,7 @@ fun DistroScreen(
                         },
                         onUninstall = {}, // Not used
                         onLaunchCli = {}, // Not used
-                        onLaunchGui = {}, // Not used
-                        onAlreadyInstalled = {
-                            StateManager.setDistroInstalled(context, distro.id, true)
-                            refreshKey.value++
-                            android.widget.Toast.makeText(context, "Marked as Installed", android.widget.Toast.LENGTH_SHORT).show()
-                        }
+                        onLaunchGui = {} // Not used
                     )
                 }
             }
@@ -142,11 +138,19 @@ fun DistroScreen(
                     onClick = {
                         // 1. Get Setup Script
                         val scriptManager = ScriptManager(context)
-                        val scriptName = when (distro.configuration?.family) {
-                            com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"
-                            else -> "debian/setup.sh" // Fallback / Default
+                        val setupScript = if (distro.configuration?.family == com.ivarna.fluxlinux.core.model.DistroFamily.TERMUX) {
+                            // Bundle all Termux scripts
+                            val baseInstall = scriptManager.getScriptContent("termux/install.sh")
+                            val appsInstall = scriptManager.getScriptContent("termux/install_apps.sh")
+                            val themeInstall = scriptManager.getScriptContent("termux/setup_theme.sh")
+                            "$baseInstall\n$appsInstall\n$themeInstall"
+                        } else {
+                            val scriptName = when (distro.configuration?.family) {
+                                com.ivarna.fluxlinux.core.model.DistroFamily.DEBIAN -> "debian/setup.sh"
+                                else -> "debian/setup.sh"
+                            }
+                            scriptManager.getScriptContent(scriptName)
                         }
-                        val setupScript = scriptManager.getScriptContent(scriptName)
                         
                         // 2. Generate Command
                         val command = TermuxIntentFactory.getInstallCommand(distro.id, setupScript)

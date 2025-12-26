@@ -1,4 +1,8 @@
+package com.ivarna.fluxlinux.core.data
+
 import com.ivarna.fluxlinux.core.model.SupportedDistro
+import androidx.compose.ui.graphics.Color
+import androidx.annotation.DrawableRes
 
 data class Distro(
     val id: String,              // e.g. "debian" (used for proot-distro command)

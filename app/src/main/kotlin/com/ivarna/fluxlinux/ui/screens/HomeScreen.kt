@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.DistroRepository
+import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.utils.ApkInstaller
@@ -154,7 +155,6 @@ fun HomeScreen(
                             permissionState.launchPermissionRequest()
                         }
                     },
-                    onAlreadyInstalled = {} // No-op
                 )
             }
         }

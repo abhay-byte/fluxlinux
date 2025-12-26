@@ -57,14 +57,26 @@ class MainActivity : ComponentActivity() {
             val scriptName = uri?.getQueryParameter("name") ?: "unknown"
             
             if (result == "success") {
-                 StateManager.setScriptStatus(this, scriptName, true)
-                 android.widget.Toast.makeText(this, "Script '$scriptName' completed! ✅", android.widget.Toast.LENGTH_LONG).show()
+                 // Check if this is a distro installation callback
+                 if (scriptName.startsWith("distro_install_")) {
+                     val distroId = scriptName.removePrefix("distro_install_")
+                     StateManager.setDistroInstalled(this, distroId, true)
+                     android.widget.Toast.makeText(this, "$distroId Installed! ✅", android.widget.Toast.LENGTH_LONG).show()
+                 } else {
+                     StateManager.setScriptStatus(this, scriptName, true)
+                     android.widget.Toast.makeText(this, "Script '$scriptName' completed! ✅", android.widget.Toast.LENGTH_LONG).show()
+                 }
                  
                  // If setup_termux just finished, ensure X11 preferences are written
                  if (scriptName == "setup_termux") {
                      com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyPreferences(this)
                  }
             } else {
+                 // Handle failure
+                 if (scriptName.startsWith("distro_install_")) {
+                     val distroId = scriptName.removePrefix("distro_install_")
+                     StateManager.setDistroInstalled(this, distroId, false) // Ensure it's marked as not installed
+                 }
                  android.widget.Toast.makeText(this, "Script '$scriptName' failed! ❌", android.widget.Toast.LENGTH_LONG).show()
             }
         }
