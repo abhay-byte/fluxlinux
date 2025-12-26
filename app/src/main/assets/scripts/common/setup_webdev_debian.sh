@@ -197,14 +197,22 @@ EOF
     
     # 2. (Alias no longer needed since wrapper handles --no-sandbox)
     
-    # 3. Patch Desktop Entry for Menu usage
-    # Find the desktop file (usually in /usr/share/applications)
-    DESKTOP_FILE=$(find /usr/share/applications -name "*antigravity*.desktop" | head -n 1)
-    
-    if [ -f "$DESKTOP_FILE" ]; then
-        # Point Exec to our wrapper script
-        sed -i 's|Exec=.*|Exec=/usr/bin/antigravity %U|g' "$DESKTOP_FILE"
-    fi
+    # 3. Create Desktop Entry (Ensure it appears in Menu)
+    # We explicitly create it ensuring it points to our wrapper and exists even if the .deb didn't provide one.
+    mkdir -p /usr/share/applications
+    cat <<EOF > /usr/share/applications/antigravity.desktop
+[Desktop Entry]
+Name=Antigravity
+Comment=AI-First Code Editor
+GenericName=Text Editor
+Exec=/usr/bin/antigravity %U
+Icon=antigravity
+Type=Application
+StartupNotify=true
+StartupWMClass=Antigravity
+Categories=TextEditor;Development;IDE;
+MimeType=text/plain;inode/directory;application/x-code-workspace;
+EOF
 
 else
     handle_error "Antigravity .deb not found"
