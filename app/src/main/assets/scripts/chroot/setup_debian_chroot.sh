@@ -176,7 +176,19 @@ main() {
     
     # Check for busybox
     if ! command -v busybox >/dev/null; then
-         echo -e "\e[1;31m[!] Busybox not found! Install Busybox and retry.\e[0m"
+         # Try to find busybox in common locations
+         for path in /data/data/com.termux/files/usr/bin/busybox /system/bin/busybox /system/xbin/busybox /sbin/busybox /data/adb/magisk/busybox; do
+             if [ -x "$path" ]; then
+                 echo -e "\e[1;36m[+] Found busybox at $path\e[0m"
+                 export PATH="$PATH:$(dirname $path)"
+                 break
+             fi
+         done
+    fi
+    
+    if ! command -v busybox >/dev/null; then
+         echo -e "\e[1;31m[!] Busybox not found in PATH! Install Busybox and retry.\e[0m"
+         echo -e "\e[1;33m[!] PATH is: $PATH\e[0m"
          exit 1
     fi
 
