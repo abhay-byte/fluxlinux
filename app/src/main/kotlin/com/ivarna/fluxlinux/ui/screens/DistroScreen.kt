@@ -167,20 +167,37 @@ fun DistroScreen(
                         // 2. Generate Command
                         val command = if (distro.id == "debian_chroot") {
                             // Specialized Root Command for Chroot
-                            // 1. Install Dependencies in Termux
-                            val depsCommand = "pkg update -y && pkg install -y x11-repo root-repo && pkg install -y termux-x11-nightly tsu pulseaudio"
-                            
                             // 2. Prepare Root Script
                             val chrootScript = scriptManager.getScriptContent("chroot/setup_debian_chroot.sh")
                             val safeScript = if (!chrootScript.endsWith("\n")) "$chrootScript\n" else chrootScript
                             val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
+                            val scriptName = "setup_debian_chroot.sh"
                             
+                            // Chunk the encoded string to avoid shell/clipboard limits (approx 1000 chars per chunk)
+                            val chunks = scriptB64.chunked(1000)
+                            val chunkedEchos = StringBuilder()
+                            chunkedEchos.append("rm -f \"\${S}.b64\"\n") // Clear previous temp file
+                            chunks.forEach { chunk ->
+                                chunkedEchos.append("echo \"$chunk\" >> \"\${S}.b64\"\n")
+                            }
+
+                            // Simplified robust command
                             """
-                                $depsCommand
-                                echo "$scriptB64" | base64 -d > ${'$'}HOME/setup_debian_chroot.sh
-                                chmod +x ${'$'}HOME/setup_debian_chroot.sh
-                                sudo sh ${'$'}HOME/setup_debian_chroot.sh
-                            """.trimIndent()
+                                S="/data/local/tmp/$scriptName"
+                                if [ "${'$'}(id -u)" != "0" ]; then S="${'$'}HOME/$scriptName"; fi
+                                $chunkedEchos
+                                base64 -d "${'$'}S.b64" > "${'$'}S"
+                                rm -f "${'$'}S.b64"
+                                chmod +x "${'$'}S"
+                                if [ "${'$'}(id -u)" = "0" ]; then
+                                    sh "${'$'}S"
+                                else
+                                    echo "⚠️ PLEASE RUN AS ROOT ⚠️"
+                                    echo "Type su and press Enter."
+                                    echo "Then paste this command again."
+                                fi
+                            """.trimIndent() + "\n"
+
                         } else {
                             // Standard Proot Command
                             TermuxIntentFactory.getInstallCommand(distro.id, setupScript, installScript, guiScript)
@@ -199,7 +216,11 @@ fun DistroScreen(
                                 // Optimistic update removed - relying on script callback
                                 // StateManager.setDistroInstalled(context, distro.id, true)
                                 // refreshKey.value++ 
-                                android.widget.Toast.makeText(context, "Command Copied! Paste in Termux.", android.widget.Toast.LENGTH_LONG).show()
+                                if (distro.id == "debian_chroot") {
+                                    android.widget.Toast.makeText(context, "Copied! Type 'su' in Termux then Paste.", android.widget.Toast.LENGTH_LONG).show()
+                                } else {
+                                    android.widget.Toast.makeText(context, "Command Copied! Paste in Termux.", android.widget.Toast.LENGTH_LONG).show()
+                                }
                             } catch (e: Exception) {
                                 android.util.Log.e("FluxLinux", "Failed to open Termux", e)
                                 android.widget.Toast.makeText(context, "Failed to open Termux", android.widget.Toast.LENGTH_SHORT).show()
