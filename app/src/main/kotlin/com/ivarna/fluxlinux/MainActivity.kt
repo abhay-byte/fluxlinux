@@ -99,7 +99,13 @@ class MainActivity : ComponentActivity() {
                      // Mark Component as Installed in StateManager
                      val distroId = currentTask.distroId
                      if (currentTask.type == com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT) {
-                         StateManager.setComponentInstalled(this, distroId, currentTask.id, true)
+                         if (currentTask.isUninstall) {
+                             // Uninstall completion: clear the "installed" flag
+                             StateManager.setComponentInstalled(this, distroId, currentTask.id, false)
+                             android.widget.Toast.makeText(this, "${currentTask.name.replace("Uninstall ", "")} Uninstalled 🗑️", android.widget.Toast.LENGTH_LONG).show()
+                         } else {
+                             StateManager.setComponentInstalled(this, distroId, currentTask.id, true)
+                         }
                      }
                      // Force State Update
                      StateManager.triggerRefresh()
@@ -177,7 +183,8 @@ class MainActivity : ComponentActivity() {
                 val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildRunFeatureScriptIntent(
                     distroId = distroId,
                     scriptContent = scriptContent,
-                    callbackName = nextTask.id
+                    callbackName = nextTask.id,
+                    isUninstall = nextTask.isUninstall
                 )
                 
                 try {
@@ -584,26 +591,52 @@ class MainActivity : ComponentActivity() {
                     Screen.DISTRO_SETTINGS -> {
                          val hazeState = remember { HazeState() }
                          if (selectedDistro != null) {
-                             com.ivarna.fluxlinux.ui.screens.DistroSettingsScreen(
-                                 distro = selectedDistro!!,
-                                 onBack = { currentScreen = Screen.HOME },
-                                 hazeState = hazeState,
-                                  onInstallComponent = { component, extraEnv ->
+                              com.ivarna.fluxlinux.ui.screens.DistroSettingsScreen(
+                                  distro = selectedDistro!!,
+                                  onBack = { currentScreen = Screen.HOME },
+                                  hazeState = hazeState,
+                                   onInstallComponent = { component, extraEnv ->
+                                       if (permissionState.status.isGranted) {
+                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
+                                               queueManager.clear()
+
+                                               val task = com.ivarna.fluxlinux.core.utils.InstallTask(
+                                                   id = component.id,
+                                                   name = component.name,
+                                                   type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
+                                                   scriptName = component.scriptName,
+                                                   distroId = selectedDistro!!.id,
+                                                   extraEnv = extraEnv,
+                                                   isUninstall = false
+                                               )
+                                               queueManager.enqueue(listOf(task))
+
+                                               withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                   processNextInstallTask()
+                                               }
+                                           }
+                                       } else {
+                                           permissionState.launchPermissionRequest()
+                                       }
+                                   },
+                                  onUninstallComponent = { component ->
                                       if (permissionState.status.isGranted) {
                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
                                               queueManager.clear()
-                                              
+
                                               val task = com.ivarna.fluxlinux.core.utils.InstallTask(
                                                   id = component.id,
-                                                  name = component.name,
+                                                  name = "Uninstall ${component.name}",
                                                   type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
                                                   scriptName = component.scriptName,
                                                   distroId = selectedDistro!!.id,
-                                                  extraEnv = extraEnv
+                                                  extraEnv = emptyMap(),
+                                                  isUninstall = true
                                               )
                                               queueManager.enqueue(listOf(task))
-                                              
+
                                               withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                   processNextInstallTask()
                                               }

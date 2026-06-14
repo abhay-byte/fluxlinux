@@ -3,6 +3,34 @@
 # Installs Office Productivity Stack
 # Target: Debian 13 (Trixie) ARM64
 # Compatible with: Chroot and Proot
+# Usage: setup_office_debian.sh [uninstall]
+
+# Office-specific packages. Shared system deps (dbus-x11, fonts) intentionally
+# excluded — they're used by XFCE, browsers, and other components.
+PKGS=(
+    libreoffice
+    libreoffice-gtk3
+    libreoffice-writer
+    libreoffice-calc
+    libreoffice-impress
+    thunderbird
+    evince
+    xournalpp
+    fonts-noto
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Office Productivity Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    echo "FluxLinux: Office Productivity Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

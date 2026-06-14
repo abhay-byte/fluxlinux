@@ -2,6 +2,27 @@
 # scripts/common/setup_qwen35_debian.sh
 # Download Qwen3.5-0.8B GGUF model for llama.cpp
 # Model: https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF
+# Usage: setup_qwen35_debian.sh [uninstall]
+
+# Model files to remove on uninstall
+MODEL_FILES=(
+    "/root/models/Qwen3.5-0.8B-Q4_0.gguf"
+    "/root/models/Qwen3.5-0.8B-Q4_0.gguf.tmp"
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Qwen3.5-0.8B Model..."
+    for f in "${MODEL_FILES[@]}"; do
+        if [ -f "$f" ]; then
+            rm -f "$f"
+            echo "  Removed: $f"
+        fi
+    done
+    echo "FluxLinux: Qwen3.5-0.8B Model Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler Function to pause and let user read logs
 handle_error() {

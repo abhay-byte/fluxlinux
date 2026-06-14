@@ -1,6 +1,27 @@
 #!/bin/bash
 # scripts/common/setup_qwen25_debian.sh
 # Download Qwen2.5-1.5B-Instruct GGUF model for llama.cpp
+# Usage: setup_qwen25_debian.sh [uninstall]
+
+# Model files to remove on uninstall
+MODEL_FILES=(
+    "/root/models/Qwen2.5-1.5B-Instruct-Q4_0.gguf"
+    "/root/models/Qwen2.5-1.5B-Instruct-Q4_0.gguf.tmp"
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Qwen2.5-1.5B Model..."
+    for f in "${MODEL_FILES[@]}"; do
+        if [ -f "$f" ]; then
+            rm -f "$f"
+            echo "  Removed: $f"
+        fi
+    done
+    echo "FluxLinux: Qwen2.5-1.5B Model Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 handle_error() {
     echo ""

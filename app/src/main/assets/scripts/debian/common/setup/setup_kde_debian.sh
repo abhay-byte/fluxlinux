@@ -2,6 +2,49 @@
 # setup_kde_debian.sh
 # Base post-install configuration for KDE Plasma on Debian-based distros (PRoot / Chroot)
 # Mirrors what setup_debian_family.sh does, but installs KDE Plasma instead of XFCE4
+# Usage: setup_kde_debian.sh <distro_name> [uninstall]
+
+# KDE-specific packages. Shared system packages (xorg, xauth, dbus-x11,
+# tigervnc-standalone-server, sddm) and the 'flux' user are intentionally
+# excluded — they're used by XFCE and other components.
+PKGS=(
+    kde-standard
+    spectacle
+    kwallet-pam
+    qt5ct
+    qt5-style-plugins
+    systemsettings
+    plasma-discover
+    kinfocenter
+    okular
+    gwenview
+    kcalc
+    kwrite
+    kfind
+    filelight
+    partitionmanager
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+# Detect uninstall as either first or second argument (since DISTRO_NAME=$1 may come first).
+if [ "$1" = "uninstall" ] || [ "$2" = "uninstall" ]; then
+    DISTRO_NAME="${1:-debian}"
+    [ "$1" = "uninstall" ] && DISTRO_NAME="debian"
+
+    echo "FluxLinux: Uninstalling KDE Plasma Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove KDE-specific marker and config
+    rm -f /home/flux/.fluxlinux/kde_installed
+    rm -rf /home/flux/.vnc  # KDE xstartup; vncserver will be re-created by xfce install if needed
+
+    echo "FluxLinux: KDE Plasma Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 DISTRO_NAME="${1:-debian}"
 LOG_FILE="/tmp/fluxlinux_kde_install.log"

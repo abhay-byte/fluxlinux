@@ -2,6 +2,58 @@
 # setup_cybersec_debian.sh
 # Installs Cybersecurity & Penetration Testing Stack
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_cybersec_debian.sh [uninstall]
+
+# Cyber-security-specific packages. Shared base tools (curl/wget/git/build-essential)
+# and apt sources.list (contrib/non-free) intentionally not reverted.
+PKGS=(
+    nmap
+    netcat-traditional
+    tcpdump
+    wireshark
+    tshark
+    aircrack-ng
+    john
+    hydra
+    sqlmap
+    hashcat
+    nikto
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Cybersecurity Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove Nikto (manual git install + symlink)
+    rm -rf /opt/nikto
+    rm -f /usr/local/bin/nikto
+
+    # Remove Metasploit Framework (apt package + /opt install)
+    if command -v msfconsole >/dev/null; then
+        apt remove -y --purge metasploit-framework 2>/dev/null || true
+    fi
+    rm -rf /opt/metasploit-framework
+    rm -f /usr/bin/msfconsole /usr/bin/msfvenom /usr/bin/msfdb /usr/bin/msfupdate
+
+    # Remove Burp Suite wrapper + desktop entry
+    rm -f /usr/local/bin/burpsuite
+    rm -f /usr/share/applications/burpsuite.desktop
+    # Don't touch /opt/burpsuite — user may have manually placed the JAR there
+
+    # Remove flux user from wireshark group (cleanup)
+    if id "flux" &>/dev/null; then
+        gpasswd -d flux wireshark 2>/dev/null || true
+    fi
+
+    echo "FluxLinux: Cybersecurity Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

@@ -500,10 +500,14 @@ object TermuxIntentFactory {
      * Runs a specific feature script inside the distro.
      * Uses Base64 injection to avoid quoting/escape issues.
      */
-    fun buildRunFeatureScriptIntent(distroId: String, scriptContent: String, callbackName: String? = null): Intent {
+    fun buildRunFeatureScriptIntent(distroId: String, scriptContent: String, callbackName: String? = null, isUninstall: Boolean = false): Intent {
         val safeScript = if (!scriptContent.endsWith("\n")) "$scriptContent\n" else scriptContent
         val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
         
+        // When uninstalling, pass "uninstall" as $1 to the script so it can
+        // branch into its removal path. Install path runs with no args.
+        val scriptArg = if (isUninstall) " uninstall" else ""
+
         // Callback command (run by Termux)
         val callbackCmd = if (callbackName != null) {
             "am start -a android.intent.action.VIEW -d \"fluxlinux://callback?result=success&name=$callbackName\""
@@ -513,10 +517,11 @@ object TermuxIntentFactory {
             // Termux Native: script runs directly in Termux host (no proot, no chroot)
             val safeScript = if (!scriptContent.endsWith("\n")) "$scriptContent\n" else scriptContent
             val scriptB64 = android.util.Base64.encodeToString(safeScript.toByteArray(), android.util.Base64.NO_WRAP)
+            val scriptArg = if (isUninstall) " uninstall" else ""
             val callbackCmd = if (callbackName != null) {
                 "am start -a android.intent.action.VIEW -d \"fluxlinux://callback?result=success&name=$callbackName\""
             } else ""
-            val command = "echo \"$scriptB64\" | base64 -d > $TERMUX_HOME_DIR/flux_feature.sh && chmod +x $TERMUX_HOME_DIR/flux_feature.sh && bash $TERMUX_HOME_DIR/flux_feature.sh; rm -f $TERMUX_HOME_DIR/flux_feature.sh; $callbackCmd"
+            val command = "echo \"$scriptB64\" | base64 -d > $TERMUX_HOME_DIR/flux_feature.sh && chmod +x $TERMUX_HOME_DIR/flux_feature.sh && bash $TERMUX_HOME_DIR/flux_feature.sh$scriptArg; rm -f $TERMUX_HOME_DIR/flux_feature.sh; $callbackCmd"
             return buildRunCommandIntent(command, runInBackground = false)
         }
 
@@ -529,7 +534,7 @@ object TermuxIntentFactory {
                 mkdir -p $termuxTmp;
                 echo "$scriptB64" | base64 -d > $termuxTmp/flux_feature.sh;
                 chmod +x $termuxTmp/flux_feature.sh;
-                busybox chroot /data/local/tmp/chrootDebian /bin/su - root -c "bash /tmp/flux_feature.sh";
+                busybox chroot /data/local/tmp/chrootDebian /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
                 rm -f $termuxTmp/flux_feature.sh;
                 ';
                 sleep 1; $callbackCmd
@@ -552,7 +557,7 @@ object TermuxIntentFactory {
                     mkdir -p $termuxTmp;
                     echo "$scriptB64" | base64 -d > $termuxTmp/flux_feature.sh;
                     chmod +x $termuxTmp/flux_feature.sh;
-                    sh "${'$'}ROOT_RUNNER" "bash /tmp/flux_feature.sh";
+                    sh "${'$'}ROOT_RUNNER" "bash /tmp/flux_feature.sh$scriptArg";
                     rm -f $termuxTmp/flux_feature.sh;
                 else
                     mnt=/data/local/tmp/chrootDebian13;
@@ -568,7 +573,7 @@ object TermuxIntentFactory {
                     mount --bind $termuxTmp ${'$'}mnt/tmp >/dev/null 2>&1;
                     echo "$scriptB64" | base64 -d > $termuxTmp/flux_feature.sh;
                     chmod +x $termuxTmp/flux_feature.sh;
-                    busybox chroot ${'$'}mnt /bin/su - root -c "bash /tmp/flux_feature.sh";
+                    busybox chroot ${'$'}mnt /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
                     rm -f $termuxTmp/flux_feature.sh;
                 fi;
                 ';
@@ -579,8 +584,8 @@ object TermuxIntentFactory {
         }
         
         // Command to run inside Termux (Proot):
-        // 1. Run script inside Proot
-        val innerCommand = "echo \"$scriptB64\" | base64 -d > /tmp/flux_feature.sh && bash /tmp/flux_feature.sh; rm -f /tmp/flux_feature.sh"
+        // 1. Run script inside Proot (with optional "uninstall" arg)
+        val innerCommand = "echo \"$scriptB64\" | base64 -d > /tmp/flux_feature.sh && bash /tmp/flux_feature.sh$scriptArg; rm -f /tmp/flux_feature.sh"
         // 2. Append Callback to outer command (Termux runs this after Proot exits)
         val command = "proot-distro login $distroId --shared-tmp -- bash -c '$innerCommand'; $callbackCmd"
         
