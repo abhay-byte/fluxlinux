@@ -106,6 +106,12 @@ class InstallServerService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + supervisor)
     private var server: LocalInstallServer? = null
     private var stateJob: Job? = null
+    private var startedAt: Long = 0L
+
+    // Android 16+ enforces a minimum FGS_DATA_SYNC lifetime (~6s) — stopping
+    // earlier triggers "Stop FGS timeout" and suppresses the notification.
+    // Track start time and defer teardown so the FGS always lives long enough.
+    private val minLifetimeMs: Long = 8_000L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -131,6 +137,7 @@ class InstallServerService : Service() {
     }
 
     private fun startInForeground() {
+        startedAt = System.currentTimeMillis()
         val notification = buildNotification("Preparing install…", "Serving install script to Termux")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIF_ID, notification, FOREGROUND_TYPE_DATA_SYNC)
@@ -226,6 +233,20 @@ class InstallServerService : Service() {
     }
 
     private fun stopServerAndSelf() {
+        val elapsed = System.currentTimeMillis() - startedAt
+        if (startedAt > 0 && elapsed < minLifetimeMs) {
+            // Defer teardown until the FGS has lived its minimum lifetime,
+            // so Android 16+ doesn't flag us for FGS_DATA_SYNC timeout.
+            scope.launch {
+                kotlinx.coroutines.delay(minLifetimeMs - elapsed)
+                doStop()
+            }
+        } else {
+            doStop()
+        }
+    }
+
+    private fun doStop() {
         try { server?.stop() } catch (_: Exception) {}
         server = null
         _activePort.value = null
