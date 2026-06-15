@@ -494,7 +494,7 @@ fun PackageInstallationStep(
             version = if (termuxInstalled.value) StateManager.getTermuxVersion(context) else null,
             apkStatus = termuxApkStatus,
             progress = termuxProgress,
-            minVersionHint = "v0.118.3 or newer (Play Store version is too old)",
+            minVersionHint = "v0.118.3",
             onDownload = { downloadTermux() },
             onInstallApk = { installApk("termux.apk") }
         )
@@ -822,16 +822,16 @@ fun PrerequisiteItem(
                             )
                             if (version != null) {
                                 Text(
-                                    text = "Installed: v$version   (REQUIRED: v0.118.3 or newer)",
+                                    text = "Installed: v$version",
                                     color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                                     fontSize = 12.sp
                                 )
                             }
                             Text(
-                                text = "Only Termux v0.118.3+ is supported. Older versions (including the Play Store release) will fail at the 'grant permission' step. Uninstall your current Termux, then install v0.118.3 from GitHub below.",
+                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -876,10 +876,11 @@ fun PrerequisiteItem(
                         }
                         if (minVersionHint != null) {
                             Text(
-                                text = "Required: $minVersionHint",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.55f),
+                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f),
                                 fontSize = 11.sp,
-                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                lineHeight = 14.sp
                             )
                         }
                     }
@@ -1020,20 +1021,11 @@ fun TermuxVersionAlertBanner() {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "FluxLinux requires Termux v0.118.3 or newer. " +
-                        "Older versions (including the Play Store release) " +
-                        "are unsupported and will fail at the permission grant step.",
+                    text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "1. Uninstall your current Termux\n" +
-                        "2. Tap Download v0.118.3 (GitHub) below",
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
