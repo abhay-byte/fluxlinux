@@ -68,3 +68,32 @@
     Test: build APK, install component, uninstall, verify packages removed
     and UI badge cleared, reinstall works.
 ---
+- id: T2
+  title: Prevent concurrent feature package installs
+  type: feature
+  priority: high
+  difficulty: easy
+  why: Concurrent installs can corrupt package state; user got bitten by misclick
+  really_needed: Yes, can break installs
+  impact: UI (disable install buttons + progress indicator while running)
+  followups: null
+  images: null
+  github_ref: GH-10
+  plan: |
+    Goal: prevent concurrent feature/component installs from corrupting package state.
+
+    Verification result: ALREADY IMPLEMENTED. No code work needed.
+
+    Existing implementation:
+    - `InstallationQueueManager.InstallationState.isInstalling` flag (singleton, queue-scoped)
+    - `GlassCard.kt:220-233` — install button disabled when `isGlobalInstalling`; label flips to
+      "Installation Busy..." or "View Progress" (when this card's distro is the active one)
+    - `DistroSettingsScreen.kt:676,705` — component Install/Re-run + Uninstall buttons disabled;
+      label "Busy..." when busy; icon alpha dimmed
+    - `DistroScreen.kt:110-113` — `isCurrentlyInstalling` distinguishes this-distro vs other-distro;
+      extra guard rejects enqueue from a non-active distro while another is running
+    - `MainActivity.kt:509,613,638` — single enqueue path through `InstallationQueueManager.enqueue()`
+    - Commit `8d2ea22 feat: concurrent installation prevention with user cancel` ships the feature
+    - Commit `e04da8f` follow-up: base install handled manually (curl/Termux) so it no longer
+      leaves UI stuck in Busy state
+  note: Verified — already implemented. Closed without code changes.
