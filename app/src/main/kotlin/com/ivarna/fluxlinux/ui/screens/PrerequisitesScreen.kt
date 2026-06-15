@@ -476,6 +476,16 @@ fun PackageInstallationStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // T4: Top-of-screen critical alert when Termux is too old.
+        // The inline warning inside PrerequisiteItem is easy to miss in a
+        // long list of cards — a prominent banner at the top of the screen
+        // makes the "uninstall Play Store, install v0.118.3 from GitHub"
+        // requirement unmissable.
+        if (isTermuxOutdated) {
+            TermuxVersionAlertBanner()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Termux
         PrerequisiteItem(
             name = "Termux",
@@ -484,6 +494,7 @@ fun PackageInstallationStep(
             version = if (termuxInstalled.value) StateManager.getTermuxVersion(context) else null,
             apkStatus = termuxApkStatus,
             progress = termuxProgress,
+            minVersionHint = "v0.118.3 or newer (Play Store version is too old)",
             onDownload = { downloadTermux() },
             onInstallApk = { installApk("termux.apk") }
         )
@@ -776,6 +787,7 @@ fun PrerequisiteItem(
     version: String?,
     apkStatus: ApkStatus = ApkStatus.INSTALLED,
     progress: Float = 0f,
+    minVersionHint: String? = null,
     onDownload: (() -> Unit)? = null,
     onInstallApk: (() -> Unit)? = null
 ) {
@@ -803,23 +815,24 @@ fun PrerequisiteItem(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "$name — Outdated Version",
-                                color = Color(0xFFFF9800),
+                                text = "$name — Version Too Old",
+                                color = Color(0xFFFF5252),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             if (version != null) {
                                 Text(
-                                    text = "Installed: v$version (min required: v0.118.3)",
+                                    text = "Installed: v$version   (REQUIRED: v0.118.3 or newer)",
                                     color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                                     fontSize = 12.sp
                                 )
                             }
                             Text(
-                                text = "You likely have the Play Store version. Uninstall it first, then install from GitHub.",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                                fontSize = 11.sp,
-                                lineHeight = 14.sp
+                                text = "Only Termux v0.118.3+ is supported. Older versions (including the Play Store release) will fail at the 'grant permission' step. Uninstall your current Termux, then install v0.118.3 from GitHub below.",
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -859,6 +872,14 @@ fun PrerequisiteItem(
                                 text = version,
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.7f),
                                 fontSize = 12.sp
+                            )
+                        }
+                        if (minVersionHint != null) {
+                            Text(
+                                text = "Required: $minVersionHint",
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.55f),
+                                fontSize = 11.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                             )
                         }
                     }
@@ -957,6 +978,63 @@ fun PrerequisiteItem(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * T4: Critical alert shown at the top of the prerequisite list when the
+ * installed Termux is too old. Renders above the Termux install-check card
+ * so the requirement (uninstall Play Store Termux, install v0.118.3 from
+ * GitHub) is unmissable.
+ */
+@Composable
+fun TermuxVersionAlertBanner() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFFF5252).copy(alpha = 0.6f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = "Outdated Termux",
+                tint = Color(0xFFFF5252),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Termux version is too old",
+                    color = Color(0xFFFF5252),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "FluxLinux requires Termux v0.118.3 or newer. " +
+                        "Older versions (including the Play Store release) " +
+                        "are unsupported and will fail at the permission grant step.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "1. Uninstall your current Termux\n" +
+                        "2. Tap Download v0.118.3 (GitHub) below",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp
+                )
             }
         }
     }
