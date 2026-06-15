@@ -212,8 +212,9 @@ class InstallServerService : Service() {
             .setContentText(body)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(openApp)
             .build()
     }
@@ -224,10 +225,10 @@ class InstallServerService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Install server",
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Keeps the local install script server alive during an install"
-            setShowBadge(false)
+            description = "Shows the active install — keeps FluxLinux alive during the install"
+            setShowBadge(true)
         }
         nm.createNotificationChannel(channel)
     }

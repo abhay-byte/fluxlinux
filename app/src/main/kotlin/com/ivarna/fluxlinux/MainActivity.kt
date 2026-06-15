@@ -535,6 +535,7 @@ class MainActivity : ComponentActivity() {
                                                           // Start the foreground service so Android keeps the bridge alive
                                                           // even when the activity is backgrounded (T3 / GH-9).
                                                           com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity, script)
+                                                          android.widget.Toast.makeText(this@MainActivity, "Starting install server…", android.widget.Toast.LENGTH_SHORT).show()
                                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                                               val port = com.ivarna.fluxlinux.core.service.InstallServerService.awaitPort()
                                                               if (port == null) {
