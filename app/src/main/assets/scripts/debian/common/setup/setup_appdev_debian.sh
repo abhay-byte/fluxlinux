@@ -64,6 +64,12 @@ if [ "$1" = "uninstall" ]; then
         fi
     done
 
+    # Remove system-wide profile.d entry
+    rm -f /etc/profile.d/android-sdk.sh
+
+    # Remove Flutter user config (regen'd on next install)
+    rm -rf /home/flux/.flutter
+
     echo "FluxLinux: App Development Environment Uninstalled."
     exit 0
 fi

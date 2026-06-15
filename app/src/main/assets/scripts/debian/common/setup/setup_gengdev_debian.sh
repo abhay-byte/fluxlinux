@@ -61,6 +61,9 @@ if [ "$1" = "uninstall" ]; then
     rm -f /usr/share/applications/lunarvim.desktop
     rm -rf /home/flux/.lvim* 2>/dev/null || true
 
+    # Remove NPM global prefix
+    rm -rf /home/flux/.npm-global
+
     # Revert .bashrc / .zshrc PATH and config entries
     for shell_rc in /home/flux/.bashrc /home/flux/.zshrc /etc/profile; do
         if [ -f "$shell_rc" ]; then

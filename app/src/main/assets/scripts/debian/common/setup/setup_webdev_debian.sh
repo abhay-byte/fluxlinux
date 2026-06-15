@@ -42,7 +42,7 @@ if [ "$1" = "uninstall" ]; then
     rm -f /usr/share/applications/firefox.desktop
     rm -f /usr/share/applications/chromium.desktop
     rm -f /home/flux/.local/share/applications/chromium.desktop
-    rm -f /home/flux/.local/share/applications/firefox.desktop
+    # (No firefox.desktop in ~/.local/share/applications/ — never created by installer)
 
     # 3. Remove Node.js (manual tarball install + symlinks)
     rm -rf /opt/nodejs
@@ -61,6 +61,15 @@ if [ "$1" = "uninstall" ]; then
     rm -f /etc/apt/keyrings/packages.mozilla.org.asc
     rm -f /etc/apt/keyrings/packages.mozilla.org.asc.sha256
     apt update -y 2>/dev/null || true
+
+    # 6. Revert .bashrc / .zshrc entries added by the installer
+    for shell_rc in /home/flux/.bashrc /home/flux/.zshrc; do
+        if [ -f "$shell_rc" ]; then
+            sed -i '/^# Node.js Global Path$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export PATH=\$PATH:\/opt\/nodejs\/bin$/d' "$shell_rc" 2>/dev/null || true
+            sed -i "/^alias code='code --no-sandbox --unity-launch'/d" "$shell_rc" 2>/dev/null || true
+        fi
+    done
 
     echo "FluxLinux: Web Development Environment Uninstalled."
     exit 0
