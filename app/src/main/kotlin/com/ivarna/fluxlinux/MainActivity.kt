@@ -506,25 +506,27 @@ class MainActivity : ComponentActivity() {
                                                   ))
                                               }
                                               
-                                              queueManager.enqueue(tasks)
-                                              
-                                              // Start the first task (Base Install)
-                                              val firstTask = queueManager.next()
-                                              if (firstTask != null && firstTask.type == com.ivarna.fluxlinux.core.utils.TaskType.BASE_INSTALL) {
-                                                   // Generate Base Script
-                                                   val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
-                                                   
-                                                   withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                         val server = com.ivarna.fluxlinux.core.utils.LocalInstallServer()
-                                                         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                             val port = server.start(script)
-                                                         // Auto-stop server after 5 min to prevent resource leak
-                                                         // (do not stop on download so re-runs work)
-                                                         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                             kotlinx.coroutines.delay(300_000L)
-                                                             server.stop()
-                                                         }
-                                                             withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                               queueManager.enqueue(tasks)
+
+                                               // Start the first task (Base Install)
+                                               val firstTask = queueManager.next()
+                                               if (firstTask != null && firstTask.type == com.ivarna.fluxlinux.core.utils.TaskType.BASE_INSTALL) {
+                                                    // Generate Base Script
+                                                    val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
+
+                                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                          // Start the foreground service so Android keeps the bridge alive
+                                                          // even when the activity is backgrounded (T3 / GH-9).
+                                                          com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity, script)
+                                                          lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                                              val port = com.ivarna.fluxlinux.core.service.InstallServerService.awaitPort()
+                                                              if (port == null) {
+                                                                  withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                                      android.widget.Toast.makeText(this@MainActivity, "Server failed to start", android.widget.Toast.LENGTH_LONG).show()
+                                                                  }
+                                                                  return@launch
+                                                              }
+                                                              withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                                   // INTERACTIVE COMMAND: Download then Run
                                                                   // Prepend Exports based on Selection
                                                                   // Use one-shot env var syntax: VAR=val command
@@ -552,28 +554,29 @@ class MainActivity : ComponentActivity() {
                                                                             if (launchIntent != null) startActivity(launchIntent)
                                                                             // Stay on Install Wizard/DistroSettings so user sees progress
                                                                         }
-                                                                        .setNegativeButton("Cancel") { _, _ -> server.stop() }
-                                                                        .setCancelable(false)
-                                                                        .show()
-                                                                  } else {
-                                                                       // Standard Proot Command
-                                                                       val installCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && $exports bash install.sh"
-                                                                       val clip = android.content.ClipData.newPlainText("FluxLinux Install", installCommand)
-                                                                       clipboard.setPrimaryClip(clip)
+                                                                         .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
+                                                                         .setCancelable(false)
+                                                                         .show()
+                                                                   } else {
+                                                                        // Standard Proot Command
+                                                                        val installCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && $exports bash install.sh"
+                                                                        val clip = android.content.ClipData.newPlainText("FluxLinux Install", installCommand)
+                                                                        clipboard.setPrimaryClip(clip)
 
-                                                                       android.app.AlertDialog.Builder(this@MainActivity)
-                                                                        .setTitle("Phase 1: Base Install 🚀")
-                                                                        .setMessage("Queue initialized!\n\n1. Open Termux\n2. Paste command\n3. Follow prompts (GPU/Theme)\n4. App will auto-launch next steps.")
-                                                                        .setPositiveButton("Open Termux") { _, _ ->
-                                                                            server.onDownload = { server.stop() }
-                                                                            val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                            if (launchIntent != null) startActivity(launchIntent)
-                                                                            currentScreen = Screen.HOME
-                                                                        }
-                                                                        .setNegativeButton("Cancel") { _, _ -> server.stop() }
-                                                                        .setCancelable(false)
-                                                                        .show()
-                                                                  }
+                                                                        android.app.AlertDialog.Builder(this@MainActivity)
+                                                                         .setTitle("Phase 1: Base Install 🚀")
+                                                                         .setMessage("Queue initialized!\n\n1. Open Termux\n2. Paste command\n3. Follow prompts (GPU/Theme)\n4. App will auto-launch next steps.")
+                                                                         .setPositiveButton("Open Termux") { _, _ ->
+                                                                             // The service observes InstallationQueueManager.installState; it will
+                                                                             // tear itself down when the install completes.
+                                                                             val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
+                                                                             if (launchIntent != null) startActivity(launchIntent)
+                                                                             currentScreen = Screen.HOME
+                                                                         }
+                                                                         .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
+                                                                         .setCancelable(false)
+                                                                         .show()
+                                                                   }
                                                              }
                                                          }
                                                    }
@@ -597,6 +600,9 @@ class MainActivity : ComponentActivity() {
                                   hazeState = hazeState,
                                    onInstallComponent = { component, extraEnv ->
                                        if (permissionState.status.isGranted) {
+                                           // Start the foreground service so the install progress notification
+                                           // stays alive when the user backgrounds the app (T3 / GH-9).
+                                           com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity)
                                            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                                val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
                                                queueManager.clear()
@@ -622,6 +628,7 @@ class MainActivity : ComponentActivity() {
                                    },
                                   onUninstallComponent = { component ->
                                       if (permissionState.status.isGranted) {
+                                          com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity)
                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
                                               queueManager.clear()
@@ -645,66 +652,70 @@ class MainActivity : ComponentActivity() {
                                           permissionState.launchPermissionRequest()
                                       }
                                   },
-                                 onReinstallDistro = {
-                                      if (permissionState.status.isGranted) {
-                                          lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                              val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-                                                                                              // No need to enqueue a task here since the base install is handled manually via curl/Termux.
-                                                // Enqueueing it causes the UI to permanently stay in 'isInstalling' (Busy) mode.
+                                  onReinstallDistro = {
+                                       if (permissionState.status.isGranted) {
+                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
+                                                                                               // No need to enqueue a task here since the base install is handled manually via curl/Termux.
+                                                 // Enqueueing it causes the UI to permanently stay in 'isInstalling' (Busy) mode.
 
-                                              withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                   // Reuse InstallConfigScreen logic for Base Install handling
-                                                   // We manually trigger the logic here because it's a manual script execution in Termux.
-                                                   
-                                                   val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
-                                                   val server = com.ivarna.fluxlinux.core.utils.LocalInstallServer()
-                                                   
-                                                   lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                        val port = server.start(script)
-                                                        // Server kept alive (no onDownload stop) so re-runs and retries work
-                                                        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                            kotlinx.coroutines.delay(300_000L)
-                                                            server.stop()
-                                                        }
-                                                        withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                              val isChroot = selectedDistro!!.chrootSupported && !selectedDistro!!.prootSupported
-                                                              val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                               withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    // Reuse InstallConfigScreen logic for Base Install handling
+                                                    // We manually trigger the logic here because it's a manual script execution in Termux.
 
-                                                              if (isChroot) {
-                                                                   // Chroot Logic
-                                                                   val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && sh install.sh"
-                                                                   val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
-                                                                   clipboard.setPrimaryClip(clip)
+                                                    val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
 
-                                                                   android.app.AlertDialog.Builder(this@MainActivity)
-                                                                    .setTitle("⚠️ Root Required (Reinstall)")
-                                                                    .setMessage("1. Open Termux\n2. Type 'su' -> Enter 🔑\n3. Paste & Run command.")
-                                                                    .setPositiveButton("Open Termux") { _, _ ->
-                                                                        val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                        if (launchIntent != null) startActivity(launchIntent)
-                                                                    }
-                                                                    .setNegativeButton("Cancel") { _, _ -> server.stop() }
-                                                                    .setCancelable(false)
-                                                                    .show()
-                                                              } else {
-                                                                   // Proot Logic
-                                                                   val curlCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && bash install.sh"
-                                                                   val clip = android.content.ClipData.newPlainText("FluxLinux Install", curlCommand)
-                                                                   clipboard.setPrimaryClip(clip)
-                                                                   
-                                                                   android.app.AlertDialog.Builder(this@MainActivity)
-                                                                    .setTitle("Reinstalling Base System 🚀")
-                                                                    .setMessage("Command copied!\n\n1. Open Termux\n2. Paste command")
-                                                                    .setPositiveButton("Open Termux") { _, _ ->
-                                                                        val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                        if (launchIntent != null) startActivity(launchIntent)
-                                                                    }
-                                                                    .setNegativeButton("Cancel") { _, _ -> server.stop() }
-                                                                    .setCancelable(false)
-                                                                    .show()
-                                                              }
-                                                        }
-                                                   }
+                                                    // Start the foreground service so Android keeps the bridge alive
+                                                    // across backgrounding (T3 / GH-9).
+                                                    com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity, script)
+
+                                                    lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                                         val port = com.ivarna.fluxlinux.core.service.InstallServerService.awaitPort()
+                                                         if (port == null) {
+                                                             withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                                 android.widget.Toast.makeText(this@MainActivity, "Server failed to start", android.widget.Toast.LENGTH_LONG).show()
+                                                             }
+                                                             return@launch
+                                                         }
+                                                         withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                               val isChroot = selectedDistro!!.chrootSupported && !selectedDistro!!.prootSupported
+                                                               val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+
+                                                               if (isChroot) {
+                                                                    // Chroot Logic
+                                                                    val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && sh install.sh"
+                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
+                                                                    clipboard.setPrimaryClip(clip)
+
+                                                                    android.app.AlertDialog.Builder(this@MainActivity)
+                                                                     .setTitle("⚠️ Root Required (Reinstall)")
+                                                                     .setMessage("1. Open Termux\n2. Type 'su' -> Enter 🔑\n3. Paste & Run command.")
+                                                                     .setPositiveButton("Open Termux") { _, _ ->
+                                                                         val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
+                                                                         if (launchIntent != null) startActivity(launchIntent)
+                                                                     }
+                                                                     .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
+                                                                     .setCancelable(false)
+                                                                     .show()
+                                                               } else {
+                                                                    // Proot Logic
+                                                                    val curlCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && bash install.sh"
+                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", curlCommand)
+                                                                    clipboard.setPrimaryClip(clip)
+
+                                                                    android.app.AlertDialog.Builder(this@MainActivity)
+                                                                     .setTitle("Reinstalling Base System 🚀")
+                                                                     .setMessage("Command copied!\n\n1. Open Termux\n2. Paste command")
+                                                                     .setPositiveButton("Open Termux") { _, _ ->
+                                                                         val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
+                                                                         if (launchIntent != null) startActivity(launchIntent)
+                                                                     }
+                                                                     .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
+                                                                     .setCancelable(false)
+                                                                     .show()
+                                                               }
+                                                         }
+                                                    }
                                               }
                                           }
                                       } else {
