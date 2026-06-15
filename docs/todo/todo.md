@@ -1,16 +1,4 @@
 ---
-- id: T3
-  title: Foreground service to keep local server alive during OS install
-  type: bug
-  priority: medium
-  difficulty: easy
-  why: Android kills FluxLinux's background server, breaking the install bridge (curl: connection refused on localhost)
-  really_needed: Workaround exists (split-screen), but proper fix avoids user friction
-  impact: Bridge/service layer + notification for the foreground service
-  followups: null
-  images: null
-  github_ref: GH-9
-  plan: null
 - id: T4
   title: Disclaimer banner on Termux/X11 install checks
   type: feature
