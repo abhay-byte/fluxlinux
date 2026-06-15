@@ -695,7 +695,10 @@ fun ComponentManagementGlassCard(
 
                             // Secondary Uninstall button — only for installed, non-mandatory components.
                             // Mandatory components (e.g., hw_accel) cannot be removed.
-                            if (isInstalled && !component.isMandatory && !component.comingSoon && onUninstall != null) {
+                            // xfce4_desktop is also hidden: its script (setup_debian_family.sh /
+                            // setup_xfce4_termux.sh / setup_arch_family.sh) is the base install
+                            // and has no uninstall branch — tapping Uninstall would re-install XFCE.
+                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && onUninstall != null) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 TextButton(
                                     onClick = onUninstall,
