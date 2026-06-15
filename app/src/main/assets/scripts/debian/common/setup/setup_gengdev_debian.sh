@@ -2,6 +2,83 @@
 # setup_gengdev_debian.sh
 # Installs General Software Engineering stack (Rust, Go, C/C++, Editors)
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_gengdev_debian.sh [uninstall]
+
+# Gen-dev-specific apt packages. Shared base tools (build-essential, git,
+# curl, python3, python3-pip, python3-venv, nodejs) and /opt/nodejs
+# (shared with webdev) intentionally excluded.
+PKGS=(
+    gdb
+    cmake
+    clang
+    lldb
+    valgrind
+    neovim
+    geany
+    vim
+    emacs-nox
+    ripgrep
+    python3-pynvim
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling General Software Engineering Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove NodeSource repo (added by this script)
+    rm -f /etc/apt/sources.list.d/nodesource.list
+    rm -f /etc/apt/sources.list.d/nodesource.list.save
+    rm -f /etc/apt/keyrings/nodesource.gpg
+    apt update -y 2>/dev/null || true
+
+    # Remove Rust (user-level)
+    rm -rf /home/flux/.cargo /home/flux/.rustup
+    rm -f /usr/local/bin/cargo /usr/local/bin/rustup /usr/local/bin/rustc
+
+    # Remove Go
+    rm -rf /opt/go
+    rm -f /usr/local/bin/go /usr/local/bin/gofmt
+
+    # Remove Lazygit
+    rm -f /usr/local/bin/lazygit
+
+    # Remove Micro
+    rm -f /usr/local/bin/micro
+
+    # Remove VS Code (tarball install + symlink + .desktop + user config)
+    rm -rf /usr/share/code
+    rm -f /usr/bin/code
+    rm -f /usr/share/applications/code.desktop
+    rm -rf /home/flux/.config/Code
+
+    # Remove LunarVim
+    rm -rf /home/flux/.local/share/lunarvim
+    rm -f /home/flux/.local/bin/lvim
+    rm -f /usr/share/applications/lunarvim.desktop
+    rm -rf /home/flux/.lvim* 2>/dev/null || true
+
+    # Remove NPM global prefix
+    rm -rf /home/flux/.npm-global
+
+    # Revert .bashrc / .zshrc PATH and config entries
+    for shell_rc in /home/flux/.bashrc /home/flux/.zshrc /etc/profile; do
+        if [ -f "$shell_rc" ]; then
+            sed -i '/# Rust Cargo/d; /\$HOME\/.cargo\/bin/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/# Go Language/d; /Go Root Bin/d; /Go User Bin/d; /\/opt\/go\/bin/d; /GOPATH=\$HOME\/go/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/# LunarVim/d; /\$HOME\/.local\/bin/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/# NPM Global/d; /npm-global\/bin/d' "$shell_rc" 2>/dev/null || true
+            sed -i "/^alias code='code --no-sandbox/d" "$shell_rc" 2>/dev/null || true
+        fi
+    done
+
+    echo "FluxLinux: General Software Engineering Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

@@ -2,6 +2,34 @@
 # setup_graphic_design_debian.sh
 # Installs Graphic Design & Digital Art Stack
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_graphic_design_debian.sh [uninstall]
+
+# Graphic-design-specific packages. Shared system deps (dbus-x11, fonts) and
+# apt sources.list (contrib/non-free) are intentionally not reverted — they're
+# used by other components (gamedev, cybersec, etc.).
+PKGS=(
+    gimp
+    inkscape
+    krita
+    darktable
+    scribus
+    blender
+    imagemagick
+    fontforge
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Graphic Design Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    echo "FluxLinux: Graphic Design Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

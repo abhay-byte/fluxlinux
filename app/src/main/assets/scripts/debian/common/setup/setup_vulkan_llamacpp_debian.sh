@@ -2,6 +2,52 @@
 # scripts/common/setup_vulkan_llamacpp_debian.sh
 # Install llama.cpp with Vulkan GPU backend for FluxLinux (PRoot/Chroot)
 # Uses Turnip (Adreno) or system Vulkan driver for GPU-accelerated LLM inference
+# Usage: setup_vulkan_llamacpp_debian.sh [uninstall]
+
+# llama-specific build deps. General tools (build-essential, git, pkg-config)
+# intentionally excluded — used by other components.
+PKGS_APT=(
+    cmake
+    libvulkan-dev
+    glslc
+    spirv-tools
+)
+PKGS_PACMAN=(
+    cmake
+    vulkan-headers
+    vulkan-icd-loader
+    glslc
+    spirv-tools
+    spirv-headers
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling llama.cpp Vulkan Environment..."
+
+    # Remove source + build dir
+    rm -rf /opt/llama-cpp
+
+    # Remove all installed llama binaries + wrapper
+    rm -f /usr/local/bin/llama-*
+    rm -f /usr/local/bin/llama-vulkan
+
+    # Remove SPIRV headers (installed to /usr/include/spirv/ by this script)
+    rm -rf /usr/include/spirv
+
+    # Try removing apt packages
+    if command -v apt-get &> /dev/null; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt remove -y --purge "${PKGS_APT[@]}" 2>/dev/null || true
+        apt autoremove -y 2>/dev/null || true
+    elif command -v pacman &> /dev/null; then
+        pacman -Rns --noconfirm "${PKGS_PACMAN[@]}" 2>/dev/null || true
+    fi
+
+    echo "FluxLinux: llama.cpp Vulkan Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler Function to pause and let user read logs
 handle_error() {

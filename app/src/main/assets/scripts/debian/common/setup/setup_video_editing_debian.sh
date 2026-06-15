@@ -2,6 +2,54 @@
 # setup_video_editing_debian.sh
 # Installs Video Editing & Processing Stack
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_video_editing_debian.sh [uninstall]
+
+# Video-editing-specific packages. apt sources.list (contrib/non-free) is
+# intentionally not reverted — shared with other components.
+PKGS=(
+    ffmpeg
+    mediainfo
+    libavcodec-extra
+    gstreamer1.0-plugins-base
+    gstreamer1.0-plugins-good
+    gstreamer1.0-plugins-bad
+    gstreamer1.0-plugins-ugly
+    gstreamer1.0-libav
+    gstreamer1.0-pulseaudio
+    kdenlive
+    shotcut
+    openshot-qt
+    flowblade
+    pitivi
+    audacity
+    vlc
+    mpv
+    smplayer
+    pulseaudio
+    blender
+    gir1.2-gsound-1.0
+    python3-opencv
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Video Editing Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Revert Kdenlive wrapper: restore the original .bin binary as the main
+    # binary, remove the wrapper script that called dbus-launch.
+    if [ -f /usr/bin/kdenlive.bin ] && [ -f /usr/bin/kdenlive ]; then
+        mv -f /usr/bin/kdenlive.bin /usr/bin/kdenlive
+    fi
+
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    echo "FluxLinux: Video Editing Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

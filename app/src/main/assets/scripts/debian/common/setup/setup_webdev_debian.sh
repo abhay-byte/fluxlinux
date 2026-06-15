@@ -1,6 +1,80 @@
 #!/bin/bash
 # setup_webdev_debian.sh
 # Installs Web Development stack (Node, Python, VS Code, Browsers) on Debian-based distros.
+# Usage: setup_webdev_debian.sh [uninstall]
+
+# Packages installed by this component. Used for uninstall.
+PKGS=(
+    firefox
+    chromium
+)
+
+# Other artifacts to remove on uninstall (not apt packages):
+#   /usr/local/bin/firefox, /usr/local/bin/chromium (wrappers)
+#   /usr/share/applications/firefox.desktop, chromium.desktop
+#   /home/flux/.local/share/applications/chromium.desktop
+#   /opt/nodejs (Node.js tarball install)
+#   /usr/local/bin/{node,npm,npx,corepack} (Node.js symlinks)
+#   /etc/profile.d/nodejs.sh
+#   /usr/share/code (VS Code tarball install)
+#   /usr/bin/code (VS Code symlink)
+#   /usr/share/applications/code.desktop
+#   /home/flux/.config/Code (VS Code user config)
+#   /etc/apt/sources.list.d/mozilla.list
+#   /etc/apt/preferences.d/mozilla
+#   /etc/apt/keyrings/packages.mozilla.org.asc
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+# If invoked with "uninstall" as the first argument, remove what we installed
+# and exit. Called by FluxLinux app from DistroSettings → Component → Uninstall.
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Web Development Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+
+    # 1. Remove apt packages
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # 2. Remove Firefox/Chromium wrappers + .desktop files
+    rm -f /usr/local/bin/firefox
+    rm -f /usr/local/bin/chromium
+    rm -f /usr/share/applications/firefox.desktop
+    rm -f /usr/share/applications/chromium.desktop
+    rm -f /home/flux/.local/share/applications/chromium.desktop
+    # (No firefox.desktop in ~/.local/share/applications/ — never created by installer)
+
+    # 3. Remove Node.js (manual tarball install + symlinks)
+    rm -rf /opt/nodejs
+    rm -f /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+    rm -f /etc/profile.d/nodejs.sh
+
+    # 4. Remove VS Code (tarball install + symlink + .desktop + user config)
+    rm -rf /usr/share/code
+    rm -f /usr/bin/code
+    rm -f /usr/share/applications/code.desktop
+    rm -rf /home/flux/.config/Code
+
+    # 5. Remove Mozilla apt repo (added by this script)
+    rm -f /etc/apt/sources.list.d/mozilla.list
+    rm -f /etc/apt/preferences.d/mozilla
+    rm -f /etc/apt/keyrings/packages.mozilla.org.asc
+    rm -f /etc/apt/keyrings/packages.mozilla.org.asc.sha256
+    apt update -y 2>/dev/null || true
+
+    # 6. Revert .bashrc / .zshrc entries added by the installer
+    for shell_rc in /home/flux/.bashrc /home/flux/.zshrc; do
+        if [ -f "$shell_rc" ]; then
+            sed -i '/^# Node.js Global Path$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export PATH=\$PATH:\/opt\/nodejs\/bin$/d' "$shell_rc" 2>/dev/null || true
+            sed -i "/^alias code='code --no-sandbox --unity-launch'/d" "$shell_rc" 2>/dev/null || true
+        fi
+    done
+
+    echo "FluxLinux: Web Development Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler Function to pause and let user read logs
 handle_error() {
@@ -51,7 +125,7 @@ Pin-Priority: 1000
 ' | tee /etc/apt/preferences.d/mozilla
 
 apt update -y
-apt install -y firefox chromium || handle_error "Browser Installation"
+apt install -y "${PKGS[@]}" || handle_error "Browser Installation"
 
 # Fix Firefox sandbox crashes in PRoot (no user namespaces, /dev is Android bind-mount)
 # Wrapper at /usr/local/bin/firefox takes priority over /usr/bin/firefox via PATH

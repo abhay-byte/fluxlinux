@@ -2,6 +2,63 @@
 # setup_gamedev_debian.sh
 # Installs Game Development stack (Godot, Ren'Py, LÖVE, Python Libs, C++ Libs)
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_gamedev_debian.sh [uninstall]
+
+# Game-dev-specific apt packages. Shared base tools (build-essential, git,
+# curl, wget, python3, python3-pip) intentionally excluded.
+PKGS=(
+    libsdl2-dev
+    libopenal-dev
+    libvorbis-dev
+    libflac-dev
+    libjpeg-dev
+    libpng-dev
+    libfreetype6-dev
+    libtiff-dev
+    libwebp-dev
+    renpy
+    love
+    python3-pygame
+    libbox2d-dev
+    libraylib-dev
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Game Development Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove Godot Engine (manual install + symlink + .desktop + icon)
+    rm -rf /opt/godot
+    rm -f /usr/local/bin/godot
+    rm -f /usr/share/applications/godot.desktop
+    rm -f /usr/share/icons/hicolor/256x256/apps/godot.png
+
+    # Remove Python venv with game libs
+    rm -rf /home/flux/gamedev_env
+
+    # Revert .bashrc / .zshrc Godot PATH entries
+    if [ -f /home/flux/.bashrc ]; then
+        sed -i '/# Godot Engine/d; /\/opt\/godot/d' /home/flux/.bashrc 2>/dev/null || true
+    fi
+    if [ -f /home/flux/.zshrc ]; then
+        sed -i '/# Godot Engine/d; /\/opt\/godot/d' /home/flux/.zshrc 2>/dev/null || true
+    fi
+
+    # If Raylib was built from source (no apt package), remove the installed files
+    if [ ! -f /usr/share/doc/libraylib-dev/copyright ] 2>/dev/null; then
+        rm -f /usr/local/include/raylib.h /usr/local/include/raymath.h
+        rm -f /usr/local/lib/libraylib.so*
+        ldconfig 2>/dev/null || true
+    fi
+
+    echo "FluxLinux: Game Development Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

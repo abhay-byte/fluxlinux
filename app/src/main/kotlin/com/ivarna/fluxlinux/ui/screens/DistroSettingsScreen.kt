@@ -49,6 +49,7 @@ fun DistroSettingsScreen(
     distro: Distro,
     onBack: () -> Unit,
     onInstallComponent: (DistroComponent, Map<String, String>) -> Unit,
+    onUninstallComponent: (DistroComponent) -> Unit = {},
     onUninstallDistro: () -> Unit,
     onReinstallDistro: () -> Unit,
     onNavigateToStart: (() -> Unit)? = null,
@@ -63,7 +64,8 @@ fun DistroSettingsScreen(
     val context = LocalContext.current
     val installState by InstallationQueueManager.installState.collectAsState()
     var showUninstallDialog by remember { mutableStateOf(false) }
-    
+    var pendingUninstallComponent by remember { mutableStateOf<DistroComponent?>(null) }
+
     // Config Dialog States
     var showThemeDialog by remember { mutableStateOf(false) }
     var showGpuDialog by remember { mutableStateOf(false) }
@@ -202,17 +204,17 @@ fun DistroSettingsScreen(
 
 
                 items(distro.components) { component ->
-                    val isInstalled = remember(component.id) { 
-                        StateManager.isComponentInstalled(context, distro.id, component.id) 
+                    val isInstalled = remember(component.id) {
+                        StateManager.isComponentInstalled(context, distro.id, component.id)
                     }
                     val details = componentDetailsMap[component.id]
-                    
+
                     ComponentManagementGlassCard(
                         component = component,
                         isInstalled = isInstalled,
                         isGlobalInstalling = installState.isInstalling,
                         details = details,
-                        onAction = { 
+                        onAction = {
                             when {
                                 component.id == "customization" -> {
                                     // XFCE4 customization — show theme + GPU dialog
@@ -234,6 +236,10 @@ fun DistroSettingsScreen(
                                     onInstallComponent(component, emptyMap())
                                 }
                             }
+                        },
+                        onUninstall = {
+                            // Stage the uninstall — confirmation dialog follows
+                            pendingUninstallComponent = component
                         }
                     )
                 }
@@ -294,6 +300,65 @@ fun DistroSettingsScreen(
     )
     
     // --- DIALOGS ---
+
+    // Component Uninstall Dialog (per-component, not whole-distro)
+    if (pendingUninstallComponent != null) {
+        val comp = pendingUninstallComponent!!
+        GlassDialog(onDismiss = { pendingUninstallComponent = null }) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFFF5252),
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Uninstall ${comp.name}?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "This will remove ${comp.name} (${comp.sizeEstimate}) and all its data. " +
+                        "You can re-install it later from this screen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { pendingUninstallComponent = null },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            val toUninstall = pendingUninstallComponent
+                            pendingUninstallComponent = null
+                            if (toUninstall != null) onUninstallComponent(toUninstall)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFF5252),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Uninstall") }
+                }
+            }
+        }
+    }
 
     // Uninstall Dialog
     if (showUninstallDialog) {
@@ -514,7 +579,8 @@ fun ComponentManagementGlassCard(
     isInstalled: Boolean,
     isGlobalInstalling: Boolean = false,
     details: ComponentDetail?,
-    onAction: () -> Unit
+    onAction: () -> Unit,
+    onUninstall: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -597,50 +663,82 @@ fun ComponentManagementGlassCard(
                     }
                 }
 
-                // Action Button (Right aligned)
-               Column(
-                   horizontalAlignment = Alignment.CenterHorizontally,
-                   verticalArrangement = Arrangement.Center
-               ) {
+                // Action area (right aligned): Re-run/Install + optional Uninstall,
+                // with the expand chevron to the right of the buttons.
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     if (!component.comingSoon) {
-                         Button(
-                             onClick = onAction,
-                             enabled = !isGlobalInstalling,
-                             colors = ButtonDefaults.buttonColors(
-                                 containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f) else MaterialTheme.colorScheme.primary,
-                                 contentColor = if (isInstalled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
-                                 disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                 disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                             ),
-                             shape = RoundedCornerShape(12.dp),
-                             modifier = Modifier.height(40.dp),
-                             elevation = ButtonDefaults.buttonElevation(0.dp)
-                         ) {
-                             if (isGlobalInstalling) {
-                                 Text("Busy...", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                             } else if (isInstalled) {
-                                 Text("Re-run", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                             } else {
-                                 Text("Install", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                             }
-                         }
-                   }
-                   
-                   Spacer(modifier = Modifier.height(8.dp))
-                   
-                    if (details != null && !component.comingSoon) {
-                         IconButton(
-                            onClick = { expanded = !expanded },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (expanded) "Collapse" else "Expand",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = onAction,
+                                enabled = !isGlobalInstalling,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isInstalled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f) else MaterialTheme.colorScheme.primary,
+                                    contentColor = if (isInstalled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(40.dp),
+                                elevation = ButtonDefaults.buttonElevation(0.dp)
+                            ) {
+                                if (isGlobalInstalling) {
+                                    Text("Busy...", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                } else if (isInstalled) {
+                                    Text("Re-run", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                } else {
+                                    Text("Install", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Secondary Uninstall button — only for installed, non-mandatory components.
+                            // Mandatory components (e.g., hw_accel) cannot be removed.
+                            // xfce4_desktop is also hidden: its script (setup_debian_family.sh /
+                            // setup_xfce4_termux.sh / setup_arch_family.sh) is the base install
+                            // and has no uninstall branch — tapping Uninstall would re-install XFCE.
+                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && onUninstall != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                TextButton(
+                                    onClick = onUninstall,
+                                    enabled = !isGlobalInstalling,
+                                    modifier = Modifier.height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Uninstall ${component.name}",
+                                        tint = Color(0xFFFF5252).copy(alpha = if (isGlobalInstalling) 0.3f else 1f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Uninstall",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFFF5252).copy(alpha = if (isGlobalInstalling) 0.3f else 1f),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            // Expand chevron — sits at the right end of the action row.
+                            if (details != null && !component.comingSoon) {
+                                Spacer(modifier = Modifier.width(2.dp))
+                                IconButton(
+                                    onClick = { expanded = !expanded },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = if (expanded) "Collapse" else "Expand",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
                         }
                     }
-               }
+                }
             }
             
             // Collapsible Content

@@ -2,6 +2,78 @@
 # setup_appdev_debian.sh
 # Installs App Development stack (Android SDK, Flutter, React Native)
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_appdev_debian.sh [uninstall]
+
+# App-dev-specific apt packages. Shared tools (adb, fastboot, chromium, cmake,
+# ninja-build, clang, git, curl, wget) intentionally excluded — used by
+# other components (gengdev, webdev, etc.).
+PKGS=(
+    libgtk-3-dev
+    liblzma-dev
+    libstdc++-12-dev
+    aapt
+    mesa-utils
+    openjdk-21-jdk
+    openjdk-21-jre
+    openjdk-21-jre-headless
+    openjdk-21-jdk-headless
+    default-jre-headless
+    default-jre
+    default-jdk-headless
+    default-jdk
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling App Development Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Remove the JDK first (it was the workaround install — clean up
+    # broken postinst files if present, then purge)
+    dpkg -l | grep -q "^iU.*openjdk\|^iF.*openjdk" && \
+        dpkg --remove --force-all openjdk-21-jre-headless openjdk-21-jre openjdk-21-jdk-headless openjdk-21-jdk default-jre-headless default-jre default-jdk-headless default-jdk 2>/dev/null || true
+
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove Android SDK
+    rm -rf /opt/android-sdk
+
+    # Remove Flutter
+    rm -rf /opt/flutter
+    rm -f /usr/local/bin/flutter /usr/local/bin/dart
+    rm -rf /home/flux/.config/flutter 2>/dev/null || true
+
+    # Remove Kotlin
+    rm -rf /opt/kotlin /opt/kotlinc
+    rm -f /usr/local/bin/kotlin /usr/local/bin/kotlinc
+
+    # Remove Gradle (manual install, not the legacy apt one)
+    rm -rf /opt/gradle
+    rm -f /usr/bin/gradle /usr/local/bin/gradle
+
+    # Revert .bashrc / .zshrc env vars added by this script
+    for shell_rc in /home/flux/.bashrc /home/flux/.zshrc; do
+        if [ -f "$shell_rc" ]; then
+            sed -i '/^export PATH="\/opt\/flutter\/bin:\$PATH"$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export ANDROID_SDK_ROOT="\/opt\/android-sdk"$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export ANDROID_HOME="\/opt\/android-sdk"$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export PATH="\$ANDROID_HOME\/cmdline-tools\/latest\/bin:\$PATH"$/d' "$shell_rc" 2>/dev/null || true
+            sed -i '/^export CHROME_EXECUTABLE=\/usr\/bin\/chromium$/d' "$shell_rc" 2>/dev/null || true
+        fi
+    done
+
+    # Remove system-wide profile.d entry
+    rm -f /etc/profile.d/android-sdk.sh
+
+    # Remove Flutter user config (regen'd on next install)
+    rm -rf /home/flux/.flutter
+
+    echo "FluxLinux: App Development Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

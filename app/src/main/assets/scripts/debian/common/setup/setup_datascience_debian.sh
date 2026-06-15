@@ -2,6 +2,60 @@
 # setup_datascience_debian.sh
 # Installs Data Science & AI/ML Stack (Python, R, Julia, IDEs)
 # Target: Debian 13 (Trixie) ARM64
+# Usage: setup_datascience_debian.sh [uninstall]
+
+# Data-science-specific apt packages. Shared system tools
+# (python3, python3-pip, python3-venv, build-essential, git, curl, wget)
+# intentionally excluded.
+PKGS=(
+    gfortran
+    libopenblas-dev
+    liblapack-dev
+    libhdf5-dev
+    libopencv-dev
+    python3-opencv
+    r-base
+    r-base-dev
+    spyder
+)
+
+# ─── UNINSTALL MODE ──────────────────────────────────────────────────────
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling Data Science Environment..."
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+
+    # Remove Python venv with all data libs (could be many GB)
+    rm -rf /home/flux/data_env
+
+    # Revert .bashrc / .zshrc PATH entries added by this script
+    if [ -f /home/flux/.bashrc ]; then
+        sed -i '/# Data Science Environment/d; /\/data_env\/bin/d' /home/flux/.bashrc 2>/dev/null || true
+    fi
+    if [ -f /home/flux/.zshrc ]; then
+        sed -i '/# Data Science Environment/d; /\/data_env\/bin/d' /home/flux/.zshrc 2>/dev/null || true
+    fi
+
+    # Remove Julia
+    rm -rf /opt/julia
+    rm -f /usr/local/bin/julia
+    rm -f /usr/share/applications/julia.desktop
+
+    # Remove PyCharm
+    rm -rf /opt/pycharm
+    rm -f /usr/local/bin/pycharm
+    rm -f /usr/share/applications/pycharm.desktop
+
+    # Remove Jupyter .desktop + icon
+    rm -f /usr/share/applications/jupyter.desktop
+    rm -f /usr/share/icons/hicolor/scalable/apps/jupyter.svg
+
+    echo "FluxLinux: Data Science Environment Uninstalled."
+    exit 0
+fi
+# ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 # Error Handler
 handle_error() {

@@ -11,7 +11,8 @@ data class InstallTask(
     val scriptName: String? = null,
     val isManual: Boolean = false,
     val distroId: String, // Required for building intents
-    val extraEnv: Map<String, String> = emptyMap()
+    val extraEnv: Map<String, String> = emptyMap(),
+    val isUninstall: Boolean = false
 )
 
 enum class TaskType {
