@@ -1,16 +1,4 @@
 ---
-- id: T4
-  title: Disclaimer banner on Termux/X11 install checks
-  type: feature
-  priority: medium
-  difficulty: easy
-  why: New users still hit "stuck at grant permission" with outdated Play Store Termux; need a visible warning in onboarding
-  really_needed: Yes, prevents repeat of GH-8-style issues
-  impact: Onboarding UI (Termux + X11 install check screens)
-  followups: null
-  images: null
-  github_ref: GH-8
-  plan: null
 - id: T5
   title: Add more OS support (postmarketOS, Redox OS, BSDs)
   type: feature
