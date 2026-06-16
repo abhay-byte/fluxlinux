@@ -154,24 +154,43 @@ Enabled=false" >> "$HOME/.config/kwinrc"
 fi
 
 # ── Step 8: Launch KDE Plasma ────────────────────────────
-echo "FluxLinux: Launching KDE Plasma..."
+
+# Verify startplasma-x11 is actually installed
+if ! command -v startplasma-x11 >/dev/null 2>&1; then
+    echo ""
+    echo "❌ FluxLinux Error: 'startplasma-x11' not found!"
+    echo "   KDE Plasma does not appear to be fully installed."
+    echo "   Please run the KDE setup script again:"
+    echo "     bash setup_kde_termux.sh"
+    echo ""
+    echo "   You can also check manually in Termux:"
+    echo "     pkg list-installed | grep plasma"
+    echo "     which startplasma-x11"
+    echo ""
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
+echo "FluxLinux: Launching KDE Plasma (this may take 30-60s)..."
 echo ""
 echo "  ┌─────────────────────────────────────────┐"
 echo "  │  Open the Termux:X11 app to see desktop │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
+
 KDE_LOG="$HOME/.fluxlinux/kde_session.log"
 mkdir -p "$HOME/.fluxlinux"
-startplasma-x11 >"$KDE_LOG" 2>&1 &
 
-echo ""
 echo "✅ KDE Plasma is starting (GPU: $GPU_BACKEND)"
-echo "   Switch to the Termux:X11 app to see the desktop."
-echo ""
 echo "   Session log: $KDE_LOG"
-echo "   To stop: run 'stop_kde_termux.sh' or press Ctrl+C here."
+echo "   Output below — Ctrl+C to stop."
 echo ""
 
-# Keep terminal alive — mirrors XFCE4 pattern.
-# Ctrl+C here cleanly kills the plasma session.
-wait
+# Run in foreground, tee to log so errors print live AND are saved.
+# If startplasma-x11 crashes immediately, the error is visible here.
+startplasma-x11 2>&1 | tee "$KDE_LOG"
+
+echo ""
+echo "🔴 KDE Plasma session ended."
+echo "   Check session log for errors: $KDE_LOG"
+echo ""
