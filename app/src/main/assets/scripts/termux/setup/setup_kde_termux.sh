@@ -26,7 +26,7 @@ handle_error() {
 if [ "$1" = "uninstall" ]; then
     echo "FluxLinux: Uninstalling KDE Plasma Desktop..."
 
-    pkg uninstall -y plasma konsole dolphin kate spectacle krita || true
+    pkg uninstall -y plasma konsole dolphin || true
 
     rm -f "$HOME/.config/kwinrc"
     rm -f "$HOME/.config/kdeglobals"
