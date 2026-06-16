@@ -20,6 +20,32 @@ handle_error() {
     exit 1
 }
 
+# ── Uninstall mode (T9) ───────────────────────────────────
+# Shared deps (x11-repo, tur-repo, termux-x11-nightly, pulseaudio,
+# fontconfig, dbus, at-spi2-core) are intentionally kept — they're
+# used by other components. Only component-specific packages + files
+# are removed. Best-effort: `|| true` after every destructive op.
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling KDE Plasma Desktop..."
+
+    # Component-specific packages only
+    pkg uninstall -y \
+        plasma \
+        konsole \
+        dolphin \
+        kate \
+        spectacle \
+        krita \
+        2>/dev/null || true
+
+    # Component-specific config files
+    rm -f "$HOME/.config/kwinrc" 2>/dev/null || true
+    rm -f "$HOME/.config/kdeglobals" 2>/dev/null || true
+
+    echo "FluxLinux: KDE Plasma Desktop Uninstalled."
+    exit 0
+fi
+
 echo ""
 echo "══════════════════════════════════════════════"
 echo "  FluxLinux — Native KDE Plasma Desktop Setup"
