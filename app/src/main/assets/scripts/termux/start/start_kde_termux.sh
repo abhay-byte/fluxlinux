@@ -160,14 +160,18 @@ echo "  ┌───────────────────────
 echo "  │  Open the Termux:X11 app to see desktop │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
-nohup startplasma-x11 >/dev/null 2>&1 &
-disown
+KDE_LOG="$HOME/.fluxlinux/kde_session.log"
+mkdir -p "$HOME/.fluxlinux"
+startplasma-x11 >"$KDE_LOG" 2>&1 &
 
 echo ""
 echo "✅ KDE Plasma is starting (GPU: $GPU_BACKEND)"
-echo "   The session is detached — it will keep running even if this"
-echo "   script exits. To stop: run 'stop_kde_termux.sh'."
+echo "   Switch to the Termux:X11 app to see the desktop."
+echo ""
+echo "   Session log: $KDE_LOG"
+echo "   To stop: run 'stop_kde_termux.sh' or press Ctrl+C here."
 echo ""
 
-# Detached — exit cleanly. Background processes survive via nohup + disown.
-exit 0
+# Keep terminal alive — mirrors XFCE4 pattern.
+# Ctrl+C here cleanly kills the plasma session.
+wait
