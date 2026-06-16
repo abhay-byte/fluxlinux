@@ -123,9 +123,12 @@ am start -n com.termux.x11/.MainActivity 2>/dev/null || \
     echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
 sleep 1
 
-# ── Step 5: Export display env ───────────────────────────
+# ── Step 5: Export display env ───────────────────────
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
+# XDG_RUNTIME_DIR is required by D-Bus and KDE session services.
+# Without it startplasma-x11 exits immediately and silently.
+export XDG_RUNTIME_DIR=${TMPDIR:-/tmp}
 case "$GPU_BACKEND" in
     turnip) export GALLIUM_DRIVER=virpipe; export MESA_LOADER_DRIVER_OVERRIDE=zink ;;
     software) ;; # already set above
@@ -135,6 +138,8 @@ esac
 # KDE-specific env: disable compositing at env level too
 export KWIN_COMPOSE=0
 export KWIN_OPENGL_INTERFACE=egl
+
+echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
 
 # ── Step 6: D-Bus session ────────────────────────────────
 echo "FluxLinux: Starting D-Bus session..."
@@ -186,9 +191,10 @@ echo "   Session log: $KDE_LOG"
 echo "   Output below — Ctrl+C to stop."
 echo ""
 
-# Run in foreground, tee to log so errors print live AND are saved.
-# If startplasma-x11 crashes immediately, the error is visible here.
-startplasma-x11 2>&1 | tee "$KDE_LOG"
+# Run inside dbus-launch --exit-with-session so D-Bus is properly
+# wired to the session lifetime (matches reference XFCE4/KDE scripts).
+# tee to log so errors print live AND are saved.
+dbus-launch --exit-with-session startplasma-x11 2>&1 | tee "$KDE_LOG"
 
 echo ""
 echo "🔴 KDE Plasma session ended."
