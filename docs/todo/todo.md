@@ -12,35 +12,22 @@
   github_ref: GH-6
   plan: null
 ---
-- id: T9
-  title: Add uninstall branch to Termux component setup scripts
-  type: feature
-  priority: high
-  difficulty: easy
-  why: User report — Termux setup scripts (setup_customization_termux.sh, setup_customization_kde_termux.sh, setup_kde_termux.sh) have zero "uninstall" handling. T1 only added uninstall blocks to the 13 feature-component scripts in Debian path. Termux native scripts (xfce4, kde, customisation, hw_accel) are a separate set that were not covered by T1.
-  really_needed: Yes — without an uninstall block, the UI uninstall button (T1) cannot work end-to-end on Termux components. Pair this with T8.
-  impact: app/src/main/assets/scripts/termux/setup/setup_xfce4_termux.sh, setup_kde_termux.sh, setup_customization_termux.sh, setup_customization_kde_termux.sh, setup_hw_accel_termux.sh (verify) — add `if [ "$1" = "uninstall" ]` branch that removes installed packages + assets
-  followups: T8
-  images: null
-  github_ref: null
-  plan: null
----
 - id: T10
   title: KDE Plasma launch broken on Termux
   type: bug
   priority: high
   difficulty: unknown
-  why: User report — installed kde plasma desktop component on Termux, launch does not work. Also flagged: needs to test kde desktop customisation component (setup_customization_kde_termux.sh — see T9, has zero uninstall handling, may also be incomplete install path).
+  why: User report — installed kde plasma desktop component on Termux, launch does not work. Setup completes (verification green) but tapping Launch does not start a working Plasma session.
   expected: Tapping "Launch" on a Termux KDE install starts a working Plasma session via Termux:X11.
-  actual: Launch does not work. Root cause unknown — needs investigation across setup_kde_termux.sh (package set), start_kde_termux.sh (session startup), D-Bus / PulseAudio / Termux:X11 wiring.
+  actual: Launch does not work. Likely root causes: (1) `start_kde_termux.sh` missing/wrong D-Bus / PulseAudio / Termux:X11 wiring; (2) `plasma` package provides startplasma-x11 binary but some session services fail to start inside Termux proot-like env. The verification step in setup_kde_termux.sh checks for binaries but doesn't validate the session can actually start.
   reproduction: |
     1. Open FluxLinux, Termux distro
-    2. Install kde_plasma component
+    2. Install kde_plasma component (install verification passes ✅)
     3. Tap Launch
     4. Nothing / session fails to start
   frequency: always (per user)
-  impact: app/src/main/assets/scripts/termux/setup/setup_kde_termux.sh, start_kde_termux.sh, possibly setup_customization_kde_termux.sh; TermuxIntentFactory.kt launch path
-  followups: T9 (customisation kde script also incomplete)
+  impact: app/src/main/assets/scripts/termux/setup/setup_kde_termux.sh, start_kde_termux.sh, possibly start_xfce4_termux.sh; TermuxIntentFactory.kt launch path
+  followups: null
   images: null
   github_ref: null
   plan: null
