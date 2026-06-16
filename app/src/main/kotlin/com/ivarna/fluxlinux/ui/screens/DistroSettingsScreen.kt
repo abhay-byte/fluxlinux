@@ -704,7 +704,10 @@ fun ComponentManagementGlassCard(
                             // xfce4_desktop is also hidden: its script (setup_debian_family.sh /
                             // setup_xfce4_termux.sh / setup_arch_family.sh) is the base install
                             // and has no uninstall branch — tapping Uninstall would re-install XFCE.
-                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && onUninstall != null) {
+                            // Termux xfce customisation (id="customization", scriptName contains
+                            // "termux") is also hidden for the same reason — see T8. T9 will add
+                            // the missing uninstall branch to setup_customization_termux.sh.
+                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && !(component.id == "customization" && component.scriptName.contains("termux")) && onUninstall != null) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 TextButton(
                                     onClick = onUninstall,
