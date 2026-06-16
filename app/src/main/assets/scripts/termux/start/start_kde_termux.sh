@@ -165,8 +165,12 @@ echo "✅ KDE Plasma is starting (GPU: $GPU_BACKEND)"
 echo "   Switch to the Termux:X11 app to see the desktop."
 echo "   Note: KDE may take 10-30 seconds to fully load."
 echo ""
-echo "   To stop: run 'stop_kde_termux.sh'"
-echo "   Or press Ctrl+C here to stop."
+echo "   To stop: press Enter here (script keeps running until then),"
+echo "   or run 'stop_kde_termux.sh' in another Termux session."
 echo ""
 
-wait
+# Block on stdin so the script (and its background processes) stay alive.
+# Without this, the Termux RunCommandService may end the script after the
+# initial setup, sending SIGHUP to startplasma-x11 / termux-x11 / virgl and
+# killing the desktop. The user has to press Enter to actually exit.
+read -p "Press Enter to stop the session and exit: " _
