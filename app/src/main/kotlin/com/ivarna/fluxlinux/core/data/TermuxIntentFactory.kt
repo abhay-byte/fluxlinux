@@ -750,6 +750,10 @@ object TermuxIntentFactory {
     fun buildLaunchKdeGuiTurnipIntent(context: android.content.Context, distroId: String): Intent {
         val scriptManager = ScriptManager(context)
 
+        if (distroId == "termux") {
+            return buildLaunchKdeGuiIntent(context, distroId)
+        }
+
         if (distroId == "debian13_chroot") {
             val chrootKdeScriptContent = scriptManager.getScriptContent("debian/chroot/start/start_debian13_kde_gui_turnip.sh")
             val chrootKdeScriptB64 = android.util.Base64.encodeToString(
@@ -800,6 +804,10 @@ object TermuxIntentFactory {
      */
     fun buildLaunchKdeGuiSoftwareIntent(context: android.content.Context, distroId: String): Intent {
         val scriptManager = ScriptManager(context)
+
+        if (distroId == "termux") {
+            return buildLaunchKdeGuiIntent(context, distroId)
+        }
 
         if (distroId == "debian13_chroot") {
             val scriptContent = scriptManager.getScriptContent("debian/chroot/start/start_debian13_kde_gui_software.sh")

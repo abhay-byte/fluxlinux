@@ -8,7 +8,7 @@
 # Launch sequence:
 #   1. Kill previous session
 #   2. Start PulseAudio (TCP mode)
-#   3. Start VirGL server (auto-selects VirGL or Turnip)
+#   3. Use KDE-safe software rendering
 #   4. Start Termux:X11 server
 #   5. Launch KDE Plasma (startplasma-x11)
 #
@@ -64,6 +64,7 @@ echo "FluxLinux: Cleaning up previous session..."
 pkill -f "startplasma" 2>/dev/null || true
 pkill -f "kwin_x11" 2>/dev/null || true
 pkill -f "plasmashell" 2>/dev/null || true
+pkill -f "ksmserver" 2>/dev/null || true
 pkill -f "kded5" 2>/dev/null || true
 pkill -f "termux-x11" 2>/dev/null || true
 pkill -f "virgl_test_server" 2>/dev/null || true
@@ -72,39 +73,20 @@ sleep 1
 
 # ── Step 2: PulseAudio ────────────────────────────────────
 echo "FluxLinux: Starting PulseAudio..."
+unset PULSE_SERVER
+pulseaudio --kill 2>/dev/null || true
 pulseaudio --start \
     --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
     --exit-idle-time=-1 2>/dev/null || \
     echo " [⚠️] PulseAudio start failed — audio may not work"
 export PULSE_SERVER=127.0.0.1
 
-# ── Step 3: VirGL GPU server ──────────────────────────────
-echo "FluxLinux: Starting GPU acceleration server..."
-case "$GPU_BACKEND" in
-    turnip)
-        echo " Using Turnip + Zink (Adreno — best performance)"
-        nohup env MESA_NO_ERROR=1 \
-            MESA_GL_VERSION_OVERRIDE=4.3COMPAT \
-            MESA_GLES_VERSION_OVERRIDE=3.2 \
-            GALLIUM_DRIVER=zink \
-            MESA_LOADER_DRIVER_OVERRIDE=zink \
-            ZINK_DESCRIPTORS=lazy \
-            virgl_test_server --use-egl-surfaceless --use-gles \
-            >/dev/null 2>&1 &
-        disown
-        ;;
-    software)
-        echo " Using software rendering (LLVMpipe)"
-        export GALLIUM_DRIVER=llvmpipe
-        export LIBGL_ALWAYS_SOFTWARE=1
-        ;;
-    virgl|*)
-        echo " Using VirGL (general compatibility)"
-        nohup virgl_test_server_android >/dev/null 2>&1 &
-        disown
-        ;;
-esac
-sleep 2
+# ── Step 3: KDE-safe software rendering ───────────────────
+echo "FluxLinux: Using software rendering (LLVMpipe) for KDE stability..."
+GPU_BACKEND="software"
+export GALLIUM_DRIVER=llvmpipe
+export LIBGL_ALWAYS_SOFTWARE=1
+sleep 1
 
 # ── Step 4: Termux:X11 ───────────────────────────────────
 echo "FluxLinux: Starting Termux:X11..."
@@ -113,29 +95,26 @@ if ! command -v termux-x11 >/dev/null 2>&1; then
     read -p "Press Enter to exit..."
     exit 1
 fi
-nohup termux-x11 :0 >/dev/null 2>&1 &
+mkdir -p "${TMPDIR:-$PREFIX/tmp}/.X11-unix"
+rm -f "${TMPDIR:-$PREFIX/tmp}/.X11-unix/X0"
+nohup termux-x11 :0 >"${TMPDIR:-$PREFIX/tmp}/termux-x11.log" 2>&1 &
 disown
-sleep 3
+sleep 4
 
 # ── Auto-open the Termux:X11 viewer ──────────────────────
 echo "FluxLinux: Opening Termux:X11 viewer..."
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1 || \
     echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
-sleep 1
+sleep 3
 
 # ── Step 5: Export display env ───────────────────────
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
 # XDG_RUNTIME_DIR must be mode 700 (owner-only) — D-Bus rejects world-writable dirs.
 # $TMPDIR itself is 1777, so create a private subdirectory.
-export XDG_RUNTIME_DIR="${TMPDIR:-/tmp}/kde-runtime"
+export XDG_RUNTIME_DIR="${TMPDIR:-$PREFIX/tmp}/kde-runtime"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
-case "$GPU_BACKEND" in
-    turnip) export GALLIUM_DRIVER=virpipe; export MESA_LOADER_DRIVER_OVERRIDE=zink ;;
-    software) ;; # already set above
-    virgl|*) export GALLIUM_DRIVER=virpipe ;;
-esac
 
 # KDE-specific env: disable compositing at env level too
 export KWIN_COMPOSE=0
