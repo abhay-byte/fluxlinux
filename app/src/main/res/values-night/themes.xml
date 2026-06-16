@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FluxLinux" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.FluxLinux" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 </resources>
