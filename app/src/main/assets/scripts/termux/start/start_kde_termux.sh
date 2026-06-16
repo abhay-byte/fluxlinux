@@ -8,7 +8,7 @@
 # Launch sequence:
 #   1. Kill previous session
 #   2. Start PulseAudio (TCP mode)
-#   3. Start VirGL server (auto-selects VirGL or Turnip)
+#   3. Use KDE-safe software rendering
 #   4. Start Termux:X11 server
 #   5. Launch KDE Plasma (startplasma-x11)
 #
@@ -64,6 +64,7 @@ echo "FluxLinux: Cleaning up previous session..."
 pkill -f "startplasma" 2>/dev/null || true
 pkill -f "kwin_x11" 2>/dev/null || true
 pkill -f "plasmashell" 2>/dev/null || true
+pkill -f "ksmserver" 2>/dev/null || true
 pkill -f "kded5" 2>/dev/null || true
 pkill -f "termux-x11" 2>/dev/null || true
 pkill -f "virgl_test_server" 2>/dev/null || true
@@ -72,36 +73,20 @@ sleep 1
 
 # ── Step 2: PulseAudio ────────────────────────────────────
 echo "FluxLinux: Starting PulseAudio..."
+unset PULSE_SERVER
+pulseaudio --kill 2>/dev/null || true
 pulseaudio --start \
     --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
     --exit-idle-time=-1 2>/dev/null || \
     echo " [⚠️] PulseAudio start failed — audio may not work"
 export PULSE_SERVER=127.0.0.1
 
-# ── Step 3: VirGL GPU server ──────────────────────────────
-echo "FluxLinux: Starting GPU acceleration server..."
-case "$GPU_BACKEND" in
-    turnip)
-        echo " Using Turnip + Zink (Adreno — best performance)"
-        MESA_NO_ERROR=1 \
-        MESA_GL_VERSION_OVERRIDE=4.3COMPAT \
-        MESA_GLES_VERSION_OVERRIDE=3.2 \
-        GALLIUM_DRIVER=zink \
-        MESA_LOADER_DRIVER_OVERRIDE=zink \
-        ZINK_DESCRIPTORS=lazy \
-        virgl_test_server --use-egl-surfaceless --use-gles &
-        ;;
-    software)
-        echo " Using software rendering (LLVMpipe)"
-        export GALLIUM_DRIVER=llvmpipe
-        export LIBGL_ALWAYS_SOFTWARE=1
-        ;;
-    virgl|*)
-        echo " Using VirGL (general compatibility)"
-        virgl_test_server_android &
-        ;;
-esac
-sleep 2
+# ── Step 3: KDE-safe software rendering ───────────────────
+echo "FluxLinux: Using software rendering (LLVMpipe) for KDE stability..."
+GPU_BACKEND="software"
+export GALLIUM_DRIVER=llvmpipe
+export LIBGL_ALWAYS_SOFTWARE=1
+sleep 1
 
 # ── Step 4: Termux:X11 ───────────────────────────────────
 echo "FluxLinux: Starting Termux:X11..."
@@ -110,24 +95,37 @@ if ! command -v termux-x11 >/dev/null 2>&1; then
     read -p "Press Enter to exit..."
     exit 1
 fi
-termux-x11 :0 &
+mkdir -p "${TMPDIR:-$PREFIX/tmp}/.X11-unix"
+rm -f "${TMPDIR:-$PREFIX/tmp}/.X11-unix/X0"
+nohup termux-x11 :0 >"${TMPDIR:-$PREFIX/tmp}/termux-x11.log" 2>&1 &
+disown
+sleep 4
+
+# ── Auto-open the Termux:X11 viewer ──────────────────────
+echo "FluxLinux: Opening Termux:X11 viewer..."
+am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1 || \
+    echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
 sleep 3
 
-# ── Step 5: Export display env ───────────────────────────
+# ── Step 5: Export display env ───────────────────────
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
-case "$GPU_BACKEND" in
-    turnip) export GALLIUM_DRIVER=virpipe; export MESA_LOADER_DRIVER_OVERRIDE=zink ;;
-    software) ;; # already set above
-    virgl|*) export GALLIUM_DRIVER=virpipe ;;
-esac
+# XDG_RUNTIME_DIR must be mode 700 (owner-only) — D-Bus rejects world-writable dirs.
+# $TMPDIR itself is 1777, so create a private subdirectory.
+export XDG_RUNTIME_DIR="${TMPDIR:-$PREFIX/tmp}/kde-runtime"
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
 
 # KDE-specific env: disable compositing at env level too
 export KWIN_COMPOSE=0
 export KWIN_OPENGL_INTERFACE=egl
 
-# ── Step 6: D-Bus session ────────────────────────────────
+echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR (mode $(stat -c '%a' $XDG_RUNTIME_DIR))"
+
+# ── Step 6: D-Bus session ────────────────────────
 echo "FluxLinux: Starting D-Bus session..."
+# Note: Termux dbus-launch does NOT support --exit-with-session.
+# Use --sh-syntax to export DBUS_SESSION_BUS_ADDRESS into this shell.
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     eval "$(dbus-launch --sh-syntax)" 2>/dev/null || \
         echo " [⚠️] D-Bus launch failed — some KDE services may not work"
@@ -144,23 +142,43 @@ Enabled=false" >> "$HOME/.config/kwinrc"
 fi
 
 # ── Step 8: Launch KDE Plasma ────────────────────────────
-echo "FluxLinux: Launching KDE Plasma..."
+
+# Verify startplasma-x11 is actually installed
+if ! command -v startplasma-x11 >/dev/null 2>&1; then
+    echo ""
+    echo "❌ FluxLinux Error: 'startplasma-x11' not found!"
+    echo "   KDE Plasma does not appear to be fully installed."
+    echo "   Please run the KDE setup script again:"
+    echo "     bash setup_kde_termux.sh"
+    echo ""
+    echo "   You can also check manually in Termux:"
+    echo "     pkg list-installed | grep plasma"
+    echo "     which startplasma-x11"
+    echo ""
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
+echo "FluxLinux: Launching KDE Plasma (this may take 30-60s)..."
 echo ""
 echo "  ┌─────────────────────────────────────────┐"
 echo "  │  Open the Termux:X11 app to see desktop │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
-startplasma-x11 &
 
-sleep 5
+KDE_LOG="$HOME/.fluxlinux/kde_session.log"
+mkdir -p "$HOME/.fluxlinux"
 
-echo ""
 echo "✅ KDE Plasma is starting (GPU: $GPU_BACKEND)"
-echo "   Switch to the Termux:X11 app to see the desktop."
-echo "   Note: KDE may take 10-30 seconds to fully load."
-echo ""
-echo "   To stop: run 'stop_kde_termux.sh'"
-echo "   Or press Ctrl+C here to stop."
+echo "   Session log: $KDE_LOG"
+echo "   Output below — Ctrl+C to stop."
 echo ""
 
-wait
+# Run in foreground with tee so errors print live AND save to log.
+# (dbus-launch --exit-with-session is NOT available in Termux)
+startplasma-x11 2>&1 | tee "$KDE_LOG"
+
+echo ""
+echo "🔴 KDE Plasma session ended."
+echo "   Check session log for errors: $KDE_LOG"
+echo ""
