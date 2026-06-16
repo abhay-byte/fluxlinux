@@ -83,13 +83,15 @@ echo "FluxLinux: Starting GPU acceleration server..."
 case "$GPU_BACKEND" in
     turnip)
         echo " Using Turnip + Zink (Adreno — best performance)"
-        MESA_NO_ERROR=1 \
-        MESA_GL_VERSION_OVERRIDE=4.3COMPAT \
-        MESA_GLES_VERSION_OVERRIDE=3.2 \
-        GALLIUM_DRIVER=zink \
-        MESA_LOADER_DRIVER_OVERRIDE=zink \
-        ZINK_DESCRIPTORS=lazy \
-        virgl_test_server --use-egl-surfaceless --use-gles &
+        nohup env MESA_NO_ERROR=1 \
+            MESA_GL_VERSION_OVERRIDE=4.3COMPAT \
+            MESA_GLES_VERSION_OVERRIDE=3.2 \
+            GALLIUM_DRIVER=zink \
+            MESA_LOADER_DRIVER_OVERRIDE=zink \
+            ZINK_DESCRIPTORS=lazy \
+            virgl_test_server --use-egl-surfaceless --use-gles \
+            >/dev/null 2>&1 &
+        disown
         ;;
     software)
         echo " Using software rendering (LLVMpipe)"
@@ -98,7 +100,8 @@ case "$GPU_BACKEND" in
         ;;
     virgl|*)
         echo " Using VirGL (general compatibility)"
-        virgl_test_server_android &
+        nohup virgl_test_server_android >/dev/null 2>&1 &
+        disown
         ;;
 esac
 sleep 2
@@ -110,7 +113,8 @@ if ! command -v termux-x11 >/dev/null 2>&1; then
     read -p "Press Enter to exit..."
     exit 1
 fi
-termux-x11 :0 &
+nohup termux-x11 :0 >/dev/null 2>&1 &
+disown
 sleep 3
 
 # ── Auto-open the Termux:X11 viewer ──────────────────────
@@ -156,21 +160,14 @@ echo "  ┌───────────────────────
 echo "  │  Open the Termux:X11 app to see desktop │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
-startplasma-x11 &
-
-sleep 5
+nohup startplasma-x11 >/dev/null 2>&1 &
+disown
 
 echo ""
 echo "✅ KDE Plasma is starting (GPU: $GPU_BACKEND)"
-echo "   Switch to the Termux:X11 app to see the desktop."
-echo "   Note: KDE may take 10-30 seconds to fully load."
-echo ""
-echo "   To stop: press Enter here (script keeps running until then),"
-echo "   or run 'stop_kde_termux.sh' in another Termux session."
+echo "   The session is detached — it will keep running even if this"
+echo "   script exits. To stop: run 'stop_kde_termux.sh'."
 echo ""
 
-# Block on stdin so the script (and its background processes) stay alive.
-# Without this, the Termux RunCommandService may end the script after the
-# initial setup, sending SIGHUP to startplasma-x11 / termux-x11 / virgl and
-# killing the desktop. The user has to press Enter to actually exit.
-read -p "Press Enter to stop the session and exit: " _
+# Detached — exit cleanly. Background processes survive via nohup + disown.
+exit 0
