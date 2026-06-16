@@ -346,6 +346,46 @@
     Edge cases: missing optional apps, missing customization script, unavailable repo packages, failed core packages, app callback on failure.
     Test plan: shell syntax check changed scripts; run project build if available.
     Open questions: none.
+
+- id: T10
+  title: KDE Plasma launch broken on Termux
+  type: bug
+  priority: high
+  difficulty: unknown
+  why: User report - installed kde plasma desktop component on Termux, launch does not work. Setup completes but tapping Launch does not start a working Plasma session.
+  expected: Tapping "Launch" on a Termux KDE install starts a working Plasma session via Termux:X11.
+  actual: Launch did not work. Root causes found during manual testing: Termux:X11 logging to `/tmp` failed with permission denied; stale PulseAudio env prevented startup; KDE GPU picker variants did not all route to the working native script; Termux KDE customization used partial `kwriteconfig5` writes instead of the Debian KDE config-file layout.
+  reproduction: |
+    1. Open FluxLinux, Termux distro
+    2. Install kde_plasma component
+    3. Tap Launch
+    4. Session fails or X11 cannot connect
+  frequency: always (per user)
+  impact: app/src/main/assets/scripts/termux/setup/setup_customization_kde_termux.sh, app/src/main/assets/scripts/termux/start/start_kde_termux.sh, app/src/main/kotlin/com/ivarna/fluxlinux/core/data/TermuxIntentFactory.kt
+  followups: null
+  images: null
+  github_ref: null
+  plan: |
+    Goal: Make native Termux KDE launch and customization work reliably.
+
+    Files changed:
+    - app/src/main/assets/scripts/termux/start/start_kde_termux.sh
+    - app/src/main/assets/scripts/termux/setup/setup_customization_kde_termux.sh
+    - app/src/main/kotlin/com/ivarna/fluxlinux/core/data/TermuxIntentFactory.kt
+
+    Approach:
+    - Use the manually verified launch sequence: clear stale PulseAudio env, start PulseAudio, use software rendering, create X11 socket/logs under `$TMPDIR`, set private `XDG_RUNTIME_DIR`, start Termux:X11, open its viewer, start D-Bus, then run `startplasma-x11`.
+    - Route all Termux KDE GPU picker options through the same working native KDE launcher.
+    - Replace partial Termux KDE customization with Debian-style direct KDE config files (`kdeglobals`, `kwinrc`, `plasmarc`, appletsrc, shortcuts, DPI config, Konsole profile).
+
+    Test plan:
+    - `./gradlew assembleRelease` passes.
+    - `bash -n` passes for changed Termux scripts.
+    - Installed release APK on connected device.
+    - User verified the one-line launch command worked before script integration.
+    - User approved the app update after launch/customization fixes.
+
+    Open questions: none.
   note: |
     Final ship (commit 493f389, PR #21):
     - setup_xfce4_termux.sh: send_callback helper + verify_installation returns
