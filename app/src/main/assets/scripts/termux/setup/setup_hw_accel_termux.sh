@@ -17,12 +17,20 @@
 
 CALLBACK_NAME="hw_accel"
 
+send_callback() {
+    RESULT="$1"
+    am start -a android.intent.action.VIEW \
+      -d "fluxlinux://callback?result=${RESULT}&name=${CALLBACK_NAME}" \
+      --flags 0x10000000 2>/dev/null || true
+}
+
 handle_error() {
     echo ""
     echo "❌ FluxLinux Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
+    send_callback "error"
     read -p "Press Enter to acknowledge error and exit..."
     exit 1
 }
@@ -47,12 +55,7 @@ pkg install -y \
     mesa-zink \
     || handle_error "VirGL/Mesa install"
 
-# ── Step 3: Vulkan loader ─────────────────────────────────
-echo ""
-echo "===== Installing Vulkan Loader ====="
-pkg install -y vulkan-loader-android || handle_error "Vulkan loader install"
-
-# ── Step 4: GPU auto-detection ───────────────────────────
+# ── Step 3: GPU auto-detection ───────────────────────────
 echo ""
 echo "===== Detecting GPU Backend ====="
 
@@ -94,6 +97,51 @@ detect_gpu_backend() {
 GPU_BACKEND=$(detect_gpu_backend)
 echo ""
 echo " Detected GPU backend: [$GPU_BACKEND]"
+
+# ── Step 4: Vulkan runtime (optional) ─────────────────────
+echo ""
+echo "===== Installing Vulkan Runtime (Optional) ====="
+VULKAN_OK=0
+
+# On Adreno (turnip), Termux's freedreno ICD depends on vulkan-loader-generic,
+# which conflicts with vulkan-loader-android. Remove the conflicting loader
+# first so the freedreno install can succeed.
+remove_vulkan_android_loader() {
+    if dpkg -s vulkan-loader-android >/dev/null 2>&1; then
+        echo " [🔧] Removing conflicting vulkan-loader-android (needed for freedreno)..."
+        apt remove -y vulkan-loader-android 2>/dev/null \
+            || pkg uninstall -y vulkan-loader-android 2>/dev/null \
+            || true
+    fi
+}
+
+if [ "$GPU_BACKEND" = "turnip" ]; then
+    echo " [🎯] Adreno GPU detected — installing Turnip Vulkan stack"
+    remove_vulkan_android_loader
+    # Prefer the dri3 variant (newer, better DRI3 integration) — fall back
+    # to the plain freedreno ICD if -dri3 isn't available in this Termux repo.
+    pkg install -y vulkan-loader-generic mesa-vulkan-icd-freedreno-dri3 \
+        && VULKAN_OK=1
+    if [ "$VULKAN_OK" -ne 1 ]; then
+        pkg install -y vulkan-loader-generic mesa-vulkan-icd-freedreno \
+            && VULKAN_OK=1
+    fi
+fi
+
+if [ "$VULKAN_OK" -ne 1 ]; then
+    # Non-Adreno path: keep vulkan-loader-android (works with swiftshader/swrast)
+    pkg install -y vulkan-loader-android swiftshader && VULKAN_OK=1
+fi
+
+if [ "$VULKAN_OK" -ne 1 ]; then
+    pkg install -y vulkan-loader-android mesa-vulkan-icd-swrast && VULKAN_OK=1
+fi
+
+if [ "$VULKAN_OK" -ne 1 ]; then
+    echo " [⚠️] Vulkan runtime packages unavailable on this mirror/device."
+    echo "      Falling back to VirGL compatibility mode."
+    GPU_BACKEND="virgl"
+fi
 
 # Save detection result for start scripts to use
 mkdir -p "$HOME/.fluxlinux"
@@ -191,19 +239,19 @@ verify_installation() {
     echo "------------------------------------------------"
     if [ $MISSING -eq 1 ]; then
         echo "⚠️  VirGL install failed. Software rendering will be used."
+        return 1
     else
         echo "🎉 Hardware acceleration configured!"
         echo "   Backend: $GPU_BACKEND"
         echo "   Config saved to: ~/.fluxlinux/gpu_config"
+        return 0
     fi
 }
 
-verify_installation
+verify_installation || handle_error "verification"
 
 # ── Callback to app ──────────────────────────────────────
-am start -a android.intent.action.VIEW \
-  -d "fluxlinux://callback?result=success&name=${CALLBACK_NAME}" \
-  --flags 0x10000000 2>/dev/null || true
+send_callback "success"
 
 echo ""
 echo "Hardware acceleration setup complete."
