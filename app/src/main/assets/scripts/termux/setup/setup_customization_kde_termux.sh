@@ -25,29 +25,6 @@ handle_error() {
     exit 1
 }
 
-# ── Uninstall mode (T9) ───────────────────────────────────
-# Reverse of install path above.
-if [ "$1" = "uninstall" ]; then
-    echo "FluxLinux: Uninstalling KDE Customization..."
-
-    pkg uninstall -y papirus-icon-theme
-
-    rm -f "$HOME/.fluxlinux/wallpapers/flux_dark.jpg"
-    rm -rf "$HOME/.local/share/wallpapers/FluxLinux"
-
-    if [ -f "$HOME/.config/kdeglobals" ]; then
-        sed -i '/^\[Icons\]/,/^$/d' "$HOME/.config/kdeglobals"
-    fi
-
-    if [ -f "$HOME/.config/gtk-3.0/settings.ini" ]; then
-        sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=Adwaita/' \
-            "$HOME/.config/gtk-3.0/settings.ini"
-    fi
-
-    echo "FluxLinux: KDE Customization Uninstalled."
-    exit 0
-fi
-
 echo ""
 echo "══════════════════════════════════════════════"
 echo "  FluxLinux — KDE Customization (Native)"
