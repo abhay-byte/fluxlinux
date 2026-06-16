@@ -126,9 +126,11 @@ sleep 1
 # ── Step 5: Export display env ───────────────────────
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
-# XDG_RUNTIME_DIR is required by D-Bus and KDE session services.
-# Without it startplasma-x11 exits immediately and silently.
-export XDG_RUNTIME_DIR=${TMPDIR:-/tmp}
+# XDG_RUNTIME_DIR must be mode 700 (owner-only) — D-Bus rejects world-writable dirs.
+# $TMPDIR itself is 1777, so create a private subdirectory.
+export XDG_RUNTIME_DIR="${TMPDIR:-/tmp}/kde-runtime"
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
 case "$GPU_BACKEND" in
     turnip) export GALLIUM_DRIVER=virpipe; export MESA_LOADER_DRIVER_OVERRIDE=zink ;;
     software) ;; # already set above
@@ -139,7 +141,7 @@ esac
 export KWIN_COMPOSE=0
 export KWIN_OPENGL_INTERFACE=egl
 
-echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR (mode $(stat -c '%a' $XDG_RUNTIME_DIR))"
 
 # ── Step 6: D-Bus session ────────────────────────
 echo "FluxLinux: Starting D-Bus session..."
