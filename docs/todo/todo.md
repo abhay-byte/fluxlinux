@@ -11,18 +11,6 @@
   images: null
   github_ref: GH-6
   plan: null
-- id: T6
-  title: Add monochrome icon for Android theming
-  type: feature
-  priority: low
-  difficulty: easy
-  why: Modern Android supports themed icons; monochrome layer lets icon adapt to user's theme
-  really_needed: Cosmetic polish, not blocking
-  impact: Assets (monochrome PNG/vector + adaptive icon config)
-  followups: null
-  images: https://github.com/user-attachments/assets/3b15435d-8e54-4d58-88ed-b85b722d8e90
-  github_ref: GH-2
-  plan: null
 - id: T7
   title: Review and fix XFCE customisation script
   type: bug

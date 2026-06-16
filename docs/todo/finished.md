@@ -289,3 +289,38 @@
 
   note: Branch flat-named T4-disclaimer-banner-termux-x11 (same git ref-
         nesting workaround as T3).
+- id: T6
+  title: Add monochrome icon for Android theming
+  type: feature
+  priority: low
+  difficulty: easy
+  why: Modern Android supports themed icons; monochrome layer lets icon adapt to user's theme
+  really_needed: Cosmetic polish, not blocking
+  impact: Assets (monochrome PNG/vector + adaptive icon config)
+  followups: null
+  images: https://github.com/user-attachments/assets/3b15435d-8e54-4d58-88ed-b85b722d8e90
+  github_ref: GH-2
+  plan: |
+    Goal: ship a Material You–compatible monochrome icon for the adaptive
+    launcher icon. Android 13+ themed icons pick up the wallpaper-derived
+    tint and apply it to a single-colour silhouette the app provides.
+
+    What shipped:
+    - app/src/main/res/drawable/ic_launcher_monochrome.png: 1024x1024 RGBA
+      PNG, black ink on transparent background. Sourced from a user-provided
+      Gemini-generated line drawing of the FluxLinux penguin-on-box mascot.
+      Icon occupies ~70% of the 108dp canvas so the launcher mask
+      (squircle / circle / teardrop) doesn't crop the silhouette.
+    - mipmap-anydpi-v26/ic_launcher.xml: <monochrome> element points at
+      @drawable/ic_launcher_monochrome (unchanged).
+    - Manual retest on OnePlus (Android 16, themed icons enabled): the
+      icon shows on the home screen in the system's gray tint, with the
+      penguin-on-box mascot clearly visible. User approved.
+
+    Verification: adaptive-icon manifest merger resolves the reference
+    cleanly; the icon tints correctly under Material You.
+
+    Closes GH-2.
+  note: Original e60f18a + f04a043 commits shipped a multi-shade raster
+        PNG which the system-tint pass couldn't flatten. T6 swaps in a
+        clean B/W silhouette that tints cleanly under any wallpaper.
