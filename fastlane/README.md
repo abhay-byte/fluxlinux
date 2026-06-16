@@ -3,7 +3,7 @@
 ## App Information
 - **Package Name**: com.zenithblue.fluxlinux
 - **App Name**: FluxLinux
-- **Current Version**: 1.7 (versionCode: 9)
+- **Current Version**: 1.8.0 (versionCode: 10)
 - **Target SDK**: 36 (Android 16)
 - **Min SDK**: 26 (Android 8.0)
 
