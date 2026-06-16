@@ -113,6 +113,12 @@ fi
 termux-x11 :0 &
 sleep 3
 
+# ── Auto-open the Termux:X11 viewer ──────────────────────
+echo "FluxLinux: Opening Termux:X11 viewer..."
+am start -n com.termux.x11/.MainActivity 2>/dev/null || \
+    echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
+sleep 1
+
 # ── Step 5: Export display env ───────────────────────────
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
