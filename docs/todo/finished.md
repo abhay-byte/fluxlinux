@@ -324,3 +324,86 @@
   note: Original e60f18a + f04a043 commits shipped a multi-shade raster
         PNG which the system-tint pass couldn't flatten. T6 swaps in a
         clean B/W silhouette that tints cleanly under any wallpaper.
+- id: T7
+  title: Review and fix XFCE customisation script
+  type: bug
+  priority: high
+  difficulty: unknown
+  why: XFCE customisation script not working completely — needs full review
+  really_needed: Yes, core feature
+  impact: termux/setup/setup_xfce4_termux.sh (customisation steps), possibly start/stop
+  followups: null
+  images: null
+  github_ref: null
+  plan: |
+    Goal: Make native Termux XFCE4 setup reliable and complete.
+    Files: MODIFY app/src/main/assets/scripts/termux/setup/setup_xfce4_termux.sh; inspect start/stop/customization scripts for compatibility.
+    Approach:
+      1. Review package dependencies against start_xfce4_termux.sh and stop_xfce4_termux.sh.
+      2. Ensure setup installs everything needed for Termux:X11, PulseAudio, D-Bus, and XFCE session startup.
+      3. Add safe handoff to setup_customization_termux.sh when available.
+      4. Harden verification and callback result reporting so failed installs do not report success.
+    Edge cases: missing optional apps, missing customization script, unavailable repo packages, failed core packages, app callback on failure.
+    Test plan: shell syntax check changed scripts; run project build if available.
+    Open questions: none.
+  note: |
+    Final ship (commit 493f389, PR #21):
+    - setup_xfce4_termux.sh: send_callback helper + verify_installation returns
+      1/0; default xfwm4.xml + gtk-3.0 settings.ini written so first XFCE4
+      launch isn't bare; PulseAudio verification now MISSING=1.
+    - setup_customization_termux.sh: full rewrite to mirror Debian XFCE4
+      customization for Termux. Pulls theme/icon/cursor/wallpaper/font zips
+      from debian-v1 GitHub release; subdir-tolerant extraction; light/dark
+      theme branches via FLUX_THEME env.
+    - setup_hw_accel_termux.sh: Adreno fix — on Turnip path, removes
+      conflicting vulkan-loader-android, installs
+      vulkan-loader-generic mesa-vulkan-icd-freedreno-dri3 (fallback to
+      plain mesa-vulkan-icd-freedreno). Non-Adreno keeps the android
+      loader. Verification: OnePlus CPH2691 (Snapdragon/Adreno, Android 16).
+    - TermuxIntentFactory.kt: error-callback plumbing (result=error) added
+      to all 4 install paths (termux, debian_chroot, debian13_chroot,
+      proot). Chroot branches capture chroot exit inside su -c and
+      propagate via exit $STATUS; proot inner command captures script RC
+      BEFORE the trailing rm (which would otherwise mask the status).
+    - MainActivity.kt: strict base_install callback match (no longer
+      matches arbitrary currentTask via the redundant `|| scriptName ==
+      "base_install"` fallback).
+    - DistroSettingsScreen.kt: remember(component.id, distro.id, refreshKey)
+      — per-distro install state no longer re-uses cached value when
+      switching distros.
+
+    Known followups (not blocking T7):
+    - Shell scripts still call send_callback from handle_error and
+      final-success line. The outer wrapper also fires a matching
+      callback. Duplicates are silently dropped by the strict
+      currentTask.id check in MainActivity, but the second toast is
+      suppressed naturally. Cleanest fix: drop send_callback from the
+      shell scripts and rely on the outer wrapper exclusively.
+    - docs/termux/native_gui_research.md §5 still says Turnip needs
+      vulkan-loader-android (now wrong). Per user instruction, not
+      updating in this T7.
+    - result=failure (line 316) vs result=error (line 520) in
+      TermuxIntentFactory — MainActivity's else-branch handles both, but
+      the values are inconsistent for grep-ability.
+- id: T7
+  title: Review and fix XFCE customisation script
+  type: bug
+  priority: high
+  difficulty: unknown
+  why: XFCE customisation script not working completely — needs full review
+  really_needed: Yes, core feature
+  impact: termux/setup/setup_xfce4_termux.sh (customisation steps), possibly start/stop
+  followups: null
+  images: null
+  github_ref: null
+  plan: |
+    Goal: Make native Termux XFCE4 setup reliable and complete.
+    Files: MODIFY app/src/main/assets/scripts/termux/setup/setup_xfce4_termux.sh; inspect start/stop/customization scripts for compatibility.
+    Approach:
+      1. Review package dependencies against start_xfce4_termux.sh and stop_xfce4_termux.sh.
+      2. Ensure setup installs everything needed for Termux:X11, PulseAudio, D-Bus, and XFCE session startup.
+      3. Add safe handoff to setup_customization_termux.sh when available.
+      4. Harden verification and callback result reporting so failed installs do not report success.
+    Edge cases: missing optional apps, missing customization script, unavailable repo packages, failed core packages, app callback on failure.
+    Test plan: shell syntax check changed scripts; run project build if available.
+    Open questions: none.
