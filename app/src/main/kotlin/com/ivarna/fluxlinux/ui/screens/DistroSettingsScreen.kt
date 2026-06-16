@@ -334,7 +334,8 @@ fun DistroSettingsScreen(
                         "You can re-install it later from this screen.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(
@@ -705,9 +706,12 @@ fun ComponentManagementGlassCard(
                             // setup_xfce4_termux.sh / setup_arch_family.sh) is the base install
                             // and has no uninstall branch — tapping Uninstall would re-install XFCE.
                             // Termux xfce customisation (id="customization", scriptName contains
-                            // "termux") is also hidden for the same reason — see T8. T9 will add
-                            // the missing uninstall branch to setup_customization_termux.sh.
-                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && !(component.id == "customization" && component.scriptName.contains("termux")) && onUninstall != null) {
+                            // "termux") and Termux kde customisation (id="kde_customization",
+                            // scriptName contains "termux") are hidden for the same reason — see
+                            // T8 + T9 v4. The scripts have no uninstall branch; tapping would
+                            // re-run the install. setup_kde_termux.sh DOES have a real uninstall
+                            // branch, so the kde_plasma button remains visible.
+                            if (isInstalled && !component.isMandatory && !component.comingSoon && component.id != "xfce4_desktop" && !(component.id == "customization" && component.scriptName.contains("termux")) && !(component.id == "kde_customization" && component.scriptName.contains("termux")) && onUninstall != null) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 TextButton(
                                     onClick = onUninstall,

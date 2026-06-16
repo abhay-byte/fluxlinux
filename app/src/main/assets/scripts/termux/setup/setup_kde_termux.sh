@@ -20,6 +20,21 @@ handle_error() {
     exit 1
 }
 
+# ── Uninstall mode (T9) ───────────────────────────────────
+# Reverse of install path above. Shared deps (x11-repo, termux-x11,
+# pulseaudio, dbus, etc.) intentionally kept.
+if [ "$1" = "uninstall" ]; then
+    echo "FluxLinux: Uninstalling KDE Plasma Desktop..."
+
+    pkg uninstall -y plasma konsole dolphin || true
+
+    rm -f "$HOME/.config/kwinrc"
+    rm -f "$HOME/.config/kdeglobals"
+
+    echo "FluxLinux: KDE Plasma Desktop Uninstalled."
+    exit 0
+fi
+
 echo ""
 echo "══════════════════════════════════════════════"
 echo "  FluxLinux — Native KDE Plasma Desktop Setup"
