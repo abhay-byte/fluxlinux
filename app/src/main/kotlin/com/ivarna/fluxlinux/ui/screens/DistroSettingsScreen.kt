@@ -204,7 +204,13 @@ fun DistroSettingsScreen(
 
 
                 items(distro.components) { component ->
-                    val isInstalled = remember(component.id) {
+                    // Include both component.id and distro.id in the remember key so the
+                    // cached isInstalled value resets when the user navigates to a different
+                    // distro. Without distro.id, switching from termux to debian would re-use
+                    // termux's cached value for the same component (e.g. kde_plasma) and
+                    // make the debian screen falsely show the component as installed.
+                    val refreshKey by StateManager.refreshTrigger.collectAsState()
+                    val isInstalled = remember(component.id, distro.id, refreshKey) {
                         StateManager.isComponentInstalled(context, distro.id, component.id)
                     }
                     val details = componentDetailsMap[component.id]

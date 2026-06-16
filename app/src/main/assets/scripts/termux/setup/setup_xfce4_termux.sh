@@ -8,12 +8,20 @@
 
 CALLBACK_NAME="xfce4_desktop"
 
+send_callback() {
+    RESULT="$1"
+    am start -a android.intent.action.VIEW \
+      -d "fluxlinux://callback?result=${RESULT}&name=${CALLBACK_NAME}" \
+      --flags 0x10000000 2>/dev/null || true
+}
+
 handle_error() {
     echo ""
     echo "❌ FluxLinux Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
+    send_callback "error"
     read -p "Press Enter to acknowledge error and exit..."
     exit 1
 }
@@ -59,6 +67,7 @@ echo "===== Installing Session Dependencies ====="
 pkg install -y \
     dbus \
     at-spi2-core \
+    procps \
     || handle_error "Session dependencies"
 
 # ── Step 6: Audio ────────────────────────────────────────
@@ -83,6 +92,32 @@ pkg install -y fontconfig || true
 
 # Rebuild font cache
 fc-cache -fv 2>/dev/null || true
+
+# ── Step 9: Default XFCE4 configuration ────────────────────
+echo ""
+echo "===== Applying Default XFCE4 Settings ====="
+XFCONF_DIR="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml"
+mkdir -p "$XFCONF_DIR"
+mkdir -p "$HOME/.config/gtk-3.0"
+
+cat > "$HOME/.config/gtk-3.0/settings.ini" << 'EOF'
+[Settings]
+gtk-theme-name=Adwaita-dark
+gtk-icon-theme-name=Adwaita
+gtk-font-name=Noto Sans 10
+gtk-application-prefer-dark-theme=1
+EOF
+
+cat > "$XFCONF_DIR/xfwm4.xml" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="false"/>
+  </property>
+</channel>
+EOF
+
+echo " [✅] Default XFCE4 settings applied"
 
 # ── Verification ─────────────────────────────────────────
 verify_installation() {
@@ -115,7 +150,8 @@ verify_installation() {
     if command -v pulseaudio >/dev/null 2>&1; then
         echo " [✅] PulseAudio"
     else
-        echo " [⚠️] PulseAudio not found (audio may not work)"
+        echo " [❌] PulseAudio Missing"
+        MISSING=1
     fi
 
     if command -v dbus-launch >/dev/null 2>&1; then
@@ -126,20 +162,20 @@ verify_installation() {
     fi
 
     echo "------------------------------------------------"
-    if [ $MISSING -eq 1 ]; then
+    if [ "$MISSING" -eq 1 ]; then
         echo "⚠️  Some components failed. Re-run or check errors above."
+        return 1
     else
         echo "🎉 XFCE4 Desktop installed successfully!"
         echo "   Run 'start_xfce4_termux.sh' to launch."
+        return 0
     fi
 }
 
-verify_installation
+verify_installation || handle_error "verification"
 
 # ── Callback to app ──────────────────────────────────────
-am start -a android.intent.action.VIEW \
-  -d "fluxlinux://callback?result=success&name=${CALLBACK_NAME}" \
-  --flags 0x10000000 2>/dev/null || true
+send_callback "success"
 
 echo ""
 echo "Note: Install Hardware Acceleration next for GPU support."

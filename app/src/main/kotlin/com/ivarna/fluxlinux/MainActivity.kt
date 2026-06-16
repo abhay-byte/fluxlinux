@@ -75,8 +75,14 @@ class MainActivity : ComponentActivity() {
                  val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
                  val currentTask = queueManager.currentTask
                  
-                 // If the callback matches the current task, proceed queue
-                 if (currentTask != null && (scriptName == currentTask.id || scriptName == "base_install")) { // base_install hardcoded in script
+                 // If the callback matches the current task, proceed queue.
+                 // Strict match: the script's callback name must equal the current task's id.
+                 // The previous `|| scriptName == "base_install"` fallback was redundant
+                 // (base install tasks have id="base_install") AND allowed the base-install
+                 // callback to be attributed to a stale/different task (e.g. a debian
+                 // component task left over from a previous screen), which would set state
+                 // for the wrong distro.
+                 if (currentTask != null && scriptName == currentTask.id) {
                      android.widget.Toast.makeText(this, "Task '${currentTask.name}' Complete. Proceeding...", android.widget.Toast.LENGTH_SHORT).show()
                      
                      if (currentTask.type == com.ivarna.fluxlinux.core.utils.TaskType.BASE_INSTALL) {
