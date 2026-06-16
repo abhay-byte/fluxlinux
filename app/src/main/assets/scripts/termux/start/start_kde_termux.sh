@@ -119,7 +119,7 @@ sleep 3
 
 # ── Auto-open the Termux:X11 viewer ──────────────────────
 echo "FluxLinux: Opening Termux:X11 viewer..."
-am start -n com.termux.x11/.MainActivity 2>/dev/null || \
+am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1 || \
     echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
 sleep 1
 
@@ -141,8 +141,10 @@ export KWIN_OPENGL_INTERFACE=egl
 
 echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
 
-# ── Step 6: D-Bus session ────────────────────────────────
+# ── Step 6: D-Bus session ────────────────────────
 echo "FluxLinux: Starting D-Bus session..."
+# Note: Termux dbus-launch does NOT support --exit-with-session.
+# Use --sh-syntax to export DBUS_SESSION_BUS_ADDRESS into this shell.
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     eval "$(dbus-launch --sh-syntax)" 2>/dev/null || \
         echo " [⚠️] D-Bus launch failed — some KDE services may not work"
@@ -191,10 +193,9 @@ echo "   Session log: $KDE_LOG"
 echo "   Output below — Ctrl+C to stop."
 echo ""
 
-# Run inside dbus-launch --exit-with-session so D-Bus is properly
-# wired to the session lifetime (matches reference XFCE4/KDE scripts).
-# tee to log so errors print live AND are saved.
-dbus-launch --exit-with-session startplasma-x11 2>&1 | tee "$KDE_LOG"
+# Run in foreground with tee so errors print live AND save to log.
+# (dbus-launch --exit-with-session is NOT available in Termux)
+startplasma-x11 2>&1 | tee "$KDE_LOG"
 
 echo ""
 echo "🔴 KDE Plasma session ended."
