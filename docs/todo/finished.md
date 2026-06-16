@@ -489,3 +489,18 @@
     Open questions: none.
 ---
 ---
+- id: T9
+  title: Add uninstall branch to Termux component setup scripts
+  type: feature
+  priority: high
+  difficulty: easy
+  why: User report — Termux setup scripts lack "uninstall" handling. T1 only added uninstall blocks to 13 Debian scripts. Termux scripts (xfce4, kde, customisation, hw_accel) are a separate set that were not covered. Per user direction: add uninstall to kde + kde customisation only (xfce4 / xfce custom / hw_accel skipped — buttons hidden by T1/T8/mandatory).
+  really_needed: Yes — without uninstall branches, the UI Uninstall button on Termux kde_plasma / kde_customization cards currently re-runs install instead of removing.
+  impact: app/src/main/assets/scripts/termux/setup/setup_kde_termux.sh, setup_customization_kde_termux.sh — add `if [ "$1" = "uninstall" ]` branch
+  followups: T8
+  images: null
+  github_ref: null
+  plan: |
+    (in-progress, awaiting user manual-test approval)
+---
+---
