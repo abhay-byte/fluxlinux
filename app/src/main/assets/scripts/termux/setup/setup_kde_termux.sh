@@ -21,37 +21,15 @@ handle_error() {
 }
 
 # ── Uninstall mode (T9) ───────────────────────────────────
-# Shared deps (x11-repo, tur-repo, termux-x11-nightly, pulseaudio,
-# fontconfig, dbus, at-spi2-core) are intentionally kept — they're
-# used by other components. Only component-specific packages + files
-# are removed.
-#
-# Strategy: enumerate which of the component packages are actually
-# installed, then uninstall only those. This avoids silent no-op
-# exits (which made the original T9 branch lie about success) and
-# keeps the script idempotent.
+# Reverse of install path above. Shared deps (x11-repo, termux-x11,
+# pulseaudio, dbus, etc.) intentionally kept.
 if [ "$1" = "uninstall" ]; then
     echo "FluxLinux: Uninstalling KDE Plasma Desktop..."
 
-    # Component-specific packages — only uninstall the ones present
-    KDE_PKGS=(plasma konsole dolphin kate spectacle krita)
-    TO_REMOVE=()
-    for p in "${KDE_PKGS[@]}"; do
-        if pkg list-installed 2>/dev/null | grep -qx "$p"; then
-            TO_REMOVE+=("$p")
-        fi
-    done
+    pkg uninstall -y plasma konsole dolphin kate spectacle krita
 
-    if [ ${#TO_REMOVE[@]} -gt 0 ]; then
-        echo "FluxLinux: Removing packages: ${TO_REMOVE[*]}"
-        pkg uninstall -y "${TO_REMOVE[@]}"
-    else
-        echo "FluxLinux: No KDE packages found to remove (already uninstalled)."
-    fi
-
-    # Component-specific config files
-    rm -f "$HOME/.config/kwinrc" 2>/dev/null
-    rm -f "$HOME/.config/kdeglobals" 2>/dev/null
+    rm -f "$HOME/.config/kwinrc"
+    rm -f "$HOME/.config/kdeglobals"
 
     echo "FluxLinux: KDE Plasma Desktop Uninstalled."
     exit 0

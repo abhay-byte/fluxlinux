@@ -26,39 +26,22 @@ handle_error() {
 }
 
 # ── Uninstall mode (T9) ───────────────────────────────────
-# Removes only the assets this script installed. The papirus icon
-# theme may be shared with setup_kde_termux.sh — if user is keeping
-# kde_plasma, uninstall is a no-op for papirus (it's still wanted
-# for the default KDE look).
-#
-# Strategy: only call pkg uninstall if the package is actually
-# installed. Suppressing errors with `2>/dev/null || true` made
-# the original T9 branch lie about success — fixed by enumerating
-# first.
+# Reverse of install path above.
 if [ "$1" = "uninstall" ]; then
     echo "FluxLinux: Uninstalling KDE Customization..."
 
-    # Component-specific package (only if installed)
-    if pkg list-installed 2>/dev/null | grep -qx "papirus-icon-theme"; then
-        echo "FluxLinux: Removing package: papirus-icon-theme"
-        pkg uninstall -y papirus-icon-theme
-    else
-        echo "FluxLinux: papirus-icon-theme not installed (skipping)."
-    fi
+    pkg uninstall -y papirus-icon-theme
 
-    # Wallpapers (FluxLinux-specific, safe to remove)
-    rm -f "$HOME/.fluxlinux/wallpapers/flux_dark.jpg" 2>/dev/null
-    rm -rf "$HOME/.local/share/wallpapers/FluxLinux" 2>/dev/null
+    rm -f "$HOME/.fluxlinux/wallpapers/flux_dark.jpg"
+    rm -rf "$HOME/.local/share/wallpapers/FluxLinux"
 
-    # Revert kdeglobals icon theme override (if present)
     if [ -f "$HOME/.config/kdeglobals" ]; then
-        sed -i '/^\[Icons\]/,/^$/d' "$HOME/.config/kdeglobals" 2>/dev/null
+        sed -i '/^\[Icons\]/,/^$/d' "$HOME/.config/kdeglobals"
     fi
 
-    # Revert GTK icon override (Papirus-Dark → default)
     if [ -f "$HOME/.config/gtk-3.0/settings.ini" ]; then
         sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=Adwaita/' \
-            "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null
+            "$HOME/.config/gtk-3.0/settings.ini"
     fi
 
     echo "FluxLinux: KDE Customization Uninstalled."
