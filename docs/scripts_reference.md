@@ -1,6 +1,6 @@
-# FluxLinux Scripts Reference
+# FluxLinux Pro Scripts Reference
 
-This document provides a comprehensive overview of all scripts used in the FluxLinux project. Scripts are organized by category and include their purpose, execution context, and key functionality.
+This document provides a comprehensive overview of all scripts used in the FluxLinux Pro project. Scripts are organized by category and include their purpose, execution context, and key functionality.
 
 ---
 
@@ -19,11 +19,11 @@ This document provides a comprehensive overview of all scripts used in the FluxL
 
 ## Architecture Overview
 
-FluxLinux uses a layered script architecture:
+FluxLinux Pro uses a layered script architecture:
 
 ```mermaid
 graph TD
-    A[FluxLinux App] --> B[Termux Intent API]
+    A[FluxLinux Pro App] --> B[Termux Intent API]
     B --> C[Termux Scripts]
     B --> D[Common Scripts]
     B --> E[Chroot Scripts]
@@ -732,7 +732,7 @@ Helper script to run commands as root inside chroot:
 ### Error Handling
 ```bash
 handle_error() {
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     read -p "Press Enter to acknowledge error and exit..."
     exit 1
 }

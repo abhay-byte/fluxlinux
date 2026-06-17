@@ -113,7 +113,7 @@ All scripts must start with:
 ```bash
 #!/bin/bash
 # ============================================================
-# FluxLinux — <Script Name>
+# FluxLinux Pro — <Script Name>
 # Location: <relative path from scripts/>
 # Runs on: <HOST Termux | PRoot container | Chroot via su>
 # Root required: <yes | no>
@@ -124,7 +124,7 @@ set -e  # Exit on error
 # ── Error Handler (MANDATORY — keeps terminal open on failure) ──
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -157,9 +157,9 @@ The **Termux Native** distro (`id = "termux"`) runs desktops directly in Termux 
 |---|---|---|---|
 | `setup_xfce4_termux.sh` | `termux/setup/` | Installs XFCE4 + Termux:X11 | `xfce4_desktop` |
 | `setup_hw_accel_termux.sh` | `termux/setup/` | Installs VirGL / Turnip GPU drivers | `hw_accel` |
-| `setup_customization_termux.sh` | `termux/setup/` | Applies FluxLinux XFCE4 theme | `customization` |
+| `setup_customization_termux.sh` | `termux/setup/` | Applies FluxLinux Pro XFCE4 theme | `customization` |
 | `setup_kde_termux.sh` | `termux/setup/` | Installs KDE Plasma + Termux:X11 | `kde_plasma` |
-| `setup_customization_kde_termux.sh` | `termux/setup/` | Applies FluxLinux KDE theme | `kde_customization` |
+| `setup_customization_kde_termux.sh` | `termux/setup/` | Applies FluxLinux Pro KDE theme | `kde_customization` |
 | `start_xfce4_termux.sh` | `termux/start/` | Launches XFCE4 via Termux:X11 | (launch only) |
 | `start_kde_termux.sh` | `termux/start/` | Launches KDE via Termux:X11 | (launch only) |
 | `stop_xfce4_termux.sh` | `termux/stop/` | Stops XFCE4 + Termux:X11 | (stop only) |
@@ -218,7 +218,7 @@ For scripts that install multiple tools, add a verification block (see [setup_ap
 ```bash
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     MISSING=0
     

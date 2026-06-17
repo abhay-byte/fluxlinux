@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="../../assets/logo/logo.webp" width="160" alt="FluxLinux Logo" />
+  <img src="../../assets/logo/logo.webp" width="160" alt="FluxLinux Pro Logo" />
   <h1>🐧 Setting up Debian PRoot</h1>
-  <p>This tutorial will guide you step-by-step through configuring and installing a Debian PRoot (non-rooted) distribution on your Android device using FluxLinux.</p>
+  <p>This tutorial will guide you step-by-step through configuring and installing a Debian PRoot (non-rooted) distribution on your Android device using FluxLinux Pro.</p>
 </div>
 
 ---
@@ -25,7 +25,7 @@
 
 ## 🐧 Step 1: Select Debian Distribution
 
-Launch the FluxLinux app and navigate to the **Distributions** tab or page. Here you will see a list of available Linux distributions that you can install.
+Launch the FluxLinux Pro app and navigate to the **Distributions** tab or page. Here you will see a list of available Linux distributions that you can install.
 
 1. Select **Debian** from the list of distributions.
 2. Tap on the Debian option to open its configuration and installation settings.
@@ -62,11 +62,11 @@ Before generating the installation commands, you need to set up the container co
 
 ## 📋 Step 3: Generate and Copy the Setup Command
 
-Once you finish setting up your preferences, FluxLinux will compile a customized bootstrap script for Termux.
+Once you finish setting up your preferences, FluxLinux Pro will compile a customized bootstrap script for Termux.
 
 1. Tap on the **Generate Setup Command** button (if you haven't already).
 2. Review the generated script and command options.
-3. Tap **Copy and Open Termux**. FluxLinux will copy the bootstrap command to your device clipboard and automatically launch Termux.
+3. Tap **Copy and Open Termux**. FluxLinux Pro will copy the bootstrap command to your device clipboard and automatically launch Termux.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
@@ -91,7 +91,7 @@ Once Termux opens, you need to run the bootstrap command to download and compile
 
 ## 🎉 Step 5: Post-Installation Redirection
 
-Once the installation script finishes successfully in Termux, return to the FluxLinux app. You will find that the Debian distribution is now marked as installed and ready to be launched.
+Once the installation script finishes successfully in Termux, return to the FluxLinux Pro app. You will find that the Debian distribution is now marked as installed and ready to be launched.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
@@ -111,7 +111,7 @@ In the distribution configuration settings, you can customize your installation 
 
 ## 🚀 Step 7: Select Launch Mode
 
-Once the installation is complete, tapping the **Launch** button on the Debian distribution page inside FluxLinux will present you with options to choose your launch mode:
+Once the installation is complete, tapping the **Launch** button on the Debian distribution page inside FluxLinux Pro will present you with options to choose your launch mode:
 - **CLI (Command Line Interface)**: Starts a lightweight terminal session.
 - **GUI (Graphical User Interface)**: Launches a full XFCE4 desktop environment.
 
@@ -143,7 +143,7 @@ Selecting GUI mode launches the X11 server backend and starts the XFCE4 desktop 
 
 ## 🛑 Step 10: Controlling the Session
 
-While the distribution is running in GUI or CLI mode, you can control and monitor the active background session directly from the FluxLinux interface.
+While the distribution is running in GUI or CLI mode, you can control and monitor the active background session directly from the FluxLinux Pro interface.
 - **Open X11**: Reopen the graphical display viewer window if you accidentally swiped it away.
 - **Stop**: Safely shut down all background Debian processes and Termux services.
 

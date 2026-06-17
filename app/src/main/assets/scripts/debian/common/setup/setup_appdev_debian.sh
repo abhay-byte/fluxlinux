@@ -25,7 +25,7 @@ PKGS=(
 
 # ─── UNINSTALL MODE ──────────────────────────────────────────────────────
 if [ "$1" = "uninstall" ]; then
-    echo "FluxLinux: Uninstalling App Development Environment..."
+    echo "FluxLinux Pro: Uninstalling App Development Environment..."
 
     export DEBIAN_FRONTEND=noninteractive
 
@@ -70,7 +70,7 @@ if [ "$1" = "uninstall" ]; then
     # Remove Flutter user config (regen'd on next install)
     rm -rf /home/flux/.flutter
 
-    echo "FluxLinux: App Development Environment Uninstalled."
+    echo "FluxLinux Pro: App Development Environment Uninstalled."
     exit 0
 fi
 # ─── END UNINSTALL MODE ──────────────────────────────────────────────────
@@ -78,7 +78,7 @@ fi
 # Error Handler
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -86,7 +86,7 @@ handle_error() {
     exit 1
 }
 
-echo "FluxLinux: Setting up App Development Environment (Android + Flutter + React Native)..."
+echo "FluxLinux Pro: Setting up App Development Environment (Android + Flutter + React Native)..."
 # Ensure we set ownership to the 'flux' user (since we verify using sudo/root)
 TARGET_USER="flux"
 TARGET_GROUP="users"
@@ -94,16 +94,16 @@ TARGET_GROUP="users"
 # CRITICAL: Remove broken Java packages FIRST (before any apt operations)
 # If Java packages are in a broken state, apt will try to configure them during
 # any apt operation, which will fail if /proc is not mounted
-echo "FluxLinux: Checking for broken Java packages..."
+echo "FluxLinux Pro: Checking for broken Java packages..."
 if dpkg -l | grep -q "^iU.*openjdk\|^iF.*openjdk"; then
-    echo "FluxLinux: Found broken Java packages, removing..."
+    echo "FluxLinux Pro: Found broken Java packages, removing..."
     dpkg --remove --force-all openjdk-21-jre-headless openjdk-21-jre openjdk-21-jdk-headless openjdk-21-jdk default-jre-headless default-jre default-jdk-headless default-jdk 2>/dev/null || true
     apt autoremove -y 2>/dev/null || true
-    echo "FluxLinux: Broken packages removed"
+    echo "FluxLinux Pro: Broken packages removed"
 fi
 
 # 1. Install Dependencies
-echo "FluxLinux: Installing System Dependencies..."
+echo "FluxLinux Pro: Installing System Dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt update -y
 # Core deps + Flutter Linux deps + React Native deps
@@ -120,16 +120,16 @@ apt remove -y gradle >/dev/null 2>&1 || true
 # 1b. Install Java (Workaround for chroot /proc issue)
 # Standard OpenJDK installation requires /proc to be mounted, which may fail in chroot
 # This workaround removes the postinst scripts that check for /proc
-echo "FluxLinux: Installing Java Development Kit..."
+echo "FluxLinux Pro: Installing Java Development Kit..."
 export DEBIAN_FRONTEND=noninteractive
 
 # Try standard installation first (works if /proc is properly mounted)
 if apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" openjdk-21-jdk 2>/dev/null; then
     JAVA_VERSION="21"
-    echo "FluxLinux: OpenJDK 21 installed successfully"
+    echo "FluxLinux Pro: OpenJDK 21 installed successfully"
 else
     # Fallback: Install without postinst scripts (workaround for /proc issue)
-    echo "FluxLinux: Standard installation failed, using workaround method..."
+    echo "FluxLinux Pro: Standard installation failed, using workaround method..."
     
     # Download packages
     apt-get download openjdk-21-jdk openjdk-21-jre openjdk-21-jre-headless openjdk-21-jdk-headless 2>/dev/null || handle_error "Java package download"
@@ -151,7 +151,7 @@ else
     rm -f openjdk-*.deb
     
     # Manually set up alternatives (postinst scripts were removed)
-    echo "FluxLinux: Configuring Java alternatives..."
+    echo "FluxLinux Pro: Configuring Java alternatives..."
     JAVA_HOME="/usr/lib/jvm/java-21-openjdk-arm64"
     
     if [ -d "$JAVA_HOME" ]; then
@@ -163,13 +163,13 @@ else
         update-alternatives --install /usr/bin/jar jar $JAVA_HOME/bin/jar 2111 2>/dev/null || true
         update-alternatives --install /usr/bin/javadoc javadoc $JAVA_HOME/bin/javadoc 2111 2>/dev/null || true
         
-        echo "FluxLinux: Java alternatives configured"
+        echo "FluxLinux Pro: Java alternatives configured"
     else
-        echo "FluxLinux: Warning - Could not find Java installation at $JAVA_HOME"
+        echo "FluxLinux Pro: Warning - Could not find Java installation at $JAVA_HOME"
     fi
     
     JAVA_VERSION="21"
-    echo "FluxLinux: OpenJDK 21 installed via workaround method"
+    echo "FluxLinux Pro: OpenJDK 21 installed via workaround method"
 fi
 
 # Fix libjli.so path issue (Common in fresh/broken Trixie installs)
@@ -177,27 +177,27 @@ LIBJLI_PATH=$(find /usr/lib/jvm -name "libjli.so" 2>/dev/null | head -1)
 if [ -n "$LIBJLI_PATH" ]; then
     LIBJLI_DIR=$(dirname "$LIBJLI_PATH")
     export LD_LIBRARY_PATH="$LIBJLI_DIR:$LD_LIBRARY_PATH"
-    echo "FluxLinux: Added $LIBJLI_DIR to LD_LIBRARY_PATH"
+    echo "FluxLinux Pro: Added $LIBJLI_DIR to LD_LIBRARY_PATH"
 fi
 
 # Verify Java installation
 if command -v java >/dev/null 2>&1 && java -version 2>&1 | grep -q "openjdk"; then
-    echo "FluxLinux: Java Status: $(java -version 2>&1 | head -1)"
+    echo "FluxLinux Pro: Java Status: $(java -version 2>&1 | head -1)"
 elif [ -f "/usr/lib/jvm/java-21-openjdk-arm64/bin/java" ]; then
-    echo "FluxLinux: Java binaries installed but alternatives not configured"
-    echo "FluxLinux: Run 'update-alternatives --config java' to configure"
+    echo "FluxLinux Pro: Java binaries installed but alternatives not configured"
+    echo "FluxLinux Pro: Run 'update-alternatives --config java' to configure"
 else
-    echo "FluxLinux: Warning - Java installation may have failed"
+    echo "FluxLinux Pro: Warning - Java installation may have failed"
 fi
 
 # 2. Android SDK Setup
 SDK_ROOT="/opt/android-sdk"
 # Check for sdkmanager binary to confirm valid install
 if [ ! -f "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-    echo "FluxLinux: Installing Android SDK..."
+    echo "FluxLinux Pro: Installing Android SDK..."
     # Clean partial install
     if [ -d "$SDK_ROOT" ]; then
-        echo "FluxLinux: Found partial/corrupt Android SDK. Cleaning..."
+        echo "FluxLinux Pro: Found partial/corrupt Android SDK. Cleaning..."
         rm -rf "$SDK_ROOT"
     fi
     
@@ -206,7 +206,7 @@ if [ ! -f "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
     
     # Download Command Line Tools (verified AArch64 compatible)
     # Using version 11076708 (stable)
-    echo "FluxLinux: Downloading Android Command Line Tools..."
+    echo "FluxLinux Pro: Downloading Android Command Line Tools..."
     wget --show-progress https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip || handle_error "Android Tools Download"
     unzip tools.zip || handle_error "Android Tools Unzip"
     mv cmdline-tools latest
@@ -217,7 +217,7 @@ if [ ! -f "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
     export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
     
     # Accept Licenses (Silence is golden)
-    echo "FluxLinux: Accepting Android Licenses..."
+    echo "FluxLinux Pro: Accepting Android Licenses..."
     yes | sdkmanager --licenses
 fi
 
@@ -227,19 +227,19 @@ export ANDROID_HOME="$SDK_ROOT"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 # Install Components
-echo "FluxLinux: Installing Platform Tools, SDK & NDK..."
+echo "FluxLinux Pro: Installing Platform Tools, SDK & NDK..."
 # NOTE: We now use ARM64 native build-tools from lzhiyong/android-sdk-tools (35.0.2)
 # This provides ARM64-compatible aapt, aapt2, aidl, zipalign for SDK 35/36 support
 
 # Clean cmdline-tools path inconsistency (latest-2 vs latest)
 if [ -d "$SDK_ROOT/cmdline-tools/latest-2" ]; then
-    echo "FluxLinux: Fixing cmdline-tools path..."
+    echo "FluxLinux Pro: Fixing cmdline-tools path..."
     rm -rf "$SDK_ROOT/cmdline-tools/latest"
     mv "$SDK_ROOT/cmdline-tools/latest-2" "$SDK_ROOT/cmdline-tools/latest"
 fi
 
 # Clean up inconsistent NDK directories before sdkmanager (only backups and duplicates)
-echo "FluxLinux: Cleaning up inconsistent NDK installations..."
+echo "FluxLinux Pro: Cleaning up inconsistent NDK installations..."
 for ndk_dir in "$SDK_ROOT/ndk/"*; do
     if [ -d "$ndk_dir" ]; then
         ndk_name=$(basename "$ndk_dir")
@@ -251,7 +251,7 @@ for ndk_dir in "$SDK_ROOT/ndk/"*; do
     fi
 done
 
-echo "FluxLinux: Installing Platform Tools, SDK 34/35/36..."
+echo "FluxLinux Pro: Installing Platform Tools, SDK 34/35/36..."
 # NOTE: NDK is installed separately as ARM64 native versions
 # DO NOT install NDK via sdkmanager - it downloads x86 binaries
 sdkmanager "platform-tools" \
@@ -267,7 +267,7 @@ sdkmanager "platform-tools" \
 # Fix CMake & Ninja (Android SDK bundles x86 binaries)
 # Strategy: SHELL WRAPPER.
 # We create a script that execs /usr/bin/cmake. This preserves CMAKE_ROOT resolution (which Hard Copy breaks).
-echo "FluxLinux: Patching Android SDK CMake/Ninja (Wrapper Script)..."
+echo "FluxLinux Pro: Patching Android SDK CMake/Ninja (Wrapper Script)..."
 
 find "$SDK_ROOT/cmake" -name "cmake" -type f | while read -r binary; do
     echo " - Wrapping $binary -> /usr/bin/cmake"
@@ -290,11 +290,11 @@ EOF
 done
 
 # Verify Patch Content
-echo "FluxLinux: Verifying CMake Wrapper Content:"
+echo "FluxLinux Pro: Verifying CMake Wrapper Content:"
 find "$SDK_ROOT/cmake" -name "cmake" -type f -print -exec cat {} \; -quit
 
 # Project-level Fix: Inject cmake.dir and ndk.dir into found local.properties
-echo "FluxLinux: Configuring local projects..."
+echo "FluxLinux Pro: Configuring local projects..."
 find /home/$TARGET_USER -name "local.properties" 2>/dev/null | while read -r prop; do
     # CMake fix
     if ! grep -q "cmake.dir" "$prop"; then
@@ -312,7 +312,7 @@ find /home/$TARGET_USER -name "local.properties" 2>/dev/null | while read -r pro
 done
 
 # ADB/Fastboot: Replace SDK x86 binaries with wrapper scripts to apt's ARM64 binaries
-echo "FluxLinux: Patching Android SDK ADB/Fastboot (Wrapper Script)..."
+echo "FluxLinux Pro: Patching Android SDK ADB/Fastboot (Wrapper Script)..."
 
 PLATFORM_TOOLS="$SDK_ROOT/platform-tools"
 mkdir -p "$PLATFORM_TOOLS"
@@ -355,7 +355,7 @@ install_arm64_ndk() {
     local ARM64_NDK_TAR="/tmp/android-ndk-$NDK_SOURCE_DIR-aarch64-linux-musl.tar.xz"
     local ARM64_NDK_EXTRACTED="/tmp/android-ndk-$NDK_SOURCE_DIR"
     
-    echo "FluxLinux: Checking NDK $NDK_VER ($NDK_RELEASE)..."
+    echo "FluxLinux Pro: Checking NDK $NDK_VER ($NDK_RELEASE)..."
     
     # Check if NDK needs installation or replacement
     local NEEDS_INSTALL=true
@@ -430,7 +430,7 @@ install_arm64_ndk() {
     fi
 }
 
-echo "FluxLinux: Installing ARM64 NDKs (static/musl)..."
+echo "FluxLinux Pro: Installing ARM64 NDKs (static/musl)..."
 
 # Install ARM64 NDK 27 (r27d) - GitHub tag is "r27", tarball is "r27d", version is 27.3.13750724
 install_arm64_ndk "27.3.13750724" "r27" "r27d"
@@ -448,10 +448,10 @@ chmod -R 777 "$SDK_ROOT" # Wide permissions for ease of use in Chroot
 FLUTTER_ROOT="/opt/flutter"
 # Check for flutter binary
 if [ ! -f "$FLUTTER_ROOT/bin/flutter" ]; then
-    echo "FluxLinux: Installing Flutter SDK (Stable)..."
+    echo "FluxLinux Pro: Installing Flutter SDK (Stable)..."
     # Clean partial
     if [ -d "$FLUTTER_ROOT" ]; then
-        echo "FluxLinux: Found partial Flutter. Cleaning..."
+        echo "FluxLinux Pro: Found partial Flutter. Cleaning..."
         rm -rf "$FLUTTER_ROOT"
     fi
     
@@ -459,7 +459,7 @@ if [ ! -f "$FLUTTER_ROOT/bin/flutter" ]; then
     git clone https://github.com/flutter/flutter.git -b stable "$FLUTTER_ROOT" || handle_error "Flutter Clone"
     
 else
-    echo "FluxLinux: Flutter already installed."
+    echo "FluxLinux Pro: Flutter already installed."
 fi # End of initial Flutter installation check
 
 # Minimal Flutter Configuration
@@ -471,14 +471,14 @@ chmod -R 775 "$FLUTTER_ROOT"
 chmod 666 /dev/null 2>/dev/null || true
 
 # 2. Configure Android SDK (Single requested command)
-echo "FluxLinux: Setting Flutter Android SDK..."
+echo "FluxLinux Pro: Setting Flutter Android SDK..."
 
 ACTUAL_USER="flux"
 USER_GROUP="users"
 
-echo "FluxLinux: Flutter already installed."
-echo "FluxLinux: Setting Flutter Android SDK..."
-echo "FluxLinux: Fixing permissions..."
+echo "FluxLinux Pro: Flutter already installed."
+echo "FluxLinux Pro: Setting Flutter Android SDK..."
+echo "FluxLinux Pro: Fixing permissions..."
 
 # Fix permissions with correct group
 chown -R $ACTUAL_USER:$USER_GROUP /opt/flutter /opt/android-sdk
@@ -528,7 +528,7 @@ if command -v zsh >/dev/null 2>&1; then
         echo 'export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"' >> "$ZSHRC"
         echo 'export CHROME_EXECUTABLE=/usr/bin/chromium' >> "$ZSHRC"
         chown $ACTUAL_USER:$USER_GROUP "$ZSHRC"
-        echo "FluxLinux: Added Flutter/Android SDK paths to .zshrc"
+        echo "FluxLinux Pro: Added Flutter/Android SDK paths to .zshrc"
     fi
 fi
 
@@ -540,12 +540,12 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 ENVEOF
 chmod 644 /etc/profile.d/android-sdk.sh
 
-echo "FluxLinux: Flutter Android SDK configured."
+echo "FluxLinux Pro: Flutter Android SDK configured."
 
 # 4. Kotlin (Manual Install for shared access)
 KOTLIN_ROOT="/opt/kotlin"
 if [ ! -f "$KOTLIN_ROOT/bin/kotlinc" ]; then
-    echo "FluxLinux: Installing Kotlin Compiler..."
+    echo "FluxLinux Pro: Installing Kotlin Compiler..."
     # Clean partial
     [ -d "$KOTLIN_ROOT" ] && rm -rf "$KOTLIN_ROOT"
     
@@ -564,16 +564,16 @@ GRADLE_VER="9.2.1"
 if [ -f "/opt/gradle/bin/gradle" ]; then
     INSTALLED_VER=$(/opt/gradle/bin/gradle --version 2>/dev/null | grep "Gradle" | head -1 | awk '{print $2}')
     if [ "$INSTALLED_VER" = "$GRADLE_VER" ]; then
-        echo "FluxLinux: Gradle $GRADLE_VER already installed."
+        echo "FluxLinux Pro: Gradle $GRADLE_VER already installed."
     else
-        echo "FluxLinux: Updating Gradle from $INSTALLED_VER to $GRADLE_VER..."
+        echo "FluxLinux Pro: Updating Gradle from $INSTALLED_VER to $GRADLE_VER..."
         rm -rf /opt/gradle
         rm -f /tmp/gradle.zip
     fi
 fi
 
 if [ ! -f "/opt/gradle/bin/gradle" ] || [ "$(/opt/gradle/bin/gradle --version 2>/dev/null | grep 'Gradle' | head -1 | awk '{print $2}')" != "$GRADLE_VER" ]; then
-    echo "FluxLinux: Installing Gradle $GRADLE_VER..."
+    echo "FluxLinux Pro: Installing Gradle $GRADLE_VER..."
     
     # Download with retry
     GRADLE_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
@@ -585,7 +585,7 @@ if [ ! -f "/opt/gradle/bin/gradle" ] || [ "$(/opt/gradle/bin/gradle --version 2>
     
     # Verify download is valid zip
     if ! unzip -t /tmp/gradle.zip >/dev/null 2>&1; then
-        echo "FluxLinux: Downloaded file corrupt, retrying..."
+        echo "FluxLinux Pro: Downloaded file corrupt, retrying..."
         rm -f /tmp/gradle.zip
         wget -q --show-progress "$GRADLE_URL" -O /tmp/gradle.zip || handle_error "Gradle Download"
     fi
@@ -597,7 +597,7 @@ if [ ! -f "/opt/gradle/bin/gradle" ] || [ "$(/opt/gradle/bin/gradle --version 2>
     ln -sf /opt/gradle/bin/gradle /usr/local/bin/gradle
     # Fix for caching issues (user reported /usr/bin/gradle not found)
     ln -sf /opt/gradle/bin/gradle /usr/bin/gradle
-    echo "FluxLinux: Gradle $GRADLE_VER installed."
+    echo "FluxLinux Pro: Gradle $GRADLE_VER installed."
 fi
 
 # 4c. ARM64 Build Tools (aapt, aapt2, aidl, zipalign, dexdump)
@@ -605,7 +605,7 @@ fi
 # - SDK 35: lzhiyong/android-sdk-tools (v35.0.2)
 # - SDK 36: HomuHomu833/android-sdk-custom (v36.1.0)
 # This fixes SDK 35/36 resource compilation on ARM64 systems
-echo "FluxLinux: Installing ARM64 Native Build Tools..."
+echo "FluxLinux Pro: Installing ARM64 Native Build Tools..."
 
 # --- SDK 35 Build Tools (from lzhiyong) ---
 ARM64_35_URL="https://github.com/lzhiyong/android-sdk-tools/releases/download/35.0.2/android-sdk-tools-static-aarch64.zip"
@@ -613,7 +613,7 @@ ARM64_35_ZIP="/tmp/android-sdk-35-aarch64.zip"
 # Use unique temp directory with timestamp to avoid leftovers from previous runs
 ARM64_35_DIR="/tmp/android-sdk-35-$$"
 
-echo "FluxLinux: Installing SDK 35 ARM64 Build Tools (35.0.2)..."
+echo "FluxLinux Pro: Installing SDK 35 ARM64 Build Tools (35.0.2)..."
 if [ ! -f "$ARM64_35_ZIP" ]; then
     wget -q --show-progress "$ARM64_35_URL" -O "$ARM64_35_ZIP" || handle_error "ARM64 SDK 35 Build Tools Download"
 fi
@@ -647,7 +647,7 @@ ARM64_36_TAR="/tmp/android-sdk-36-aarch64.tar.xz"
 # Use unique temp directory with PID to avoid leftovers from previous runs
 ARM64_36_DIR="/tmp/android-sdk-36-$$"
 
-echo "FluxLinux: Installing SDK 36 ARM64 Build Tools (36.1.0)..."
+echo "FluxLinux Pro: Installing SDK 36 ARM64 Build Tools (36.1.0)..."
 if [ ! -f "$ARM64_36_TAR" ]; then
     wget -q --show-progress "$ARM64_36_URL" -O "$ARM64_36_TAR" || handle_error "ARM64 SDK 36 Build Tools Download"
 fi
@@ -692,7 +692,7 @@ fi
 chown -R $TARGET_USER:$TARGET_GROUP "$GRADLE_USER_HOME"
 
 # Verify ARM64 aapt2
-echo "FluxLinux: Verifying ARM64 aapt2..."
+echo "FluxLinux Pro: Verifying ARM64 aapt2..."
 # Try 'file' command first, fallback to readelf
 if command -v file >/dev/null 2>&1; then
     if file /usr/local/bin/aapt2 | grep -q "aarch64"; then
@@ -714,14 +714,14 @@ fi
 
 # 6. React Native Setup (Environment)
 # Node is installed via webdev script. We just ensure env vars are ready.
-echo "FluxLinux: Configuring Environment (React Native/Android)..."
+echo "FluxLinux Pro: Configuring Environment (React Native/Android)..."
 
 # Update .bashrc
 BASHRC="$HOME/.bashrc"
 if ! grep -q "ANDROID_HOME" "$BASHRC"; then
     cat <<EOF >> "$BASHRC"
 
-# FluxLinux App Dev Config
+# FluxLinux Pro App Dev Config
 # Dynamic Java Home
 if [ -d "/usr/lib/jvm/java-21-openjdk-arm64" ]; then
     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
@@ -758,7 +758,7 @@ fi
 # (Done in previous step with 512M update)
 
 # 7. Global Symlinks for Immediate Usage
-echo "FluxLinux: Creating global symlinks..."
+echo "FluxLinux Pro: Creating global symlinks..."
 
 ln -sf "$FLUTTER_ROOT/bin/flutter" /usr/local/bin/flutter
 ln -sf "$FLUTTER_ROOT/bin/dart" /usr/local/bin/dart
@@ -768,16 +768,16 @@ ln -sf "$KOTLIN_ROOT/bin/kotlin" /usr/local/bin/kotlin
 ln -sf "$KOTLIN_ROOT/bin/kotlinc" /usr/local/bin/kotlinc
 
 # 8. Final Permission Fix (Crucial for non-root usage)
-echo "FluxLinux: Ensuring correct permissions for $TARGET_USER..."
+echo "FluxLinux Pro: Ensuring correct permissions for $TARGET_USER..."
 chown -R $TARGET_USER:$TARGET_GROUP "$SDK_ROOT" "$FLUTTER_ROOT" "$KOTLIN_ROOT" "/opt/gradle"
 chmod -R 775 "$SDK_ROOT" "$FLUTTER_ROOT" "$KOTLIN_ROOT" "/opt/gradle"
 
-echo "FluxLinux: App Development Setup Complete!"
+echo "FluxLinux Pro: App Development Setup Complete!"
 
 # Final Verification
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     MISSING=0
     

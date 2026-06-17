@@ -22,7 +22,7 @@ PKGS=(
 
 # ─── UNINSTALL MODE ──────────────────────────────────────────────────────
 if [ "$1" = "uninstall" ]; then
-    echo "FluxLinux: Uninstalling Cybersecurity Environment..."
+    echo "FluxLinux Pro: Uninstalling Cybersecurity Environment..."
 
     export DEBIAN_FRONTEND=noninteractive
 
@@ -50,7 +50,7 @@ if [ "$1" = "uninstall" ]; then
         gpasswd -d flux wireshark 2>/dev/null || true
     fi
 
-    echo "FluxLinux: Cybersecurity Environment Uninstalled."
+    echo "FluxLinux Pro: Cybersecurity Environment Uninstalled."
     exit 0
 fi
 # ─── END UNINSTALL MODE ──────────────────────────────────────────────────
@@ -58,7 +58,7 @@ fi
 # Error Handler
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -66,12 +66,12 @@ handle_error() {
     exit 1
 }
 
-echo "FluxLinux: Setting up Cybersecurity Environment..."
+echo "FluxLinux Pro: Setting up Cybersecurity Environment..."
 TARGET_USER="flux"
 TARGET_GROUP="users"
 
 # 1. System Dependencies & Core Tools
-echo "FluxLinux: Installing Security Tools (Apt)..."
+echo "FluxLinux Pro: Installing Security Tools (Apt)..."
 export DEBIAN_FRONTEND=noninteractive
 
 # Enable non-free/contrib repositories for nikto/hashcat if not present
@@ -103,7 +103,7 @@ apt install -y \
 
 # Install Nikto Manually (Fallback if apt fails or is too old)
 if ! command -v nikto >/dev/null; then
-    echo "FluxLinux: Installing Nikto (GitHub)..."
+    echo "FluxLinux Pro: Installing Nikto (GitHub)..."
     # Try apt first (it's in non-free)
     if ! apt install -y nikto; then
         echo " - Apt install failed/missing. Installing from source..."
@@ -116,7 +116,7 @@ else
 fi
 
 # 2. Configure Wireshark Permissions
-echo "FluxLinux: Configuring Wireshark permissions..."
+echo "FluxLinux Pro: Configuring Wireshark permissions..."
 # Allow non-root users from 'wireshark' group to capture packets
 # Pre-seed the configuration to avoid interactive prompt
 echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections
@@ -126,7 +126,7 @@ dpkg-reconfigure -f noninteractive wireshark-common
 usermod -aG wireshark "$TARGET_USER" || echo " [⚠️] Failed to add user to wireshark group"
 
 # 3. Metasploit Framework (Rapid7 Nightly - ARM64 Supported)
-echo "FluxLinux: Installing Metasploit Framework..."
+echo "FluxLinux Pro: Installing Metasploit Framework..."
 if ! command -v msfconsole >/dev/null; then
     echo " - Downloading Official Installer..."
     # The Rapid7 script handles aptitude dependencies and ruby environment
@@ -158,7 +158,7 @@ fi
 
 # 4. Burp Suite Community (JAR Method - Most reliable for ARM64)
 # Official Linux installer is often x64 only.
-echo "FluxLinux: Checking Burp Suite..."
+echo "FluxLinux Pro: Checking Burp Suite..."
 BURP_DIR="/opt/burpsuite"
 if [ ! -f "$BURP_DIR/burpsuite.jar" ]; then
     echo " - Installing Burp Suite Community (JAR)..."
@@ -202,13 +202,13 @@ else
 fi
 
 # 5. Final Permissions & Cleanup
-echo "FluxLinux: Applying permissions..."
+echo "FluxLinux Pro: Applying permissions..."
 chown -R $TARGET_USER:$TARGET_GROUP "/home/$TARGET_USER"
 
 # 6. Verification
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     
     # Network Tools

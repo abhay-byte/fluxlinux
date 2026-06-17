@@ -1,13 +1,13 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/abhay-byte/fluxlinux/v1.0/assets/logo/logo.webp" width="150" />
-  <h1>FluxLinux v1.0 - Initial Release</h1>
+  <h1>FluxLinux Pro v1.0 - Initial Release</h1>
   <p><strong>Run full Linux desktop environments on your Android device</strong></p>
 </div>
 
 ---
 
-We are thrilled to announce the first stable release of **FluxLinux**! Version `1.0` brings a complete, hardware-accelerated Linux desktop experience to your Android device.
+We are thrilled to announce the first stable release of **FluxLinux Pro**! Version `1.0` brings a complete, hardware-accelerated Linux desktop experience to your Android device.
 
 ## 🚀 What's New in v1.0
 
@@ -77,7 +77,7 @@ We are thrilled to announce the first stable release of **FluxLinux**! Version `
 
 **Just one app to start!**
 
-1. Download and install **FluxLinux** (APK below).
+1. Download and install **FluxLinux Pro** (APK below).
 2. Open the app and follow the **Setup Wizard**.
 3. *That's it!* key components (like Termux) and your Linux environment are configured automatically within the app.
 

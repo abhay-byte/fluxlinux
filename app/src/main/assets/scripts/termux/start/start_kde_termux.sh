@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# FluxLinux — Start Native Termux KDE Plasma Desktop
+# FluxLinux Pro — Start Native Termux KDE Plasma Desktop
 # Location: termux/start/start_kde_termux.sh
 # Runs on: HOST Termux (native, no container)
 # Root required: no
@@ -12,13 +12,13 @@
 #   4. Start Termux:X11 server
 #   5. Launch KDE Plasma (startplasma-x11)
 #
-# Note: KDE compositing is disabled by default in FluxLinux
+# Note: KDE compositing is disabled by default in FluxLinux Pro
 # for stability on mobile GPUs. See docs/termux/ for details.
 # ============================================================
 
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -28,7 +28,7 @@ handle_error() {
 
 echo ""
 echo "══════════════════════════════════════════════"
-echo "  FluxLinux — Launching Native KDE Plasma"
+echo "  FluxLinux Pro — Launching Native KDE Plasma"
 echo "  ⚠️  Experimental — compositor is disabled"
 echo "══════════════════════════════════════════════"
 echo ""
@@ -41,7 +41,7 @@ if [ -f "$GPU_CONFIG" ]; then
     GPU_BACKEND="${FLUX_GPU_BACKEND:-virgl}"
 else
     # gpu_config not found — auto-detect now
-    echo "FluxLinux: gpu_config not found, auto-detecting GPU..."
+    echo "FluxLinux Pro: gpu_config not found, auto-detecting GPU..."
     _vulkan_hw=$(getprop ro.hardware.vulkan 2>/dev/null || echo "")
     _egl_hw=$(getprop ro.hardware.egl 2>/dev/null || echo "")
     _board=$(getprop ro.product.board 2>/dev/null || echo "")
@@ -55,12 +55,12 @@ else
     # Save result so next launch skips detection
     mkdir -p "$HOME/.fluxlinux"
     echo "FLUX_GPU_BACKEND=$GPU_BACKEND" > "$GPU_CONFIG"
-    echo "FluxLinux: Auto-detected GPU backend: [$GPU_BACKEND] (saved to gpu_config)"
+    echo "FluxLinux Pro: Auto-detected GPU backend: [$GPU_BACKEND] (saved to gpu_config)"
 fi
-echo "FluxLinux: GPU backend [$GPU_BACKEND]"
+echo "FluxLinux Pro: GPU backend [$GPU_BACKEND]"
 
 # ── Step 1: Kill previous session ─────────────────────────
-echo "FluxLinux: Cleaning up previous session..."
+echo "FluxLinux Pro: Cleaning up previous session..."
 pkill -f "startplasma" 2>/dev/null || true
 pkill -f "kwin_x11" 2>/dev/null || true
 pkill -f "plasmashell" 2>/dev/null || true
@@ -72,7 +72,7 @@ pkill -f "pulseaudio" 2>/dev/null || true
 sleep 1
 
 # ── Step 2: PulseAudio ────────────────────────────────────
-echo "FluxLinux: Starting PulseAudio..."
+echo "FluxLinux Pro: Starting PulseAudio..."
 unset PULSE_SERVER
 pulseaudio --kill 2>/dev/null || true
 pulseaudio --start \
@@ -82,14 +82,14 @@ pulseaudio --start \
 export PULSE_SERVER=127.0.0.1
 
 # ── Step 3: KDE-safe software rendering ───────────────────
-echo "FluxLinux: Using software rendering (LLVMpipe) for KDE stability..."
+echo "FluxLinux Pro: Using software rendering (LLVMpipe) for KDE stability..."
 GPU_BACKEND="software"
 export GALLIUM_DRIVER=llvmpipe
 export LIBGL_ALWAYS_SOFTWARE=1
 sleep 1
 
 # ── Step 4: Termux:X11 ───────────────────────────────────
-echo "FluxLinux: Starting Termux:X11..."
+echo "FluxLinux Pro: Starting Termux:X11..."
 if ! command -v termux-x11 >/dev/null 2>&1; then
     echo "❌ termux-x11 not found. Run 'setup_kde_termux.sh' first."
     read -p "Press Enter to exit..."
@@ -102,7 +102,7 @@ disown
 sleep 4
 
 # ── Auto-open the Termux:X11 viewer ──────────────────────
-echo "FluxLinux: Opening Termux:X11 viewer..."
+echo "FluxLinux Pro: Opening Termux:X11 viewer..."
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1 || \
     echo " [⚠️] Could not auto-open Termux:X11 — please open it manually"
 sleep 3
@@ -120,10 +120,10 @@ chmod 700 "$XDG_RUNTIME_DIR"
 export KWIN_COMPOSE=0
 export KWIN_OPENGL_INTERFACE=egl
 
-echo "FluxLinux: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR (mode $(stat -c '%a' $XDG_RUNTIME_DIR))"
+echo "FluxLinux Pro: XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR (mode $(stat -c '%a' $XDG_RUNTIME_DIR))"
 
 # ── Step 6: D-Bus session ────────────────────────
-echo "FluxLinux: Starting D-Bus session..."
+echo "FluxLinux Pro: Starting D-Bus session..."
 # Note: Termux dbus-launch does NOT support --exit-with-session.
 # Use --sh-syntax to export DBUS_SESSION_BUS_ADDRESS into this shell.
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
@@ -146,7 +146,7 @@ fi
 # Verify startplasma-x11 is actually installed
 if ! command -v startplasma-x11 >/dev/null 2>&1; then
     echo ""
-    echo "❌ FluxLinux Error: 'startplasma-x11' not found!"
+    echo "❌ FluxLinux Pro Error: 'startplasma-x11' not found!"
     echo "   KDE Plasma does not appear to be fully installed."
     echo "   Please run the KDE setup script again:"
     echo "     bash setup_kde_termux.sh"
@@ -159,7 +159,7 @@ if ! command -v startplasma-x11 >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "FluxLinux: Launching KDE Plasma (this may take 30-60s)..."
+echo "FluxLinux Pro: Launching KDE Plasma (this may take 30-60s)..."
 echo ""
 echo "  ┌─────────────────────────────────────────┐"
 echo "  │  Open the Termux:X11 app to see desktop │"

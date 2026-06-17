@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo/logo.webp" width="180" />
-  <h1>FluxLinux</h1>
+  <h1>FluxLinux Pro</h1>
   <p><strong>Run full Linux desktop environments on your Android device</strong></p>
 
 <a href="https://f-droid.org/packages/com.ivarna.fluxlinux">
@@ -50,8 +50,8 @@
 <div align="center">
   <table>
     <tr>
-      <td align="center" width="140"><img src="assets/logo/logo.webp" width="48"/><br/><b><a href="docs/tutorial/setup_fluxlinux.md">FluxLinux Setup</a></b></td>
-      <td><strong>New to FluxLinux?</strong> Check out our comprehensive Step-by-Step Installation & Onboarding Guide for a detailed visual walkthrough covering both rooted and non-rooted devices.</td>
+      <td align="center" width="140"><img src="assets/logo/logo.webp" width="48"/><br/><b><a href="docs/tutorial/setup_fluxlinux.md">FluxLinux Pro Setup</a></b></td>
+      <td><strong>New to FluxLinux Pro?</strong> Check out our comprehensive Step-by-Step Installation & Onboarding Guide for a detailed visual walkthrough covering both rooted and non-rooted devices.</td>
     </tr>
     <tr>
       <td align="center" width="140"><img src="app/src/main/res/drawable/distro_debian.webp" width="48"/><br/><b><a href="docs/tutorial/setup_debian_proot.md">Debian Trixie PRoot</a></b></td>
@@ -73,7 +73,7 @@
     <tr>
       <td align="center">
         <a href="https://www.youtube.com/watch?v=BXRzlJnaiLU"><img src="https://markdown-videos-api.jorgenkh.no/youtube/BXRzlJnaiLU" width="240"/></a><br/>
-        <b>Complete FluxLinux Setup Guide</b>
+        <b>Complete FluxLinux Pro Setup Guide</b>
       </td>
     </tr>
   </table>
@@ -83,7 +83,7 @@
 
 ## 🚀 Vision
 
-Modern Android hardware is powerful enough to run desktop workloads, but the software ecosystem limits it. **FluxLinux** bridges this gap, enabling:
+Modern Android hardware is powerful enough to run desktop workloads, but the software ecosystem limits it. **FluxLinux Pro** bridges this gap, enabling:
 
 - 🌐 **Full-Stack Web Development** — Node.js, Python, React, VS Code
 - 🎮 **Desktop Gaming** — Box64/Wine *(coming soon)*
@@ -160,7 +160,7 @@ Modern Android hardware is powerful enough to run desktop workloads, but the sof
 ```mermaid
 flowchart TB
     subgraph Android["📱 Android Device"]
-        FluxLinux["🚀 FluxLinux App<br/>(Kotlin + Jetpack Compose)"]
+        FluxLinux Pro["🚀 FluxLinux Pro App<br/>(Kotlin + Jetpack Compose)"]
         
         subgraph Termux["🔧 Termux Environment"]
             TermuxHost["Terminal Host"]
@@ -182,7 +182,7 @@ flowchart TB
         end
     end
     
-    FluxLinux --> TermuxHost
+    FluxLinux Pro --> TermuxHost
     TermuxHost --> PRoot
     TermuxHost --> Chroot
     PRoot --> Distro
@@ -220,10 +220,10 @@ flowchart TB
 
 ### Install
 
-1. Download FluxLinux from [Releases](https://github.com/abhay-byte/fluxlinux/releases)
+1. Download FluxLinux Pro from [Releases](https://github.com/abhay-byte/fluxlinux/releases)
 2. Install Termux from F-Droid
 3. Install Termux:X11
-4. Open FluxLinux and follow setup wizard
+4. Open FluxLinux Pro and follow setup wizard
 
 <div align="center">
   <img src="assets/screenshots/setup_wizard.png" width="250" />
@@ -234,7 +234,7 @@ flowchart TB
 
 ## 🎮 GPU Acceleration
 
-FluxLinux supports hardware-accelerated graphics:
+FluxLinux Pro supports hardware-accelerated graphics:
 
 <table>
 <tr>

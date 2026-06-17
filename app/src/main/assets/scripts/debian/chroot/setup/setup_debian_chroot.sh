@@ -471,10 +471,10 @@ EOF
     chmod +x "$CLI_SCRIPT"
     success "CLI Launcher created: $CLI_SCRIPT"
     
-    echo "FluxLinux: Chroot Setup Complete!"
+    echo "FluxLinux Pro: Chroot Setup Complete!"
     
     # --- NOTIFY APP ---
-    progress "Notifying FluxLinux App..."
+    progress "Notifying FluxLinux Pro App..."
     am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=distro_install_debian_chroot" >/dev/null 2>&1
 }
 

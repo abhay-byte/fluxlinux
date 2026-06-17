@@ -40,7 +40,7 @@ termux-x11-preference touchMode:Trackpad pointerCapture:true
         ```
 
 2.  **External App Access (Manual Step):**
-    For FluxLinux (or any external app) to send commands to Termux, **you must manually configure this permission**.
+    For FluxLinux Pro (or any external app) to send commands to Termux, **you must manually configure this permission**.
 
     1.  Open Termux.
     2.  Run: `nano ~/.termux/termux.properties`

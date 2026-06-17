@@ -21,7 +21,7 @@ PKGS=(
 
 # ─── UNINSTALL MODE ──────────────────────────────────────────────────────
 if [ "$1" = "uninstall" ]; then
-    echo "FluxLinux: Uninstalling Data Science Environment..."
+    echo "FluxLinux Pro: Uninstalling Data Science Environment..."
 
     export DEBIAN_FRONTEND=noninteractive
     apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
@@ -52,7 +52,7 @@ if [ "$1" = "uninstall" ]; then
     rm -f /usr/share/applications/jupyter.desktop
     rm -f /usr/share/icons/hicolor/scalable/apps/jupyter.svg
 
-    echo "FluxLinux: Data Science Environment Uninstalled."
+    echo "FluxLinux Pro: Data Science Environment Uninstalled."
     exit 0
 fi
 # ─── END UNINSTALL MODE ──────────────────────────────────────────────────
@@ -60,7 +60,7 @@ fi
 # Error Handler
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -86,12 +86,12 @@ update_shell_path() {
     fi
 }
 
-echo "FluxLinux: Setting up Data Science & AI Environment..."
+echo "FluxLinux Pro: Setting up Data Science & AI Environment..."
 TARGET_USER="flux"
 TARGET_GROUP="users"
 
 # 1. System Dependencies
-echo "FluxLinux: Installing System Dependencies..."
+echo "FluxLinux Pro: Installing System Dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt update -y
 # Dependencies for R, Python scientific stack, OpenCV, HDF5
@@ -103,7 +103,7 @@ apt install -y curl wget unzip zip xz-utils tar build-essential git \
     || handle_error "System Dependencies"
 
 # 2. Python Data Science Environment
-echo "FluxLinux: Setting up Python Environment (data_env)..."
+echo "FluxLinux Pro: Setting up Python Environment (data_env)..."
 VENV_DIR="/home/$TARGET_USER/data_env"
 
 if [ ! -d "$VENV_DIR" ]; then
@@ -151,7 +151,7 @@ Categories=Development;Science;
 EOF
 
 # 3. Julia Language (LTS/Stable)
-echo "FluxLinux: Installing Julia Language..."
+echo "FluxLinux Pro: Installing Julia Language..."
 JULIA_DIR="/opt/julia"
 if [ ! -d "$JULIA_DIR" ]; then
     mkdir -p "$JULIA_DIR"
@@ -195,7 +195,7 @@ else
 fi
 
 # 4. PyCharm Community
-echo "FluxLinux: Installing PyCharm Community..."
+echo "FluxLinux Pro: Installing PyCharm Community..."
 PYCHARM_DIR="/opt/pycharm"
 if [ ! -d "$PYCHARM_DIR" ]; then
     mkdir -p "$PYCHARM_DIR"
@@ -236,7 +236,7 @@ else
 fi
 
 # 5. Spyder IDE
-echo "FluxLinux: Installing Spyder IDE..."
+echo "FluxLinux Pro: Installing Spyder IDE..."
 # apt version is simplest/safest
 # pip install spyder is newer 6.0? but requires PyQt5 matching.
 # Let's use apt for stability or pip for latest? User wants latest.
@@ -245,17 +245,17 @@ echo "FluxLinux: Installing Spyder IDE..."
 apt install -y spyder || echo " [⚠️] Spyder install failed"
 
 # 6. RStudio (Optional check)
-echo "FluxLinux: Checking RStudio..."
+echo "FluxLinux Pro: Checking RStudio..."
 # RStudio on ARM64 Linux is tricky. Often requires manual deb specific to OS version.
 # Skipping auto-install to avoid breakage, but R is installed.
 echo " [ℹ️] R is installed. RStudio is omitted due to lack of stable ARM64 builds for Debian Trixie (Use VS Code or R terminal)."
 
 # 7. Final Permissions
-echo "FluxLinux: Applying permissions..."
+echo "FluxLinux Pro: Applying permissions..."
 chown -R $TARGET_USER:$TARGET_GROUP "/home/$TARGET_USER"
 
 # Add to PATH for easy access
-echo "FluxLinux: Configuring Shell Access..."
+echo "FluxLinux Pro: Configuring Shell Access..."
 update_shell_path "/home/$TARGET_USER/.bashrc" "/home/$TARGET_USER/data_env/bin" "Data Science Environment"
 
 # Only update zshrc if zsh is installed
@@ -266,7 +266,7 @@ fi
 # 8. Verification
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     
     # Python

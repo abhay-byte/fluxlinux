@@ -1,6 +1,6 @@
 # Hardware Acceleration with gpu-launch
 
-This guide explains how FluxLinux enables hardware-accelerated graphics in Android Linux containers and how to use the `gpu-launch` wrapper to run GPU-accelerated applications.
+This guide explains how FluxLinux Pro enables hardware-accelerated graphics in Android Linux containers and how to use the `gpu-launch` wrapper to run GPU-accelerated applications.
 
 ---
 
@@ -9,7 +9,7 @@ This guide explains how FluxLinux enables hardware-accelerated graphics in Andro
 - [Overview](#overview)
 - [How Hardware Acceleration Works](#how-hardware-acceleration-works)
   - [The Challenge](#the-challenge)
-  - [FluxLinux Solution](#fluxlinux-solution)
+  - [FluxLinux Pro Solution](#fluxlinux-solution)
 - [GPU Modes](#gpu-modes)
   - [Turnip (Adreno GPUs)](#turnip-adreno-gpus)
   - [VirGL (Universal)](#virgl-universal)
@@ -71,9 +71,9 @@ flowchart LR
     APP -.->|❌ Can't access directly| DRV
 ```
 
-### FluxLinux Solution
+### FluxLinux Pro Solution
 
-FluxLinux bridges this gap using two methods:
+FluxLinux Pro bridges this gap using two methods:
 
 #### Method 1: Turnip + Zink (Adreno GPUs)
 
@@ -200,7 +200,7 @@ The `gpu-launch` script is a wrapper that:
 
 ```bash
 #!/bin/bash
-# FluxLinux GPU Launcher
+# FluxLinux Pro GPU Launcher
 # Automatically detects and applies the correct GPU configuration
 
 MODE="turnip"  # or "virgl" - set during setup
@@ -347,7 +347,7 @@ glmark2
 
 Hardware acceleration is configured during distro installation if you select a GPU mode. You can also run it manually:
 
-1. **Start GUI** (from FluxLinux app)
+1. **Start GUI** (from FluxLinux Pro app)
 2. **Open Terminal** in the desktop
 3. **Run as root:**
    ```bash
@@ -567,6 +567,6 @@ VTEST_DEBUG=1 gpu-launch glxinfo
 
 ## See Also
 
-- [Scripts Reference](scripts_reference.md) - All FluxLinux scripts
+- [Scripts Reference](scripts_reference.md) - All FluxLinux Pro scripts
 - [Script Execution Workflow](script_execution_workflow.md) - How scripts are executed
 - [VirGL Troubleshooting](../app/src/main/assets/scripts/common/virgl_troubleshooting.md) - Detailed VirGL fixes

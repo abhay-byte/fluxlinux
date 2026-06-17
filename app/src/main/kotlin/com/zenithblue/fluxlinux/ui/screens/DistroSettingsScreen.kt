@@ -444,7 +444,7 @@ fun DistroSettingsScreen(
                                     val command = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.getSafeRootManualCommand(scriptContent, "uninstall_${distro.id}.sh")
                                     
                                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("FluxLinux Uninstall", command)
+                                    val clip = android.content.ClipData.newPlainText("FluxLinux Pro Uninstall", command)
                                     clipboard.setPrimaryClip(clip)
                                     
                                     val launchIntent = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(context)

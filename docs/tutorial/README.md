@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="../../assets/logo/logo.webp" alt="FluxLinux Logo" width="120" />
-  <h1>FluxLinux Tutorials</h1>
+  <img src="../../assets/logo/logo.webp" alt="FluxLinux Pro Logo" width="120" />
+  <h1>FluxLinux Pro Tutorials</h1>
   <p>Comprehensive step-by-step guides for installing and configuring Linux distributions on your Android device.</p>
 </div>
 
@@ -14,8 +14,8 @@ We offer three main guides depending on your device's capabilities and what you 
 <div align="center">
   <table>
     <tr>
-      <td align="center" width="140"><img src="../../assets/logo/logo.webp" width="48"/><br/><b><a href="setup_fluxlinux.md">FluxLinux Setup</a></b></td>
-      <td><strong>New to FluxLinux?</strong> Start here! This is the fundamental onboarding guide that walks you through installing the main application, configuring Termux, and preparing your Android device for its first distribution.</td>
+      <td align="center" width="140"><img src="../../assets/logo/logo.webp" width="48"/><br/><b><a href="setup_fluxlinux.md">FluxLinux Pro Setup</a></b></td>
+      <td><strong>New to FluxLinux Pro?</strong> Start here! This is the fundamental onboarding guide that walks you through installing the main application, configuring Termux, and preparing your Android device for its first distribution.</td>
     </tr>
   </table>
 </div>

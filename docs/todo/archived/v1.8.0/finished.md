@@ -102,7 +102,7 @@
   type: bug
   priority: medium
   difficulty: easy
-  why: Android kills FluxLinux's background server, breaking the install bridge (curl: connection refused on localhost)
+  why: Android kills FluxLinux Pro's background server, breaking the install bridge (curl: connection refused on localhost)
   really_needed: Workaround exists (split-screen), but proper fix avoids user friction
   impact: Bridge/service layer + notification for the foreground service
   followups: null
@@ -206,7 +206,7 @@
   plan: |
     Goal: add a visible warning card on the Termux and Termux:X11 install-check
     screens in onboarding, telling users to UNINSTALL the Play Store version
-    first and to use the GitHub release version FluxLinux already downloads.
+    first and to use the GitHub release version FluxLinux Pro already downloads.
 
     Reference: docs/to_be_fixed.md § "Play Store Termux Version Warning"
     (already has a stub plan). Expand it into a working feature.
@@ -236,7 +236,7 @@
          Title:  "⚠️ Use the GitHub version of Termux"
          Body:   "The Play Store version of Termux is no longer maintained and
                   will fail at the 'grant permission' step. Uninstall it, then
-                  tap 'Re-check' below to install the version FluxLinux
+                  tap 'Re-check' below to install the version FluxLinux Pro
                   recommends."
          CTA:    small inline "How to uninstall" text with a deeplink
                  (termux:// uninstall flow) — or just a "Re-check" button that
@@ -272,7 +272,7 @@
     Test plan:
     - Build: ./gradlew assembleDebug succeeds.
     - Manual A (Play Store installed): install v0.117 from Play Store,
-      open FluxLinux onboarding, expect red warning banner on Termux
+      open FluxLinux Pro onboarding, expect red warning banner on Termux
       check card.
     - Manual B (GitHub installed): install v0.118+ from GitHub, expect
       no banner.
@@ -308,7 +308,7 @@
     What shipped:
     - app/src/main/res/drawable/ic_launcher_monochrome.png: 1024x1024 RGBA
       PNG, black ink on transparent background. Sourced from a user-provided
-      Gemini-generated line drawing of the FluxLinux penguin-on-box mascot.
+      Gemini-generated line drawing of the FluxLinux Pro penguin-on-box mascot.
       Icon occupies ~70% of the 108dp canvas so the launcher mask
       (squircle / circle / teardrop) doesn't crop the silhouette.
     - mipmap-anydpi-v26/ic_launcher.xml: <monochrome> element points at
@@ -356,7 +356,7 @@
   expected: Tapping "Launch" on a Termux KDE install starts a working Plasma session via Termux:X11.
   actual: Launch did not work. Root causes found during manual testing: Termux:X11 logging to `/tmp` failed with permission denied; stale PulseAudio env prevented startup; KDE GPU picker variants did not all route to the working native script; Termux KDE customization used partial `kwriteconfig5` writes instead of the Debian KDE config-file layout.
   reproduction: |
-    1. Open FluxLinux, Termux distro
+    1. Open FluxLinux Pro, Termux distro
     2. Install kde_plasma component
     3. Tap Launch
     4. Session fails or X11 cannot connect
@@ -456,7 +456,7 @@
   expected: Every non-mandatory component (including xfce4 customisation, kde customisation, hw_accel-if-applicable) shows an Uninstall button in the Termux distro ComponentManagementGlassCard.
   actual: Termux customisation and hw_accel components do not render the Uninstall button. xfce4 customisation does (Debian path). Inconsistent.
   reproduction: |
-    1. Open FluxLinux on a Termux distro
+    1. Open FluxLinux Pro on a Termux distro
     2. Install a component (e.g., xfce4 customisation or hw_accel)
     3. Open DistroSettings screen
     4. Expected: Uninstall button visible next to Re-run
@@ -551,10 +551,10 @@
   difficulty: easy
   why: User report — splash screen background is always white, even when the device is in dark theme. Causes jarring white flash on every cold start.
   expected: Splash screen background matches the active theme (white in light, dark in dark).
-  actual: Splash is always white because `app/src/main/res/values/themes.xml` hardcodes `<style name="Theme.FluxLinux" parent="android:Theme.Material.Light.NoActionBar" />` and there is no `values-night/themes.xml` override.
+  actual: Splash is always white because `app/src/main/res/values/themes.xml` hardcodes `<style name="Theme.FluxLinux Pro" parent="android:Theme.Material.Light.NoActionBar" />` and there is no `values-night/themes.xml` override.
   reproduction: |
     1. Set device to dark theme
-    2. Force-stop FluxLinux
+    2. Force-stop FluxLinux Pro
     3. Launch from launcher
     4. Observe: white flash on splash
   frequency: always
@@ -567,7 +567,7 @@
     theme (white in light mode, dark in dark mode).
 
     Root cause: `app/src/main/res/values/themes.xml` defines
-    `<style name="Theme.FluxLinux" parent="android:Theme.Material.Light.NoActionBar" />`
+    `<style name="Theme.FluxLinux Pro" parent="android:Theme.Material.Light.NoActionBar" />`
     with no `android:windowBackground` override. There is no
     `values-night/themes.xml`, so the app always uses the light
     theme. The default window background for `Theme.Material.Light`
@@ -586,14 +586,14 @@
         so the theme's day/night-aware background is used. This
         resolves to white in light mode, dark in dark mode.
     - NEW app/src/main/res/values-night/themes.xml
-        Same style name `Theme.FluxLinux`, parent
+        Same style name `Theme.FluxLinux Pro`, parent
         `android:Theme.Material.NoActionBar` (the dark variant
         of `Theme.Material`), with the same windowBackground
         override. Android's resource system swaps between
         `values/themes.xml` and `values-night/themes.xml` based
         on the system's Configuration.UI_MODE_NIGHT_* state.
     - (No AndroidManifest change needed — already references
-     `@style/Theme.FluxLinux` on both the application and
+     `@style/Theme.FluxLinux Pro` on both the application and
      MainActivity, lines 28 and 44.)
 
     Approach:

@@ -39,7 +39,7 @@ object TermuxIntentFactory {
      * A simple "Ping" command to check if connection works.
      */
     fun buildTestConnectionIntent(): Intent {
-        return buildRunCommandIntent("echo 'FluxLinux: Connection Established!' && sleep 2")
+        return buildRunCommandIntent("echo 'FluxLinux Pro: Connection Established!' && sleep 2")
     }
 
     /**
@@ -104,7 +104,7 @@ object TermuxIntentFactory {
         
         val command = when {
             distroId == "termux" -> {
-                "pkg uninstall -y xfce4 xfce4-terminal tigervnc && echo 'FluxLinux: Termux Native Desktop Removed.' && sleep 1 && am start -a android.intent.action.VIEW -d \"$callbackUrl\""
+                "pkg uninstall -y xfce4 xfce4-terminal tigervnc && echo 'FluxLinux Pro: Termux Native Desktop Removed.' && sleep 1 && am start -a android.intent.action.VIEW -d \"$callbackUrl\""
             }
             distroId == "debian13_chroot" -> {
                 // Chroot: Inline uninstall logic (unmount, remove, callback)
@@ -150,16 +150,16 @@ object TermuxIntentFactory {
                 """
                 echo "Attempting to remove $distroId..."
                 if proot-distro remove $distroId 2>/dev/null; then
-                    echo "FluxLinux: $distroId Uninstalled."
+                    echo "FluxLinux Pro: $distroId Uninstalled."
                 else
                     echo "First attempt failed, retrying..."
                     sleep 1
                     if proot-distro remove $distroId 2>/dev/null; then
-                        echo "FluxLinux: $distroId Uninstalled."
+                        echo "FluxLinux Pro: $distroId Uninstalled."
                     else
                         echo "proot-distro command failed, using manual removal..."
                         rm -rf ${'$'}PREFIX/var/lib/proot-distro/installed-rootfs/$distroId
-                        echo "FluxLinux: $distroId manually removed."
+                        echo "FluxLinux Pro: $distroId manually removed."
                     fi
                 fi
                 sleep 2
@@ -318,7 +318,7 @@ object TermuxIntentFactory {
         runnerScript.append("if [ $? -eq 0 ]; then\n")
         runnerScript.append("    am start -a android.intent.action.VIEW -d \"$callbackUrl\"\n")
         runnerScript.append("else\n")
-        runnerScript.append("    echo \"FluxLinux: Installation Failed!\"\n")
+        runnerScript.append("    echo \"FluxLinux Pro: Installation Failed!\"\n")
         runnerScript.append("    am start -a android.intent.action.VIEW -d \"$errorUrl\"\n")
         runnerScript.append("fi\n")
         
@@ -428,7 +428,7 @@ object TermuxIntentFactory {
             // IMPORTANT: Start VirGL and PulseAudio in Termux context FIRST (not root)
             // This fixes socket/permission issues
             val command = """
-                echo "FluxLinux: Starting services in Termux context..."
+                echo "FluxLinux Pro: Starting services in Termux context..."
                 
                 # VirGL server
                 if [ -x "${'$'}PREFIX/bin/virgl_test_server_android" ]; then
@@ -443,7 +443,7 @@ object TermuxIntentFactory {
                 echo "[OK] PulseAudio started"
                 
                 sleep 1
-                echo "FluxLinux: Launching Chroot GUI..."
+                echo "FluxLinux Pro: Launching Chroot GUI..."
                 su -c "sh /data/local/tmp/start_debian13_gui.sh"
             """.trimIndent()
             return buildRunCommandIntent(command, runInBackground = false)
@@ -701,12 +701,12 @@ object TermuxIntentFactory {
             val chrootKdeScriptB64 = android.util.Base64.encodeToString(chrootKdeScriptContent.toByteArray(), android.util.Base64.NO_WRAP)
 
             val command = """
-                echo "FluxLinux: Deploying KDE launcher..."
+                echo "FluxLinux Pro: Deploying KDE launcher..."
                 echo '$chrootKdeScriptB64' | base64 -d > ${'$'}HOME/start_debian13_kde_gui.sh
                 chmod +x ${'$'}HOME/start_debian13_kde_gui.sh
                 su -c "cp ${'$'}HOME/start_debian13_kde_gui.sh /data/local/tmp/start_debian13_kde_gui.sh && chmod +x /data/local/tmp/start_debian13_kde_gui.sh"
 
-                echo "FluxLinux: Starting services in Termux context for KDE..."
+                echo "FluxLinux Pro: Starting services in Termux context for KDE..."
 
                 # VirGL server
                 if [ -x "${'$'}PREFIX/bin/virgl_test_server_android" ]; then
@@ -721,7 +721,7 @@ object TermuxIntentFactory {
                 echo "[OK] PulseAudio started"
 
                 sleep 1
-                echo "FluxLinux: Launching Chroot KDE GUI..."
+                echo "FluxLinux Pro: Launching Chroot KDE GUI..."
                 su -c "sh /data/local/tmp/start_debian13_kde_gui.sh"
             """.trimIndent()
             return buildRunCommandIntent(command, runInBackground = false)
@@ -761,12 +761,12 @@ object TermuxIntentFactory {
             )
 
             val command = """
-                echo "FluxLinux: Deploying KDE Turnip launcher..."
+                echo "FluxLinux Pro: Deploying KDE Turnip launcher..."
                 echo '$chrootKdeScriptB64' | base64 -d > ${'$'}HOME/start_debian13_kde_gui_turnip.sh
                 chmod +x ${'$'}HOME/start_debian13_kde_gui_turnip.sh
                 su -c "cp ${'$'}HOME/start_debian13_kde_gui_turnip.sh /data/local/tmp/start_debian13_kde_gui_turnip.sh && chmod +x /data/local/tmp/start_debian13_kde_gui_turnip.sh"
 
-                echo "FluxLinux: Starting PulseAudio for KDE (Turnip)..."
+                echo "FluxLinux Pro: Starting PulseAudio for KDE (Turnip)..."
 
                 # PulseAudio server (VirGL server not needed for Turnip)
                 ${'$'}PREFIX/bin/pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 2>/dev/null
@@ -774,7 +774,7 @@ object TermuxIntentFactory {
                 echo "[OK] PulseAudio started"
 
                 sleep 1
-                echo "FluxLinux: Launching Chroot KDE GUI (Turnip/Zink)..."
+                echo "FluxLinux Pro: Launching Chroot KDE GUI (Turnip/Zink)..."
                 su -c "sh /data/local/tmp/start_debian13_kde_gui_turnip.sh"
             """.trimIndent()
             return buildRunCommandIntent(command, runInBackground = false)
@@ -816,18 +816,18 @@ object TermuxIntentFactory {
             )
 
             val command = """
-                echo "FluxLinux: Deploying KDE Software launcher..."
+                echo "FluxLinux Pro: Deploying KDE Software launcher..."
                 echo '$scriptB64' | base64 -d > ${'$'}HOME/start_debian13_kde_gui_software.sh
                 chmod +x ${'$'}HOME/start_debian13_kde_gui_software.sh
                 su -c "cp ${'$'}HOME/start_debian13_kde_gui_software.sh /data/local/tmp/start_debian13_kde_gui_software.sh && chmod +x /data/local/tmp/start_debian13_kde_gui_software.sh"
 
-                echo "FluxLinux: Starting PulseAudio (no VirGL needed for software mode)..."
+                echo "FluxLinux Pro: Starting PulseAudio (no VirGL needed for software mode)..."
                 ${'$'}PREFIX/bin/pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 2>/dev/null
                 ${'$'}PREFIX/bin/pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1 >/dev/null 2>&1 || true
                 echo "[OK] PulseAudio started"
 
                 sleep 1
-                echo "FluxLinux: Launching KDE (Software/LLVMpipe)..."
+                echo "FluxLinux Pro: Launching KDE (Software/LLVMpipe)..."
                 su -c "sh /data/local/tmp/start_debian13_kde_gui_software.sh"
             """.trimIndent()
             return buildRunCommandIntent(command, runInBackground = false)
@@ -892,7 +892,7 @@ object TermuxIntentFactory {
         // proot-distro login runs killall INSIDE proot namespace, then kill X11 from Termux.
         // Do NOT use pkill from Termux directly — it kills the Termux session itself.
         val command = """
-            echo "FluxLinux: Stopping KDE Plasma..."
+            echo "FluxLinux Pro: Stopping KDE Plasma..."
 
             # Step 1: Kill KDE session processes inside proot (same as XFCE4 stop approach)
             proot-distro login ${'$'}{1:-${distroId}} -- bash -c \
@@ -907,7 +907,7 @@ object TermuxIntentFactory {
             # Step 3: Stop PulseAudio
             pulseaudio --kill 2>/dev/null
 
-            echo "FluxLinux: KDE Plasma stopped."
+            echo "FluxLinux Pro: KDE Plasma stopped."
         """.trimIndent()
         return buildRunCommandIntent(command, runInBackground = false)
     }

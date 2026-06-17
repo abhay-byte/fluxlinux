@@ -1,4 +1,4 @@
-FluxLinux brings full Linux desktops to Android. Install Debian with XFCE4, run dev tools, and use GPU acceleration.
+FluxLinux Pro brings full Linux desktops to Android. Install Debian with XFCE4, run dev tools, and use GPU acceleration.
 
 <b>Features:</b>
 • One-tap Debian install
@@ -9,4 +9,4 @@ FluxLinux brings full Linux desktops to Android. Install Debian with XFCE4, run 
 
 <b>Requirements:</b> Termux (from F-Droid) and Termux:X11 (from F-Droid). Both are free.
 
-FluxLinux does not collect any personal data and does not transmit data off-device.
+FluxLinux Pro does not collect any personal data and does not transmit data off-device.

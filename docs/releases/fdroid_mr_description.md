@@ -1,4 +1,4 @@
-# F-Droid Merge Request: FluxLinux
+# F-Droid Merge Request: FluxLinux Pro
 
 ## Required
 
@@ -22,7 +22,7 @@
 
 ## App Details
 
-**FluxLinux** is an Android app that provides a complete Linux desktop environment (XFCE) inside Termux. It supports multiple distributions including Debian, Ubuntu, Fedora, and Arch Linux.
+**FluxLinux Pro** is an Android app that provides a complete Linux desktop environment (XFCE) inside Termux. It supports multiple distributions including Debian, Ubuntu, Fedora, and Arch Linux.
 
 ### Key Features
 - One-click Linux installation with XFCE desktop

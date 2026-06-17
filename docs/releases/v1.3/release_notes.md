@@ -1,4 +1,4 @@
-# FluxLinux v1.3 Release Notes
+# FluxLinux Pro v1.3 Release Notes
 
 ## 🚨 Google Play Compliance Update
 

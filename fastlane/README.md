@@ -2,8 +2,8 @@
 
 ## App Information
 - **Package Name**: com.zenithblue.fluxlinux
-- **App Name**: FluxLinux
-- **Current Version**: 1.8.0 (versionCode: 10)
+- **App Name**: FluxLinux Pro
+- **Current Version**: 1.8p (versionCode: 11)
 - **Target SDK**: 36 (Android 16)
 - **Min SDK**: 26 (Android 8.0)
 
@@ -41,7 +41,7 @@ fastlane/
 
 ### title.txt
 ```
-FluxLinux - Mobile Linux
+FluxLinux Pro - Mobile Linux
 ```
 
 ### short_description.txt

@@ -3,7 +3,7 @@
 # Enhance Termux with Oh My Zsh, themes, fonts, and fastfetch
 # Based on: https://github.com/abhay-byte/Linux_Setup
 
-echo "🎨 FluxLinux: Enhancing Termux Environment..."
+echo "🎨 FluxLinux Pro: Enhancing Termux Environment..."
 
 install_ohmyzsh() {
     echo "🐚 Installing Oh My Zsh..."
@@ -181,7 +181,7 @@ install_nerd_font
 configure_fastfetch
 
 echo ""
-echo "🎉 FluxLinux: Termux enhancement complete!"
+echo "🎉 FluxLinux Pro: Termux enhancement complete!"
 echo "🔄 Restart Termux to see all changes."
 
 # Create marker file to track tweaks application

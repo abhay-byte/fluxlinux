@@ -11,21 +11,21 @@ MODEL_FILES=(
 
 # ─── UNINSTALL MODE ──────────────────────────────────────────────────────
 if [ "$1" = "uninstall" ]; then
-    echo "FluxLinux: Uninstalling Qwen2.5-1.5B Model..."
+    echo "FluxLinux Pro: Uninstalling Qwen2.5-1.5B Model..."
     for f in "${MODEL_FILES[@]}"; do
         if [ -f "$f" ]; then
             rm -f "$f"
             echo "  Removed: $f"
         fi
     done
-    echo "FluxLinux: Qwen2.5-1.5B Model Uninstalled."
+    echo "FluxLinux Pro: Qwen2.5-1.5B Model Uninstalled."
     exit 0
 fi
 # ─── END UNINSTALL MODE ──────────────────────────────────────────────────
 
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above."
     echo "---------------------------------------------------"
@@ -34,10 +34,10 @@ handle_error() {
     exit 1
 }
 
-echo "FluxLinux: Setting up Qwen2.5-1.5B-Instruct Model..."
+echo "FluxLinux Pro: Setting up Qwen2.5-1.5B-Instruct Model..."
 
 # --- 1. Check llama.cpp is installed ---
-echo "FluxLinux: Checking llama.cpp installation..."
+echo "FluxLinux Pro: Checking llama.cpp installation..."
 if [ ! -f "/usr/local/bin/llama-vulkan" ] && [ ! -f "/usr/local/bin/llama-cli" ]; then
     echo " [❌] llama.cpp not found! Install 'Vulkan Llama.cpp' first."
     handle_error "llama.cpp not installed"
@@ -74,7 +74,7 @@ if [ -f "$MODEL_FILE" ]; then
 fi
 
 if [ ! -f "$MODEL_FILE" ]; then
-    echo "FluxLinux: Downloading Qwen2.5-1.5B-Instruct Q4_0 (938 MB)..."
+    echo "FluxLinux Pro: Downloading Qwen2.5-1.5B-Instruct Q4_0 (938 MB)..."
     echo "Source: huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF"
     echo ""
     curl -L -o "$MODEL_TMP" \

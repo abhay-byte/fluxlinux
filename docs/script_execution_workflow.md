@@ -1,6 +1,6 @@
-# FluxLinux Script Execution Workflow
+# FluxLinux Pro Script Execution Workflow
 
-This document provides a comprehensive overview of how the FluxLinux Android app handles script execution, from user interaction to script completion and callback handling.
+This document provides a comprehensive overview of how the FluxLinux Pro Android app handles script execution, from user interaction to script completion and callback handling.
 
 ---
 
@@ -26,7 +26,7 @@ This document provides a comprehensive overview of how the FluxLinux Android app
 
 ```mermaid
 flowchart TB
-    subgraph "FluxLinux App"
+    subgraph "FluxLinux Pro App"
         UI[UI Screen<br/>HomeScreen, DistroScreen,<br/>InstallConfigScreen]
         TIF[TermuxIntentFactory]
         SM[ScriptManager]
@@ -167,7 +167,7 @@ A lightweight HTTP server for serving large scripts to Termux:
 
 ```mermaid
 sequenceDiagram
-    participant App as FluxLinux App
+    participant App as FluxLinux Pro App
     participant Server as LocalInstallServer
     participant Clipboard as Clipboard
     participant Termux as Termux
@@ -386,7 +386,7 @@ flowchart TD
 
 ## Script Delivery Methods
 
-FluxLinux uses multiple methods to deliver scripts to Termux:
+FluxLinux Pro uses multiple methods to deliver scripts to Termux:
 
 ### 1. Direct Intent (Small Scripts)
 
@@ -634,7 +634,7 @@ su -c '
 ```mermaid
 sequenceDiagram
     actor User
-    participant App as FluxLinux
+    participant App as FluxLinux Pro
     participant Queue as QueueManager
     participant Server as LocalInstallServer  
     participant Termux
@@ -685,7 +685,7 @@ sequenceDiagram
 ```bash
 # Pattern used in scripts
 handle_error() {
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     read -p "Press Enter to acknowledge error and exit..."
     exit 1
 }

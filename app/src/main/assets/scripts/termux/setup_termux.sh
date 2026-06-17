@@ -1,13 +1,13 @@
 #!/bin/bash
 # setup_termux.sh
-# Core initialization script for FluxLinux
+# Core initialization script for FluxLinux Pro
 # Installs necessary dependencies in Termux
 
 MARKER_FILE="$HOME/.fluxlinux/setup_termux.done"
 mkdir -p "$HOME/.fluxlinux"
 
 if [ -f "$MARKER_FILE" ]; then
-    echo "FluxLinux: Termux Setup already completed. Skipping."
+    echo "FluxLinux Pro: Termux Setup already completed. Skipping."
     am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=setup_termux"
     exit 0
 fi
@@ -16,10 +16,10 @@ fi
 set -e
 trap 'am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=failure&name=setup_termux"' ERR
 
-echo "FluxLinux: Initializing Termux Environment..."
+echo "FluxLinux Pro: Initializing Termux Environment..."
 
 # Force clear any deadlocks from background updates
-echo "FluxLinux: Clearing potential locks..."
+echo "FluxLinux Pro: Clearing potential locks..."
 pkill -9 apt || true
 pkill -9 apt-get || true
 pkill -9 dpkg || true
@@ -28,7 +28,7 @@ rm -rf "$PREFIX/var/lib/dpkg/lock-frontend"
 rm -rf "$PREFIX/var/cache/apt/archives/lock"
 
 # Repair any interrupted installations
-echo "FluxLinux: Repairing package database..."
+echo "FluxLinux Pro: Repairing package database..."
 dpkg --configure -a || true
 
 # 1. Update Packages
@@ -51,7 +51,7 @@ pkg install -y proot-distro x11-repo pulseaudio wget zsh fastfetch git unzip uti
 pkg install -y termux-x11-nightly
 
 # 4. Install Hardware Acceleration Tools
-echo "FluxLinux: Installing Hardware Acceleration tools..."
+echo "FluxLinux Pro: Installing Hardware Acceleration tools..."
 # Enable TUR repo for advanced packages
 pkg install -y tur-repo
 pkg update -y
@@ -62,7 +62,7 @@ pkg install -y virglrenderer-android mesa-zink
 # Required for Mali acceleration (Zink over Host Wrapper)
 ARCH=$(dpkg --print-architecture)
 if [ "$ARCH" = "aarch64" ]; then
-    echo "FluxLinux: Installing Vulkan Wrapper for Mali (aarch64)..."
+    echo "FluxLinux Pro: Installing Vulkan Wrapper for Mali (aarch64)..."
     WRAPPER_URL="https://github.com/sabamdarif/termux-desktop/releases/download/pipetto-crypto-vulkan-wrapper-android/pipetto-crypto-vulkan-wrapper-android_25.0.0-1_aarch64.deb"
     
     mkdir -p "$PREFIX/tmp"
@@ -72,7 +72,7 @@ if [ "$ARCH" = "aarch64" ]; then
     dpkg -i "$PREFIX/tmp/vulkan-wrapper.deb" || apt-get install -f -y
     rm "$PREFIX/tmp/vulkan-wrapper.deb"
 else
-    echo "FluxLinux: Skipping Vulkan Wrapper (Architecture $ARCH not supported)"
+    echo "FluxLinux Pro: Skipping Vulkan Wrapper (Architecture $ARCH not supported)"
 fi
 
 # 4. (Scripts now deployed separately via app logic)
@@ -84,7 +84,7 @@ fi
 # per user request/security policy.
 
 
-echo "FluxLinux: Setup Complete"
+echo "FluxLinux Pro: Setup Complete"
 echo ""
 echo "📝 Optional: Run 'bash ~/termux_tweaks.sh' for enhanced terminal experience"
 

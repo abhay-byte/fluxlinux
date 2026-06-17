@@ -1,4 +1,4 @@
-# UI Design System: FluxLinux Glassmorphism
+# UI Design System: FluxLinux Pro Glassmorphism
 
 **Vision:** A futuristic, fluid interface that mimics the properties of glass (translucency, blur, light refraction). It should feel like a premium, floating layer above the Android system.
 

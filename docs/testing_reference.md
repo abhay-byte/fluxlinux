@@ -1,6 +1,6 @@
-# FluxLinux Testing Reference
+# FluxLinux Pro Testing Reference
 
-A comprehensive guide for testing FluxLinux's development stacks by building and running sample projects. Each category corresponds to a component installed by FluxLinux scripts.
+A comprehensive guide for testing FluxLinux Pro's development stacks by building and running sample projects. Each category corresponds to a component installed by FluxLinux Pro scripts.
 
 ---
 
@@ -818,7 +818,7 @@ box64 wine notepad.exe
 
 - **Status Legend:** 🟢 Working | 🟡 Partial | 🔴 Failed | ⬜ Not Tested
 - GPU column indicates if `gpu-launch` was tested with hardware acceleration
-- All tests should be run inside the FluxLinux Debian environment
+- All tests should be run inside the FluxLinux Pro Debian environment
 - Hardware acceleration recommended for graphics/gaming apps
 - Chroot offers better performance but requires root access
 

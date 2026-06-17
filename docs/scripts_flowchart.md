@@ -1,6 +1,6 @@
-# FluxLinux Script Execution Flowchart
+# FluxLinux Pro Script Execution Flowchart
 
-This flowchart visualises the lifecycle of a FluxLinux installation using the restructured `scripts/` filesystem, grouped by **distro → execution type → action**.
+This flowchart visualises the lifecycle of a FluxLinux Pro installation using the restructured `scripts/` filesystem, grouped by **distro → execution type → action**.
 
 ```mermaid
 flowchart TD

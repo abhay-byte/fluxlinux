@@ -1,7 +1,7 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/abhay-byte/fluxlinux/main/assets/logo/logo.webp" width="150" />
-  <h1>FluxLinux v1.2 - BusyBox & Policy Update</h1>
+  <h1>FluxLinux Pro v1.2 - BusyBox & Policy Update</h1>
   <p><strong>Run full Linux desktop environments on your Android device</strong></p>
 </div>
 

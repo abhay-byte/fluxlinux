@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# FluxLinux — Native Termux XFCE4 Desktop Setup
+# FluxLinux Pro — Native Termux XFCE4 Desktop Setup
 # Location: termux/setup/setup_xfce4_termux.sh
 # Runs on: HOST Termux (native, no container)
 # Root required: no
@@ -17,7 +17,7 @@ send_callback() {
 
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -28,17 +28,17 @@ handle_error() {
 
 echo ""
 echo "══════════════════════════════════════════════"
-echo "  FluxLinux — Native XFCE4 Desktop Setup"
+echo "  FluxLinux Pro — Native XFCE4 Desktop Setup"
 echo "══════════════════════════════════════════════"
 echo ""
 
 # ── Step 1: Repositories ──────────────────────────────────
-echo "FluxLinux: Enabling required repositories..."
+echo "FluxLinux Pro: Enabling required repositories..."
 pkg install x11-repo -y || handle_error "x11-repo install"
 pkg install tur-repo -y || handle_error "tur-repo install"
 
 # ── Step 2: Update ───────────────────────────────────────
-echo "FluxLinux: Updating package lists..."
+echo "FluxLinux Pro: Updating package lists..."
 pkg update -y || handle_error "pkg update"
 
 # ── Step 3: Core XFCE4 packages ──────────────────────────
@@ -122,7 +122,7 @@ echo " [✅] Default XFCE4 settings applied"
 # ── Verification ─────────────────────────────────────────
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying XFCE4 Installation..."
+    echo "🔎 FluxLinux Pro: Verifying XFCE4 Installation..."
     echo "------------------------------------------------"
     MISSING=0
 

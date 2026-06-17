@@ -31,7 +31,7 @@ if [ "$1" = "uninstall" ] || [ "$2" = "uninstall" ]; then
     DISTRO_NAME="${1:-debian}"
     [ "$1" = "uninstall" ] && DISTRO_NAME="debian"
 
-    echo "FluxLinux: Uninstalling KDE Plasma Environment..."
+    echo "FluxLinux Pro: Uninstalling KDE Plasma Environment..."
 
     export DEBIAN_FRONTEND=noninteractive
     apt remove -y --purge "${PKGS[@]}" 2>/dev/null || true
@@ -41,7 +41,7 @@ if [ "$1" = "uninstall" ] || [ "$2" = "uninstall" ]; then
     rm -f /home/flux/.fluxlinux/kde_installed
     rm -rf /home/flux/.vnc  # KDE xstartup; vncserver will be re-created by xfce install if needed
 
-    echo "FluxLinux: KDE Plasma Environment Uninstalled."
+    echo "FluxLinux Pro: KDE Plasma Environment Uninstalled."
     exit 0
 fi
 # ─── END UNINSTALL MODE ──────────────────────────────────────────────────
@@ -49,7 +49,7 @@ fi
 DISTRO_NAME="${1:-debian}"
 LOG_FILE="/tmp/fluxlinux_kde_install.log"
 
-echo "FluxLinux: Configuring ${DISTRO_NAME} with KDE Plasma..."
+echo "FluxLinux Pro: Configuring ${DISTRO_NAME} with KDE Plasma..."
 
 # Redirect all output to log
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -58,7 +58,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 handle_error() {
     local STEP="$1"
     echo ""
-    echo "❌ FluxLinux KDE Error: Script failed at step: $STEP"
+    echo "❌ FluxLinux Pro KDE Error: Script failed at step: $STEP"
     echo "──────────────────────────────────────────────────────"
     echo "Log saved to: $LOG_FILE"
     echo ""
@@ -68,7 +68,7 @@ handle_error() {
     echo "──────────────────────────────────────────────────────"
     read -p "Press Enter to acknowledge error and exit..."
 
-    # Notify FluxLinux app of failure
+    # Notify FluxLinux Pro app of failure
     am start -a android.intent.action.VIEW \
         -d "fluxlinux://callback?result=failure&name=kde_plasma_install_${DISTRO_NAME}" \
         2>/dev/null || true
@@ -147,10 +147,10 @@ touch /home/flux/.fluxlinux/kde_installed
 chown -R flux:flux /home/flux/.fluxlinux
 
 echo ""
-echo "✅ FluxLinux: KDE Plasma base setup for ${DISTRO_NAME} complete!"
+echo "✅ FluxLinux Pro: KDE Plasma base setup for ${DISTRO_NAME} complete!"
 echo "Log saved at: $LOG_FILE"
 
-# Notify FluxLinux app of success
+# Notify FluxLinux Pro app of success
 am start -a android.intent.action.VIEW \
     -d "fluxlinux://callback?result=success&name=kde_plasma_install_${DISTRO_NAME}" \
     2>/dev/null || true

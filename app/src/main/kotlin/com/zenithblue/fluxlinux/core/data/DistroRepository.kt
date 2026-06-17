@@ -30,7 +30,7 @@ object DistroRepository {
         DistroComponent(
             id = "customization",
             name = "XFCE4 Customization",
-            description = "FluxLinux Theme, Wallpapers, Fonts, and 2x Scaling for XFCE4.",
+            description = "FluxLinux Pro Theme, Wallpapers, Fonts, and 2x Scaling for XFCE4.",
             scriptName = "debian/common/setup/setup_customization_debian.sh",
             sizeEstimate = "200 MB"
         ),
@@ -44,7 +44,7 @@ object DistroRepository {
         DistroComponent(
             id = "kde_customization",
             name = "KDE Desktop Customization",
-            description = "FluxLinux theme, Papirus icons, wallpapers & Zsh for KDE Plasma.",
+            description = "FluxLinux Pro theme, Papirus icons, wallpapers & Zsh for KDE Plasma.",
             scriptName = "debian/common/setup/setup_customization_kde_debian.sh",
             sizeEstimate = "250 MB"
         ),
@@ -163,7 +163,7 @@ object DistroRepository {
         DistroComponent(
             id = "customization",
             name = "XFCE4 Customization",
-            description = "FluxLinux theme, wallpapers, and fonts for XFCE4.",
+            description = "FluxLinux Pro theme, wallpapers, and fonts for XFCE4.",
             scriptName = "termux/setup/setup_customization_termux.sh",
             sizeEstimate = "200 MB"
         ),
@@ -177,7 +177,7 @@ object DistroRepository {
         DistroComponent(
             id = "kde_customization",
             name = "KDE Desktop Customization",
-            description = "FluxLinux theme, Papirus icons & Zsh for native KDE Plasma.",
+            description = "FluxLinux Pro theme, Papirus icons & Zsh for native KDE Plasma.",
             scriptName = "termux/setup/setup_customization_kde_termux.sh",
             sizeEstimate = "200 MB"
         )

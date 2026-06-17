@@ -4,7 +4,7 @@
 
 DISTRO_NAME="${1:-fedora}"
 
-echo "FluxLinux: Configuring ${DISTRO_NAME} (Fedora Family)..."
+echo "FluxLinux Pro: Configuring ${DISTRO_NAME} (Fedora Family)..."
 
 # 1. Update and Install Core Packages
 dnf update -y || exit 1
@@ -30,4 +30,4 @@ startxfce4" > /home/flux/.vnc/xstartup
 chmod +x /home/flux/.vnc/xstartup
 chown -R flux:flux /home/flux/.vnc
 
-echo "FluxLinux: ${DISTRO_NAME} Setup Complete!"
+echo "FluxLinux Pro: ${DISTRO_NAME} Setup Complete!"

@@ -41,7 +41,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun FluxLinuxTheme(
+fun FluxLinuxProTheme(
     themeMode: com.zenithblue.fluxlinux.core.utils.ThemeMode = com.zenithblue.fluxlinux.core.utils.ThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit

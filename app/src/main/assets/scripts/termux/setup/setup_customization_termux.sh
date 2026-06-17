@@ -1,11 +1,11 @@
 #!/bin/bash
 # ============================================================
-# FluxLinux — Native Termux XFCE4 Customization
+# FluxLinux Pro — Native Termux XFCE4 Customization
 # Location: termux/setup/setup_customization_termux.sh
 # Runs on: HOST Termux (native, no container)
 # Root required: no
 #
-# Mirrors the Debian XFCE4 FluxLinux customization for Termux.
+# Mirrors the Debian XFCE4 FluxLinux Pro customization for Termux.
 # ============================================================
 
 CALLBACK_NAME="customization"
@@ -29,7 +29,7 @@ send_callback() {
 
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -84,38 +84,38 @@ extract_all_assets() {
 
 echo ""
 echo "══════════════════════════════════════════════"
-echo "  FluxLinux — XFCE4 Customization (Native)"
+echo "  FluxLinux Pro — XFCE4 Customization (Native)"
 echo "══════════════════════════════════════════════"
 echo ""
 
-echo "FluxLinux: Installing customization tools..."
+echo "FluxLinux Pro: Installing customization tools..."
 pkg update -y || handle_error "pkg update"
 pkg install -y curl wget unzip tar fontconfig xfce4-goodies || handle_error "customization tools"
 
 if [ -n "$FLUX_THEME" ] && [ "$FLUX_THEME" = "light" ]; then
-    echo "FluxLinux: Light Mode Selected."
+    echo "FluxLinux Pro: Light Mode Selected."
     SEL_THEME="Space-light"
     SEL_ICON="Papirus"
     SEL_CURSOR="Vimix-cursors"
     SEL_WALLPAPER="fluxlinux-light.png"
 else
-    echo "FluxLinux: Dark Mode Selected."
+    echo "FluxLinux Pro: Dark Mode Selected."
     SEL_THEME="Space-transparency"
     SEL_ICON="Papirus-Dark"
     SEL_CURSOR="Vimix-white-cursors"
     SEL_WALLPAPER="fluxlinux-dark.png"
 fi
 
-echo "FluxLinux: Installing Themes..."
+echo "FluxLinux Pro: Installing Themes..."
 extract_all_assets "$BASE_URL/theme.zip" "$THEME_DIR"
 
-echo "FluxLinux: Installing Icons..."
+echo "FluxLinux Pro: Installing Icons..."
 extract_all_assets "$BASE_URL/icons.zip" "$ICON_DIR"
 
-echo "FluxLinux: Installing Cursors..."
+echo "FluxLinux Pro: Installing Cursors..."
 extract_all_assets "$BASE_URL/cursor.zip" "$ICON_DIR"
 
-echo "FluxLinux: Installing Wallpaper..."
+echo "FluxLinux Pro: Installing Wallpaper..."
 mkdir -p "$WALLPAPER_DIR"
 TEMP_WP_ZIP="$TMP_BASE/wallpaper.zip"
 download_file "$BASE_URL/wallpaper.zip" "$TEMP_WP_ZIP" || handle_error "wallpaper download"
@@ -124,7 +124,7 @@ rm -f "$TEMP_WP_ZIP"
 [ -f "$WALLPAPER_DIR/dark.png" ] && mv "$WALLPAPER_DIR/dark.png" "$WALLPAPER_DIR/fluxlinux-dark.png"
 [ -f "$WALLPAPER_DIR/light.png" ] && mv "$WALLPAPER_DIR/light.png" "$WALLPAPER_DIR/fluxlinux-light.png"
 
-echo "FluxLinux: Installing JetBrains Mono Nerd Font..."
+echo "FluxLinux Pro: Installing JetBrains Mono Nerd Font..."
 mkdir -p "$FONT_DIR"
 TEMP_FONT_ZIP="$TMP_BASE/JetBrainsMono.zip"
 download_file "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip" "$TEMP_FONT_ZIP" || \
@@ -155,7 +155,7 @@ fi
 pkill -TERM -f "xfconfd" 2>/dev/null || true
 sleep 1
 
-echo "FluxLinux: Writing GTK settings..."
+echo "FluxLinux Pro: Writing GTK settings..."
 cat > "$HOME/.config/gtk-3.0/settings.ini" <<EOF
 [Settings]
 gtk-theme-name=$SEL_THEME
@@ -167,7 +167,7 @@ gtk-application-prefer-dark-theme=1
 EOF
 cp "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini" 2>/dev/null || true
 
-echo "FluxLinux: Writing xsettings.xml..."
+echo "FluxLinux Pro: Writing xsettings.xml..."
 cat > "$XFCONF_DIR/xsettings.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 
@@ -193,7 +193,7 @@ cat > "$XFCONF_DIR/xsettings.xml" <<EOF
 </channel>
 EOF
 
-echo "FluxLinux: Writing xfwm4.xml..."
+echo "FluxLinux Pro: Writing xfwm4.xml..."
 cat > "$XFCONF_DIR/xfwm4.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 
@@ -215,7 +215,7 @@ cat > "$XFCONF_DIR/xfwm4.xml" <<EOF
 </channel>
 EOF
 
-echo "FluxLinux: Writing xfce4-desktop.xml..."
+echo "FluxLinux Pro: Writing xfce4-desktop.xml..."
 MONITORS="monitor0 monitor1 monitorVNC-0 monitorbuiltin builtin monitorHDMI-A-0 monitorVirtual-0 monitorVirtual-1 monitorVirtual1"
 MONITOR_PROPS=""
 for M in $MONITORS; do
@@ -249,7 +249,7 @@ cat > "$XFCONF_DIR/xfce4-desktop.xml" <<EOF
 </channel>
 EOF
 
-echo "FluxLinux: Writing XFCE4 panel..."
+echo "FluxLinux Pro: Writing XFCE4 panel..."
 cat > "$XFCONF_DIR/xfce4-panel.xml" <<'EOF'
 <?xml version="1.1" encoding="UTF-8"?>
 <channel name="xfce4-panel" version="1.0">
@@ -333,7 +333,7 @@ cat > "$XFCONF_DIR/xfce4-panel.xml" <<'EOF'
 </channel>
 EOF
 
-echo "FluxLinux: Checking core panel plugins..."
+echo "FluxLinux Pro: Checking core panel plugins..."
 for PLUGIN in applicationsmenu tasklist separator systray clock actions pager windowmenu; do
     if find "$PREFIX" -path "*/xfce4/panel/plugins/$PLUGIN.desktop" -o -path "*/xfce4/panel/plugins/lib${PLUGIN}.so" 2>/dev/null | grep -q .; then
         echo " [✅] Panel plugin: $PLUGIN"

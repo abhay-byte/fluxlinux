@@ -17,7 +17,7 @@ else
     MODE="GENERIC"
 fi
 
-echo "FluxLinux: GPU Mode detected: $MODE"
+echo "FluxLinux Pro: GPU Mode detected: $MODE"
 
 # Function to ensure server is running
 ensure_server() {

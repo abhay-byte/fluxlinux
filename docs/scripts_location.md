@@ -74,8 +74,8 @@ Run **inside the Linux container** (both PRoot and Chroot). Invoked by the app v
 | `setup_debian_family.sh` | `xfce4_desktop` | XFCE4 desktop + Termux:X11 base setup |
 | `setup_hw_accel_debian.sh` | `hw_accel` *(mandatory)* | VirGL, Turnip, and Zink GPU drivers |
 | `setup_kde_debian.sh` | `kde_plasma` | KDE Plasma DE, Konsole, Dolphin, Kate |
-| `setup_customization_debian.sh` | `customization` | FluxLinux theme, wallpapers, 2× scale (XFCE4) |
-| `setup_customization_kde_debian.sh` | `kde_customization` | FluxLinux theme, Papirus icons, Zsh (KDE) |
+| `setup_customization_debian.sh` | `customization` | FluxLinux Pro theme, wallpapers, 2× scale (XFCE4) |
+| `setup_customization_kde_debian.sh` | `kde_customization` | FluxLinux Pro theme, Papirus icons, Zsh (KDE) |
 | `setup_gpu.sh` | *(standalone)* | General GPU preparation helper |
 
 **Development:**

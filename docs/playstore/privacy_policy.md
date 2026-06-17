@@ -1,15 +1,15 @@
-# FluxLinux Privacy Policy
+# FluxLinux Pro Privacy Policy
 
 _Last updated: 2026-06-17._
 
-FluxLinux ("the App") is a desktop-environment installer for Android.
+FluxLinux Pro ("the App") is a desktop-environment installer for Android.
 This page describes what data the App handles so that the Google Play
 Console "Data safety" form and the in-app disclosures can stay
 consistent with the actual code.
 
 ## Summary
 
-**FluxLinux does not collect, transmit, sell, or share any personal
+**FluxLinux Pro does not collect, transmit, sell, or share any personal
 data.** All operations described below happen on-device. No analytics,
 no crash reporting, no third-party SDKs, no remote logging.
 

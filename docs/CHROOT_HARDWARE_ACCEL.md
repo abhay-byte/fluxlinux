@@ -1,6 +1,6 @@
 # Hardware Acceleration and Audio for Chroot Environments
 
-This document explains how VirGL (GPU acceleration) and PulseAudio work in chroot environments and how they are configured in FluxLinux.
+This document explains how VirGL (GPU acceleration) and PulseAudio work in chroot environments and how they are configured in FluxLinux Pro.
 
 ## Overview
 
@@ -43,7 +43,7 @@ Chroot environments run as a separate Linux filesystem on Android, but they need
 
 VirGL **MUST** be started from Termux user context (not root):
 - If started from root, the socket gets root ownership and chroot apps can't connect
-- FluxLinux starts VirGL in Termux context before calling `su` for chroot
+- FluxLinux Pro starts VirGL in Termux context before calling `su` for chroot
 
 ### Usage in Chroot
 
@@ -78,7 +78,7 @@ FLUX_GPU_DEBUG=1 gpu-launch glmark2
 
 Like VirGL, PulseAudio **MUST** be started from Termux context:
 - Root can't access Termux's XDG_RUNTIME_DIR
-- FluxLinux starts PulseAudio alongside VirGL before chroot entry
+- FluxLinux Pro starts PulseAudio alongside VirGL before chroot entry
 
 ### Termux Server Command
 
@@ -109,13 +109,13 @@ pactl info
 1. **Check server is running**: `pgrep -f virgl_test_server`
 2. **Check socket exists**: `ls -la /tmp/.virgl_test`
 3. **Check socket ownership**: Should be Termux user (u0_aXXX), NOT root
-4. **Restart GUI**: Click GUI button in FluxLinux app (starts VirGL fresh)
+4. **Restart GUI**: Click GUI button in FluxLinux Pro app (starts VirGL fresh)
 
 ### PulseAudio: No Sound
 
 1. **Check server is running**: `pgrep -f pulseaudio`
 2. **Check from chroot**: `pactl info` (should show connection)
-3. **Restart**: Kill existing and restart GUI from FluxLinux app
+3. **Restart**: Kill existing and restart GUI from FluxLinux Pro app
 
 ### Quick Manual Start (Termux, NOT root)
 
@@ -133,7 +133,7 @@ pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth
 
 ## Implementation Details
 
-### FluxLinux App Flow
+### FluxLinux Pro App Flow
 
 When user clicks GUI button for Debian 13 Chroot:
 

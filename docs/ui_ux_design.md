@@ -1,7 +1,7 @@
-# FluxLinux UI/UX Design Specification
+# FluxLinux Pro UI/UX Design Specification
 
 ## Overview
-FluxLinux is a modern Android app for running Linux distributions via Termux. This document outlines the complete UI/UX design for all screens and user flows.
+FluxLinux Pro is a modern Android app for running Linux distributions via Termux. This document outlines the complete UI/UX design for all screens and user flows.
 
 ## Design Principles
 - **Glassmorphism**: Translucent cards with blur effects
@@ -18,7 +18,7 @@ FluxLinux is a modern Android app for running Linux distributions via Termux. Th
 **Purpose**: Introduce app and set expectations
 
 **Layout**:
-- FluxLinux logo with gradient animation
+- FluxLinux Pro logo with gradient animation
 - Tagline: "Run Full Linux Distributions on Android"
 - Feature highlights (3 cards):
   - 🐧 Multiple Distros (Debian, Ubuntu, Arch)
@@ -36,7 +36,7 @@ FluxLinux is a modern Android app for running Linux distributions via Termux. Th
 
 **Layout**:
 - Title: "Prerequisites"
-- Subtitle: "FluxLinux requires these apps to function"
+- Subtitle: "FluxLinux Pro requires these apps to function"
 
 **Checklist**:
 1. **Termux** 
@@ -62,7 +62,7 @@ FluxLinux is a modern Android app for running Linux distributions via Termux. Th
 **Layout**:
 - Icon: 🔐
 - Title: "Grant Termux Permission"
-- Explanation: "FluxLinux needs permission to communicate with Termux"
+- Explanation: "FluxLinux Pro needs permission to communicate with Termux"
 - "Grant Permission" button
 - "Why is this needed?" expandable info
 
@@ -184,7 +184,7 @@ FluxLinux is a modern Android app for running Linux distributions via Termux. Th
 3. Toast: "Command Copied! Paste in Termux to Install."
 4. Termux app opens automatically
 5. User pastes and executes command
-6. Auto-return to FluxLinux after completion
+6. Auto-return to FluxLinux Pro after completion
 
 **Future Enhancement** (In-App Install):
 - Progress dialog with steps:

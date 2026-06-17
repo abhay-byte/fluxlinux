@@ -1,7 +1,7 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/abhay-byte/fluxlinux/main/assets/logo/logo.webp" width="150" />
-  <h1>FluxLinux v1.1 - Policy Compliance Update</h1>
+  <h1>FluxLinux Pro v1.1 - Policy Compliance Update</h1>
   <p><strong>Run full Linux desktop environments on your Android device</strong></p>
 </div>
 
@@ -24,7 +24,7 @@ This release focuses on **Google Play Policy Compliance** and stability improvem
 - **Removed Features**: In-app APK installer (replaced with deep links)
 
 ## 📦 Installation
-1. Uninstall any previous version of FluxLinux (due to signature change).
+1. Uninstall any previous version of FluxLinux Pro (due to signature change).
 2. Download and install `app-release.apk`.
 3. Follow the expanded **Prerequisites** wizard to setup Termux.
 

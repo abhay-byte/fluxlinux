@@ -3,7 +3,7 @@
 # Installs XFCE4 and VNC on Arch Linux (via Proot)
 
 DISTRO=$1
-echo "FluxLinux: Setting up Arch Linux ($DISTRO)..."
+echo "FluxLinux Pro: Setting up Arch Linux ($DISTRO)..."
 
 # 1. Optimize Pacman (Speed Boost)
 # Enable Parallel Downloads
@@ -13,7 +13,7 @@ sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 # Enable Parallel Downloads
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-echo "FluxLinux: Finding fastest mirrors (this may take a moment)..."
+echo "FluxLinux Pro: Finding fastest mirrors (this may take a moment)..."
 
 # List of potential high-speed mirrors (Global spread)
 MIRRORS=(
@@ -46,13 +46,13 @@ for url in "${MIRRORS[@]}"; do
 done
 
 if [ -n "$BEST_MIRROR" ]; then
-    echo "FluxLinux: Fastest mirror selected: $BEST_MIRROR ($BEST_TIME s)"
+    echo "FluxLinux Pro: Fastest mirror selected: $BEST_MIRROR ($BEST_TIME s)"
     echo "Server = $BEST_MIRROR/\$arch/\$repo" > /etc/pacman.d/mirrorlist
     # Add official redirector as backup
     echo "Server = http://mirror.archlinuxarm.org/\$arch/\$repo" >> /etc/pacman.d/mirrorlist
     echo "Server = http://mirror.leaseweb.com/archlinuxarm/\$arch/\$repo" >> /etc/pacman.d/mirrorlist
 else
-    echo "FluxLinux: Could not rank mirrors, using defaults."
+    echo "FluxLinux Pro: Could not rank mirrors, using defaults."
     echo "Server = http://mirror.archlinuxarm.org/\$arch/\$repo" > /etc/pacman.d/mirrorlist
 fi
 
@@ -83,4 +83,4 @@ startxfce4" > /home/flux/.vnc/xstartup
 chmod +x /home/flux/.vnc/xstartup
 chown -R flux:flux /home/flux/.vnc
 
-echo "FluxLinux: Arch Setup Complete!"
+echo "FluxLinux Pro: Arch Setup Complete!"

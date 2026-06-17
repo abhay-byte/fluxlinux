@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Critical for FluxLinux -> Termux Communication -->
-    <!-- Critical for FluxLinux -> Termux Communication -->
+    <!-- Critical for FluxLinux Pro -> Termux Communication -->
+    <!-- Critical for FluxLinux Pro -> Termux Communication -->
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -24,7 +24,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.FluxLinux"
+        android:theme="@style/Theme.FluxLinuxPro"
         tools:targetApi="31">
 
         <provider
@@ -40,7 +40,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.FluxLinux">
+            android:theme="@style/Theme.FluxLinuxPro">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

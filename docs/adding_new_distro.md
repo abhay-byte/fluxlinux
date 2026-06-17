@@ -1,6 +1,6 @@
-# Adding a New Distro to FluxLinux
+# Adding a New Distro to FluxLinux Pro
 
-This guide walks through every step needed to make a new Linux distribution appear on the FluxLinux Home and Distros screens — from scripts to UI registration — covering PRoot, Chroot, install, start, stop, CLI, and root CLI.
+This guide walks through every step needed to make a new Linux distribution appear on the FluxLinux Pro Home and Distros screens — from scripts to UI registration — covering PRoot, Chroot, install, start, stop, CLI, and root CLI.
 
 ---
 
@@ -54,7 +54,7 @@ Create the required scripts under `app/src/main/assets/scripts/`. The minimum se
 
 ```bash
 #!/bin/bash
-# FluxLinux — <Distro Name> Family Setup
+# FluxLinux Pro — <Distro Name> Family Setup
 # Location: <distro>/common/setup/setup_<distro>_family.sh
 # Runs on: Inside PRoot/Chroot container
 # Root required: no (inside container context)
@@ -67,7 +67,7 @@ export DEBIAN_FRONTEND=noninteractive  # or equivalent for your distro
 # can read the error, copy it, and report the issue.
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -91,7 +91,7 @@ log_step "Setting up locale and timezone"
 # ── Verification (recommended for scripts that install multiple tools) ──
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     MISSING=0
     if command -v xfce4-session >/dev/null; then echo " [✅] XFCE4"; else echo " [❌] XFCE4 Missing"; MISSING=1; fi
@@ -105,7 +105,7 @@ verify_installation() {
 }
 verify_installation
 
-# Signal completion back to FluxLinux app
+# Signal completion back to FluxLinux Pro app
 am start -a android.intent.action.VIEW \
   -d "fluxlinux://callback?result=success&name=base_install" \
   --flags 0x10000000 2>/dev/null || true

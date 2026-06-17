@@ -26,7 +26,7 @@ import com.google.accompanist.permissions.isGranted
 import com.zenithblue.fluxlinux.ui.components.BottomTab
 import com.zenithblue.fluxlinux.ui.components.GlassBottomNavigation
 import com.zenithblue.fluxlinux.ui.components.GlassScaffold
-import com.zenithblue.fluxlinux.ui.theme.FluxLinuxTheme
+import com.zenithblue.fluxlinux.ui.theme.FluxLinuxProTheme
 import com.zenithblue.fluxlinux.core.utils.StateManager
 import com.zenithblue.fluxlinux.core.utils.ThemePreferences
 import androidx.lifecycle.Lifecycle
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleScriptCallback(intent: android.content.Intent) {
-        android.util.Log.d("FluxLinux", "handleScriptCallback called with action: ${intent.action}, data: ${intent.data}")
+        android.util.Log.d("FluxLinux Pro", "handleScriptCallback called with action: ${intent.action}, data: ${intent.data}")
         // Handle Deep Link: fluxlinux://callback?result=success&name=setup_termux
         if (intent.action == android.content.Intent.ACTION_VIEW && intent.data?.scheme == "fluxlinux") {
             val uri = intent.data
@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
             val scriptName = uri?.getQueryParameter("name") ?: "unknown"
             val installedComponents = uri?.getQueryParameter("components") // Legacy
             
-            android.util.Log.d("FluxLinux", "Deep Link received: result=$result, scriptName=$scriptName")
+            android.util.Log.d("FluxLinux Pro", "Deep Link received: result=$result, scriptName=$scriptName")
             
             if (result == "success") {
                  // Check Queue first
@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
         val nextTask = queueManager.next() ?: return // advances queue state internal
         
         // Log Update
-        android.util.Log.d("FluxLinux", "Processing Task: ${nextTask.name}")
+        android.util.Log.d("FluxLinux Pro", "Processing Task: ${nextTask.name}")
         
         android.widget.Toast.makeText(this, "Starting: ${nextTask.name}...", android.widget.Toast.LENGTH_SHORT).show()
         
@@ -218,7 +218,7 @@ class MainActivity : ComponentActivity() {
                     // BUT for Termux RUN_COMMAND we usually use startService.
                     // However, my stub 'onStartServiceStub' used startService.
                 } catch (e: Exception) {
-                    android.util.Log.e("FluxLinux", "Failed to start task: ${nextTask.name}", e)
+                    android.util.Log.e("FluxLinux Pro", "Failed to start task: ${nextTask.name}", e)
                     android.widget.Toast.makeText(this, "Failed to start ${nextTask.name}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
@@ -233,7 +233,7 @@ class MainActivity : ComponentActivity() {
             // Force Permanent Dark Mode
             val currentThemeMode = com.zenithblue.fluxlinux.core.utils.ThemeMode.DARK
             
-            FluxLinuxTheme(themeMode = currentThemeMode) {
+            FluxLinuxProTheme(themeMode = currentThemeMode) {
                 val onboardingComplete = StateManager.isOnboardingComplete(this@MainActivity)
                 
                 // Permission State (Lifted for Settings and Home access)
@@ -270,10 +270,10 @@ class MainActivity : ComponentActivity() {
                 
                 // Helpers for service/activity
                 val onStartServiceStub: (android.content.Intent) -> Unit = { intent ->
-                    try { startService(intent) } catch (e: Exception) { android.util.Log.e("FluxLinux", "StartService failed", e) }
+                    try { startService(intent) } catch (e: Exception) { android.util.Log.e("FluxLinux Pro", "StartService failed", e) }
                 }
                 val onStartActivityStub: (android.content.Intent) -> Unit = { intent ->
-                    try { startActivity(intent) } catch (e: Exception) { android.util.Log.e("FluxLinux", "StartActivity failed", e) }
+                    try { startActivity(intent) } catch (e: Exception) { android.util.Log.e("FluxLinux Pro", "StartActivity failed", e) }
                 }
                 
                 // Navigation Callbacks
@@ -350,7 +350,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "FluxLinux",
+                                    text = "FluxLinux Pro",
                                     color = MaterialTheme.colorScheme.onBackground,
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold
@@ -567,7 +567,7 @@ class MainActivity : ComponentActivity() {
                                                                        // Assumes /system/bin/curl exists (standard on rooted Android 10+)
                                                                        val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && $exports sh install.sh"
                                                                        
-                                                                       val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
+                                                                       val clip = android.content.ClipData.newPlainText("FluxLinux Pro Install", chrootCommand)
                                                                        clipboard.setPrimaryClip(clip)
 
                                                                        android.app.AlertDialog.Builder(this@MainActivity)
@@ -584,7 +584,7 @@ class MainActivity : ComponentActivity() {
                                                                    } else {
                                                                         // Standard Proot Command
                                                                         val installCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && $exports bash install.sh"
-                                                                        val clip = android.content.ClipData.newPlainText("FluxLinux Install", installCommand)
+                                                                        val clip = android.content.ClipData.newPlainText("FluxLinux Pro Install", installCommand)
                                                                         clipboard.setPrimaryClip(clip)
 
                                                                         android.app.AlertDialog.Builder(this@MainActivity)
@@ -708,7 +708,7 @@ class MainActivity : ComponentActivity() {
                                                                if (isChroot) {
                                                                     // Chroot Logic
                                                                     val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && sh install.sh"
-                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
+                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Pro Install", chrootCommand)
                                                                     clipboard.setPrimaryClip(clip)
 
                                                                     android.app.AlertDialog.Builder(this@MainActivity)
@@ -724,7 +724,7 @@ class MainActivity : ComponentActivity() {
                                                                } else {
                                                                     // Proot Logic
                                                                     val curlCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && bash install.sh"
-                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", curlCommand)
+                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Pro Install", curlCommand)
                                                                     clipboard.setPrimaryClip(clip)
 
                                                                     android.app.AlertDialog.Builder(this@MainActivity)
@@ -759,7 +759,7 @@ class MainActivity : ComponentActivity() {
                                               android.widget.Toast.makeText(this@MainActivity, "Uninstalling...", android.widget.Toast.LENGTH_SHORT).show()
                                               currentScreen = Screen.HOME
                                           } catch(e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Uninstall failed", e)
+                                              android.util.Log.e("FluxLinux Pro", "Uninstall failed", e)
                                           }
                                       } else {
                                           permissionState.launchPermissionRequest()
@@ -773,7 +773,7 @@ class MainActivity : ComponentActivity() {
                                               val intent = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.buildLaunchGuiIntent(this@MainActivity, selectedDistro!!.id)
                                               onStartServiceStub(intent)
                                           } catch (e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Launch XFCE4 failed", e)
+                                              android.util.Log.e("FluxLinux Pro", "Launch XFCE4 failed", e)
                                           }
                                       } else {
                                           permissionState.launchPermissionRequest()
@@ -784,7 +784,7 @@ class MainActivity : ComponentActivity() {
                                           val intent = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.buildStopGuiIntent(this, selectedDistro!!.id)
                                           onStartServiceStub(intent)
                                       } catch (e: Exception) {
-                                          android.util.Log.e("FluxLinux", "Stop XFCE4 failed", e)
+                                          android.util.Log.e("FluxLinux Pro", "Stop XFCE4 failed", e)
                                       }
                                   },
                                   onLaunchKde = {
@@ -793,7 +793,7 @@ class MainActivity : ComponentActivity() {
                                               val intent = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.buildLaunchKdeGuiIntent(this@MainActivity, selectedDistro!!.id)
                                               onStartServiceStub(intent)
                                           } catch (e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Launch KDE failed", e)
+                                              android.util.Log.e("FluxLinux Pro", "Launch KDE failed", e)
                                           }
                                       } else {
                                           permissionState.launchPermissionRequest()
@@ -804,7 +804,7 @@ class MainActivity : ComponentActivity() {
                                            val intent = com.zenithblue.fluxlinux.core.data.TermuxIntentFactory.buildStopKdeGuiIntent(this, selectedDistro!!.id)
                                           onStartServiceStub(intent)
                                       } catch (e: Exception) {
-                                          android.util.Log.e("FluxLinux", "Stop KDE failed", e)
+                                          android.util.Log.e("FluxLinux Pro", "Stop KDE failed", e)
                                       }
                                   }
                               )

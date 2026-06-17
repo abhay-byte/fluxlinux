@@ -1,6 +1,6 @@
 # Play Store Documentation
 
-Documents related to publishing and maintaining FluxLinux on the
+Documents related to publishing and maintaining FluxLinux Pro on the
 Google Play Store.
 
 ## Index

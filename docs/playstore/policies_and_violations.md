@@ -1,11 +1,11 @@
-# FluxLinux — Google Play Store Policies & Violations Reference
+# FluxLinux Pro — Google Play Store Policies & Violations Reference
 
 > **Scope.** This document is the canonical reference for everything in this
 > repo that may collide with the Google Play Developer Program Policies. It
 > covers the four classes of issues called out in the original report
 > (in-app APK installation, download links for other apps, external links,
 > embedded YouTube playback) plus every other common rejection category that
-> is plausibly relevant to FluxLinux.
+> is plausibly relevant to FluxLinux Pro.
 >
 > **Sources.** Citations are inline. Policy text is paraphrased from the
 > official Google Play Console Help pages and Play Console developer
@@ -21,7 +21,7 @@
 
 ---
 
-## 1. TL;DR for FluxLinux
+## 1. TL;DR for FluxLinux Pro
 
 > **Note.** The table below is the v1 inventory against `main`. After the
 > v2 playstore-branch rebase (see §7), the §2.x issues
@@ -112,7 +112,7 @@ team will reject on first review and will not grant an appeal.
 3. **Build the prerequisite install into a single non-APK flow.** If
    Termux could be acquired via the Play Store and Termux:X11 via F-Droid
    (the only legitimate distribution channels for those apps), then
-   FluxLinux does not need the permission at all. F-Droid links are
+   FluxLinux Pro does not need the permission at all. F-Droid links are
    addressable via a normal `https://` URL Play accepts.
 
 The cleanest fix is **(1) + (3)**: deep-link to Termux on Play Store and
@@ -203,7 +203,7 @@ repo will trigger manual review if framed as the install/update path.
   - L864 — `https://github.com/abhay-byte`
   - L899-903 — `SocialLink` list: GitHub, LinkedIn, Portfolio,
     Instagram, X (Twitter). All `openUrl()` calls.
-  - L923 — `https://github.com/abhay-byte/FluxLinux`
+  - L923 — `https://github.com/abhay-byte/FluxLinux Pro`
 - `app/src/main/kotlin/com/ivarna/fluxlinux/ui/screens/PrerequisitesScreen.kt:2109`
   — `https://xdaforums.com/attachments/update-busybox-installer-v1-36-1-all-signed-zip.6000117/`
   (a direct link to a `.zip` file on XDA; this is a downloadable asset
@@ -294,11 +294,11 @@ the app already uses for other links is the right shape.)
 
 These are the policies a Linux-on-Android app is most likely to be
 reviewed against. Each row links the policy text and notes how it
-applies to FluxLinux.
+applies to FluxLinux Pro.
 
 ### 3.1 Permissions & Restricted Permissions
 
-| Permission / Policy | What Play says | FluxLinux status |
+| Permission / Policy | What Play says | FluxLinux Pro status |
 |---|---|---|
 | `REQUEST_INSTALL_PACKAGES` | Allowed only for browsers, file managers, comms apps handling attachments, enterprise MDM, device migration/backup. | **Used (line 9 of `AndroidManifest.xml`).** Not in allowed list. Must be removed. |
 | `BIND_ACCESSIBILITY_SERVICE` | Must be a true accessibility tool *or* carry an in-app disclosure + Play Console declaration. | Not declared in manifest. But the store description claims "Uses AccessibilityService API" — see §4. |
@@ -313,7 +313,7 @@ applies to FluxLinux.
 Covers: hidden/undocumented features, manipulated media, behavior
 transparency, impersonation, misleading claims.
 
-- **Applies to FluxLinux.** The Termux/Termux:X11 sideload path is a
+- **Applies to FluxLinux Pro.** The Termux/Termux:X11 sideload path is a
   "hidden" install feature from a reviewer's perspective because the
   store description does not mention it.
 - **Store description claim.** "Uses AccessibilityService API for
@@ -331,7 +331,7 @@ transparency, impersonation, misleading claims.
   permissions or handle user data. The Play Console "App content" page
   requires it. `docs/playstore/` is a good place to host one; this
   directory already exists but is currently empty.
-- **Data safety form** must be filled in. FluxLinux downloads APKs to
+- **Data safety form** must be filled in. FluxLinux Pro downloads APKs to
   the app cache and writes install state. The "data collected" answer
   should be: *no personal data; app does not transmit data off-device*
   (the SHA-256 verification is local; the APK is HTTPS to GitHub but
@@ -353,7 +353,7 @@ Covered in §2.1. A Linux-distro manager is not in the allowed list for
 ### 3.6 Spam & Minimum Functionality
 
 - The app must provide a "minimum degree of functionality and value".
-  FluxLinux clearly does. `clean` on this axis.
+  FluxLinux Pro clearly does. `clean` on this axis.
 - "Spam" covers duplicate submissions, misleading metadata, etc. The
   app has one Play listing. `clean`.
 
@@ -373,7 +373,7 @@ Covered in §2.1. A Linux-distro manager is not in the allowed list for
 
 ### 3.8 Impersonation
 
-- App name "FluxLinux" and icon are not impersonating another product.
+- App name "FluxLinux Pro" and icon are not impersonating another product.
   `clean`.
 - Make sure the developer name on Play Console matches the brand.
   README credits "Abhay Raj" / `abhay-byte` — keep the Play Console
@@ -381,7 +381,7 @@ Covered in §2.1. A Linux-distro manager is not in the allowed list for
 
 ### 3.9 Payments & Subscriptions
 
-- FluxLinux has no in-app purchases. Play Billing policy is not
+- FluxLinux Pro has no in-app purchases. Play Billing policy is not
   triggered. `clean`.
 - The current fastlane metadata does not mention any monetization. `clean`.
 
@@ -391,7 +391,7 @@ Covered in §2.1. A Linux-distro manager is not in the allowed list for
 
 ### 3.11 Privacy & Data Safety
 
-- Play Console requires a "Data safety" form. FluxLinux:
+- Play Console requires a "Data safety" form. FluxLinux Pro:
   - Collects no personal data.
   - Downloads APKs from `github.com` (Termux, Termux:X11) and stores
     them in app cache.
@@ -407,7 +407,7 @@ Covered in §2.1. A Linux-distro manager is not in the allowed list for
 gambling, illegal activities, user-generated content, health, blockchain,
 AI-generated content, age-restricted content)
 
-- FluxLinux is none of these. `clean`.
+- FluxLinux Pro is none of these. `clean`.
 
 ### 3.14 Background Execution & Foreground Services
 
@@ -422,7 +422,7 @@ AI-generated content, age-restricted content)
 ### 3.15 Permissions Declaration Form
 
 - Several sensitive permissions require a declaration. For
-  FluxLinux: `REQUEST_INSTALL_PACKAGES` (if kept) and
+  FluxLinux Pro: `REQUEST_INSTALL_PACKAGES` (if kept) and
   `FOREGROUND_SERVICE_DATA_SYNC`. The form is in Play Console →
   Policy → App content → Sensitive permissions and APIs.
 

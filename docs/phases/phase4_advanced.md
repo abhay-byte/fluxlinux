@@ -1,6 +1,6 @@
 # Phase 4: Advanced Features (The "Wow" Factor)
 
-**Goal:** Unlock high-performance capabilities that distinguish FluxLinux from basic script runners.
+**Goal:** Unlock high-performance capabilities that distinguish FluxLinux Pro from basic script runners.
 
 ## 4.1 Hardware Acceleration (GPU)
 We need to inject optimized drivers into the container.

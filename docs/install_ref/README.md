@@ -1,6 +1,6 @@
 # Installation Reference
 
-Complete reference for all packages, tools, paths, and environments installed by FluxLinux.
+Complete reference for all packages, tools, paths, and environments installed by FluxLinux Pro.
 
 ---
 

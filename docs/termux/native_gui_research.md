@@ -1,6 +1,6 @@
 # Native Termux GUI Research — XFCE4, KDE, VirGL, Turnip
 
-> Research gathered June 2026 for FluxLinux native Termux desktop support.
+> Research gathered June 2026 for FluxLinux Pro native Termux desktop support.
 > Sources: Termux Wiki, r/termux, GitHub (termux/termux-x11, LinuxDroidMaster/Termux-Desktops, sabamdarif/termux-desktop).
 
 ---
@@ -233,7 +233,7 @@ Theme directories:
 Apply with xfconf:
 ```bash
 # GTK theme
-xfconf-query -c xsettings -p /Net/ThemeName -s "FluxLinuxDark"
+xfconf-query -c xsettings -p /Net/ThemeName -s "FluxLinux ProDark"
 
 # Icon theme
 xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark"
@@ -280,7 +280,7 @@ kwriteconfig5 --file kdeglobals --group KScreen --key ScaleFactor 2
 
 ---
 
-## 8. Script Locations in FluxLinux
+## 8. Script Locations in FluxLinux Pro
 
 ```
 scripts/termux/
@@ -292,8 +292,8 @@ scripts/termux/
 │   ├── setup_xfce4_termux.sh    # Install XFCE4 natively
 │   ├── setup_kde_termux.sh      # Install KDE natively
 │   ├── setup_hw_accel_termux.sh # Install VirGL + Turnip packages + auto-detect
-│   ├── setup_customization_termux.sh     # XFCE4 FluxLinux theme
-│   └── setup_customization_kde_termux.sh # KDE FluxLinux theme
+│   ├── setup_customization_termux.sh     # XFCE4 FluxLinux Pro theme
+│   └── setup_customization_kde_termux.sh # KDE FluxLinux Pro theme
 ├── start/                        # ← NEW
 │   ├── start_xfce4_termux.sh    # Launch XFCE4 (auto GPU detect)
 │   └── start_kde_termux.sh      # Launch KDE (auto GPU detect)

@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="../../assets/logo/logo.webp" width="160" alt="FluxLinux Logo" />
+  <img src="../../assets/logo/logo.webp" width="160" alt="FluxLinux Pro Logo" />
   <h1>🐧 Setting up Debian Chroot (Root Required)</h1>
-  <p>This tutorial will guide you step-by-step through configuring and installing a Debian Chroot distribution on your rooted Android device using FluxLinux. Chroot mode provides near-native performance and full hardware access.</p>
+  <p>This tutorial will guide you step-by-step through configuring and installing a Debian Chroot distribution on your rooted Android device using FluxLinux Pro. Chroot mode provides near-native performance and full hardware access.</p>
 </div>
 
 ---
@@ -44,7 +44,7 @@ Because Chroot relies on low-level Linux utilities, you must install the BusyBox
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | FluxLinux will prompt you to install BusyBox NDK if it isn't detected. Click **Download Module**. |
+| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | FluxLinux Pro will prompt you to install BusyBox NDK if it isn't detected. Click **Download Module**. |
 | **Download Module** | <img src="img/step-six-download-busybox-module.png" width="500" /> | Your browser will download the BusyBox module package (`UPDATE-Busybox.Installer.zip`) to your phone's storage. |
 | **Flash in Root Manager** | <img src="img/step-six-then-flash-module-in-your-root-application.png" width="500" /> | Open your root manager application (e.g. APatch, KernelSU, or Magisk), go to the Modules tab, select the downloaded file, and flash it. |
 
@@ -52,7 +52,7 @@ Because Chroot relies on low-level Linux utilities, you must install the BusyBox
 
 ## 🐧 Step 2: Select Debian (Rooted) Distribution
 
-Launch the FluxLinux app and navigate to the **Distributions** tab. Here you will see a list of available Linux distributions.
+Launch the FluxLinux Pro app and navigate to the **Distributions** tab. Here you will see a list of available Linux distributions.
 
 1. Select the **Debian (Rooted)** option.
 2. Tap on it to open its configuration and installation settings.
@@ -85,7 +85,7 @@ Before generating the installation commands, configure your container profile.
 
 ## 📋 Step 4: Generate and Copy the Setup Command
 
-Once you finish setting up your preferences, FluxLinux will compile a customized bootstrap script.
+Once you finish setting up your preferences, FluxLinux Pro will compile a customized bootstrap script.
 
 1. Tap on the **Generate Setup Command** button.
 2. Review the generated script and options.
@@ -113,11 +113,11 @@ Once Termux opens, run the bootstrap command to compile the Debian container.
 
 ## 🎉 Step 6: Verify Installation in Home Screen
 
-Once the installation finishes, return to the FluxLinux app. The home screen will now list your newly installed Debian (Rooted) Chroot environment.
+Once the installation finishes, return to the FluxLinux Pro app. The home screen will now list your newly installed Debian (Rooted) Chroot environment.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Verify Installation** | <img src="img/debian-chroot/step-four-verify-in-home.png" width="500" /> | Your new Debian Chroot installation will be visible on the FluxLinux Home screen. |
+| **Verify Installation** | <img src="img/debian-chroot/step-four-verify-in-home.png" width="500" /> | Your new Debian Chroot installation will be visible on the FluxLinux Pro Home screen. |
 
 ---
 

@@ -4,7 +4,7 @@
 # Run this from Android Root Shell
 
 echo "========================================"
-echo "FluxLinux: Starting Debian 13 KDE GUI"
+echo "FluxLinux Pro: Starting Debian 13 KDE GUI"
 echo "  Renderer: Software (LLVMpipe)"
 echo "========================================"
 

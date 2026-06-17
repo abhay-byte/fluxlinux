@@ -6,7 +6,7 @@
 # Error Handler
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: Script failed at step: $1"
+    echo "❌ FluxLinux Pro Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
@@ -14,13 +14,13 @@ handle_error() {
     exit 1
 }
 
-echo "FluxLinux: Setting up Gaming & Emulation Environment..."
+echo "FluxLinux Pro: Setting up Gaming & Emulation Environment..."
 echo "Target: Debian 13 (Trixie) - ARM64"
 
 export DEBIAN_FRONTEND=noninteractive
 
 # 1. Install Dependencies
-echo "FluxLinux: Installing Dependencies..."
+echo "FluxLinux Pro: Installing Dependencies..."
 apt update -y
 apt install -y \
     wget \
@@ -44,7 +44,7 @@ apt install -y \
 apt install -y debianutils || handle_error "Debian Utils"
 
 # 2. Install Box64 (Ryan Fortner Repo)
-echo "FluxLinux: Installing Box64 (Ryan Fortner Repo)..."
+echo "FluxLinux Pro: Installing Box64 (Ryan Fortner Repo)..."
 # Add repo
 wget https://ryanfortner.github.io/box86-debs/box86.list -O /etc/apt/sources.list.d/box86.list
 wget -qO- https://ryanfortner.github.io/box86-debs/KEY.gpg | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/box86-debs-archive-keyring.gpg
@@ -61,7 +61,7 @@ apt-cache policy box64
 apt install -y box64 || handle_error "Box64 Installation"
 
 # 3. Install xow64-wine (Windows Emulation)
-echo "FluxLinux: Setting up xow64-wine..."
+echo "FluxLinux Pro: Setting up xow64-wine..."
 # Cleanup old
 rm -rf ~/xow64
 # Download script
@@ -98,7 +98,7 @@ chown -R "$(whoami)" "$HOME/xow64_prefix" 2>/dev/null
 TMPDIR=/tmp ~/xow64 install || echo " [⚠️] xow64 install had issues (check logs)"
 
 # 4. Install Heroic Games Launcher (Native ARM64)
-echo "FluxLinux: Installing Heroic Games Launcher..."
+echo "FluxLinux Pro: Installing Heroic Games Launcher..."
 
 # Robust URL Fetcher: API -> HTML Scraping -> Fallback
 # 1. Try GitHub API
@@ -145,7 +145,7 @@ else
 fi
 
 # 5. Install RetroArch & DOSBox
-echo "FluxLinux: Installing RetroArch & DOSBox..."
+echo "FluxLinux Pro: Installing RetroArch & DOSBox..."
 apt install -y \
     retroarch \
     dosbox \
@@ -155,7 +155,7 @@ apt install -y \
 # 6. Verification
 verify_installation() {
     echo ""
-    echo "🔎 FluxLinux: Verifying Installations..."
+    echo "🔎 FluxLinux Pro: Verifying Installations..."
     echo "------------------------------------------------"
     
     if command -v box64 >/dev/null; then echo " [✅] Box64"; else echo " [❌] Box64 Missing"; fi

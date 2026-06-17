@@ -3,7 +3,7 @@
 # Run this inside Debian to check your GPU setup
 
 echo "=========================================="
-echo "  FluxLinux GPU Acceleration Diagnostics"
+echo "  FluxLinux Pro GPU Acceleration Diagnostics"
 echo "=========================================="
 echo ""
 

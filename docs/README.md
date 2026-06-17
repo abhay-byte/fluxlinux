@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../assets/logo/logo.webp" width="120" />
-  <h1>📚 FluxLinux Documentation</h1>
-  <p><em>Complete technical documentation for FluxLinux</em></p>
+  <h1>📚 FluxLinux Pro Documentation</h1>
+  <p><em>Complete technical documentation for FluxLinux Pro</em></p>
 </div>
 
 ---

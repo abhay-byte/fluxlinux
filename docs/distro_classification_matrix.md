@@ -1,6 +1,6 @@
 # Distro Classification Matrix
 
-This document outlines the classification of all Linux distributions tracked by FluxLinux, based on the `DistroSpec` architecture.
+This document outlines the classification of all Linux distributions tracked by FluxLinux Pro, based on the `DistroSpec` architecture.
 
 | Distro Name | ID | Family | Package Manager | Release Type | Implementation Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |

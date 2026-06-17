@@ -4,7 +4,7 @@
 
 handle_error() {
     echo ""
-    echo "❌ FluxLinux Error: $1"
+    echo "❌ FluxLinux Pro Error: $1"
     echo "---------------------------------------------------"
     read -p "Press Enter to exit..."
     exit 1
@@ -12,7 +12,7 @@ handle_error() {
 
 MODEL_PATH="/root/models/Qwen2.5-1.5B-Instruct-Q4_0.gguf"
 
-echo "FluxLinux: Running Qwen2.5-1.5B-Instruct..."
+echo "FluxLinux Pro: Running Qwen2.5-1.5B-Instruct..."
 echo ""
 
 # --- Check model ---

@@ -1,6 +1,6 @@
 # Phase 2: The Bridge (Termux Integration)
 
-**Goal:** Establish a secure, automated communication channel between FluxLinux and Termux using Android Intents.
+**Goal:** Establish a secure, automated communication channel between FluxLinux Pro and Termux using Android Intents.
 
 ## 2.1 Permission Handling
 To control Termux, we need the specialized permission.
@@ -11,7 +11,7 @@ To control Termux, we need the specialized permission.
 *problem:* Termux defaults `allow-external-apps = false`.
 *Solution:*
 1.  **Detection:** Check if we can run a simple `echo "hello"` command via Intent.
-2.  **On Failure:** Show a helpful dialog tutorial: "Please run this command in Termux once to authorize FluxLinux."
+2.  **On Failure:** Show a helpful dialog tutorial: "Please run this command in Termux once to authorize FluxLinux Pro."
     *   Provide a "Copy Command" button: `sed -i 's/^allow-external-apps.*/allow-external-apps = true/' ~/.termux/termux.properties && termux-reload-settings`
 
 ## 2.3 IntentFactory Class

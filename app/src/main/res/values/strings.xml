@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">FluxLinux</string>
-    <string name="accessibility_service_description">FluxLinux Keyboard Toggle allows you to toggle the keyboard in Termux:X11 using a floating button.</string>
+    <string name="app_name">FluxLinux Pro</string>
+    <string name="accessibility_service_description">FluxLinux Pro Keyboard Toggle allows you to toggle the keyboard in Termux:X11 using a floating button.</string>
 </resources>

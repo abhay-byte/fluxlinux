@@ -40,7 +40,7 @@ import com.zenithblue.fluxlinux.core.utils.ThemeMode
 import com.zenithblue.fluxlinux.core.utils.TermuxX11Preferences
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
-import com.zenithblue.fluxlinux.ui.theme.FluxLinuxTheme
+import com.zenithblue.fluxlinux.ui.theme.FluxLinuxProTheme
 import com.zenithblue.fluxlinux.ui.theme.GlassBorder
 import com.zenithblue.fluxlinux.core.data.ScriptManager
 import com.zenithblue.fluxlinux.core.data.TermuxIntentFactory
@@ -201,7 +201,7 @@ fun SettingsScreen(
                                             onStartService(intent)
                                             android.widget.Toast.makeText(context, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
-                                            android.util.Log.e("FluxLinux", "Setup failed", e)
+                                            android.util.Log.e("FluxLinux Pro", "Setup failed", e)
                                         }
                                     } else {
                                         permissionState.launchPermissionRequest()
@@ -249,7 +249,7 @@ fun SettingsScreen(
                                             onStartService(intent)
                                             android.widget.Toast.makeText(context, "Applying Termux Tweaks...", android.widget.Toast.LENGTH_LONG).show()
                                         } catch (e: Exception) {
-                                            android.util.Log.e("FluxLinux", "Tweaks failed", e)
+                                            android.util.Log.e("FluxLinux Pro", "Tweaks failed", e)
                                         }
                                     } else {
                                         permissionState.launchPermissionRequest()
@@ -733,13 +733,13 @@ fun SettingsScreen(
                             ) {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_logo),
-                                    contentDescription = "FluxLinux Logo",
+                                    contentDescription = "FluxLinux Pro Logo",
                                     modifier = Modifier.size(48.dp), // Slightly larger for visibility
                                     contentScale = ContentScale.Fit
                                 )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("FluxLinux", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text("FluxLinux Pro", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                             Text("v1.8p • Jun 17, 2026", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Made with ❤️ in Kotlin", fontSize = 14.sp, color = MaterialTheme.colorScheme.secondary)
@@ -920,7 +920,7 @@ fun SettingsScreen(
                     // 5. STAR THIS REPO
                     // =====================================================================
                     GlassSettingCard(
-                        onClick = { openUrl(context, "https://github.com/abhay-byte/FluxLinux") }
+                        onClick = { openUrl(context, "https://github.com/abhay-byte/fluxlinux") }
                     ) {
                         Row(
                             modifier = Modifier.padding(20.dp).fillMaxWidth(),

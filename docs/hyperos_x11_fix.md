@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains the HyperOS-specific modifications made to FluxLinux's Debian 13 chroot GUI launcher to fix X11 connection and freezing issues.
+This document explains the HyperOS-specific modifications made to FluxLinux Pro's Debian 13 chroot GUI launcher to fix X11 connection and freezing issues.
 
 ## The Problem
 
@@ -176,7 +176,7 @@ Changed from `:1` to `:0` across all scripts:
 
 ```mermaid
 graph TD
-    A[User taps 'Start GUI' in FluxLinux app] --> B[App calls /data/local/tmp/start_debian13_gui.sh]
+    A[User taps 'Start GUI' in FluxLinux Pro app] --> B[App calls /data/local/tmp/start_debian13_gui.sh]
     B --> C{Check SELinux Status}
     C -->|Enforcing| D[Set SELinux to Permissive]
     C -->|Permissive/Disabled| E[Skip SELinux workarounds]
@@ -232,7 +232,7 @@ graph TD
 ### Verification Steps
 
 1. Install app: `./gradlew installDebug`
-2. Launch "Debian 13 Chroot GUI" from FluxLinux app
+2. Launch "Debian 13 Chroot GUI" from FluxLinux Pro app
 3. Check output for:
    - `[OK] SELinux set to Permissive` (on HyperOS)
    - `[OK] X11 socket created successfully`
