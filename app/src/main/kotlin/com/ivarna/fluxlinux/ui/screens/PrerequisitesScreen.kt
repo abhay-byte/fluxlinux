@@ -39,7 +39,6 @@ import android.content.res.Configuration
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.core.utils.RootUtils
 import com.ivarna.fluxlinux.core.utils.SystemInfoUtils
-import com.ivarna.fluxlinux.core.utils.ApkDownloader
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -50,26 +49,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
 import android.widget.Toast
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.delay
 
-enum class ApkStatus { NOT_INSTALLED, DOWNLOADING, DOWNLOADED, INSTALLED, CORRUPTED }
 
-private fun isVersionOlderThan(current: String, minimum: String): Boolean {
-    if (current == "Not Installed") return false
-    val c = current.split(".").mapNotNull { it.toIntOrNull() }
-    val m = minimum.split(".").mapNotNull { it.toIntOrNull() }
-    if (c.isEmpty() || m.isEmpty()) return false
-    for (i in 0 until maxOf(c.size, m.size)) {
-        val cv = c.getOrElse(i) { 0 }
-        val mv = m.getOrElse(i) { 0 }
-        if (cv < mv) return true
-        if (cv > mv) return false
-    }
-    return false
-}
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -350,104 +334,6 @@ fun PackageInstallationStep(
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    var termuxApkStatus by remember { mutableStateOf(ApkStatus.NOT_INSTALLED) }
-    var termuxProgress by remember { mutableStateOf(0f) }
-    var x11ApkStatus by remember { mutableStateOf(ApkStatus.NOT_INSTALLED) }
-    var x11Progress by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(termuxInstalled.value) {
-        if (termuxInstalled.value) {
-            termuxApkStatus = ApkStatus.INSTALLED
-            ApkDownloader.deleteApk(context, "termux.apk")
-        }
-    }
-    LaunchedEffect(x11Installed.value) {
-        if (x11Installed.value) {
-            x11ApkStatus = ApkStatus.INSTALLED
-            ApkDownloader.deleteApk(context, "termux_x11.apk")
-        }
-    }
-
-    val TERMUX_SHA = "7600078440c3c34ef050bc009b00fc3215cb87ec4a449e01a696f74cf4249db2"
-    LaunchedEffect(Unit) {
-        if (!termuxInstalled.value && ApkDownloader.apkExists(context, "termux.apk")) {
-            if (ApkDownloader.verifySha256(context, "termux.apk", TERMUX_SHA)) {
-                termuxApkStatus = ApkStatus.DOWNLOADED
-            } else {
-                termuxApkStatus = ApkStatus.CORRUPTED
-            }
-        }
-        if (!x11Installed.value && ApkDownloader.apkExists(context, "termux_x11.apk")) {
-            x11ApkStatus = ApkStatus.DOWNLOADED
-        }
-    }
-
-    fun downloadTermux() {
-        termuxApkStatus = ApkStatus.DOWNLOADING
-        termuxProgress = 0f
-        coroutineScope.launch {
-            ApkDownloader.download(
-                context,
-                "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk",
-                "termux.apk"
-            ).collect { state ->
-                if (state.error != null) {
-                    termuxApkStatus = ApkStatus.NOT_INSTALLED
-                } else if (state.isDone) {
-                    if (ApkDownloader.verifySha256(context, "termux.apk", TERMUX_SHA)) {
-                        termuxApkStatus = ApkStatus.DOWNLOADED
-                    } else {
-                        termuxApkStatus = ApkStatus.CORRUPTED
-                    }
-                    termuxProgress = 1f
-                } else {
-                    termuxProgress = state.progress
-                }
-            }
-        }
-    }
-
-    fun downloadX11() {
-        x11ApkStatus = ApkStatus.DOWNLOADING
-        x11Progress = 0f
-        coroutineScope.launch {
-            ApkDownloader.download(
-                context,
-                "https://github.com/termux/termux-x11/releases/download/nightly/app-universal-debug.apk",
-                "termux_x11.apk"
-            ).collect { state ->
-                if (state.error != null) {
-                    x11ApkStatus = ApkStatus.NOT_INSTALLED
-                } else if (state.isDone) {
-                    x11ApkStatus = ApkStatus.DOWNLOADED
-                    x11Progress = 1f
-                } else {
-                    x11Progress = state.progress
-                }
-            }
-        }
-    }
-
-    fun installApk(fileName: String) {
-        if (!ApkDownloader.canInstallPackages(context)) {
-            ApkDownloader.openInstallPermissionSettings(context)
-            return
-        }
-        val intent = ApkDownloader.getInstallIntent(context, fileName)
-        if (intent != null) {
-            try {
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to open installer", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    val isTermuxOutdated = termuxInstalled.value && isVersionOlderThan(
-        StateManager.getTermuxVersion(context), "0.118.3"
-    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -476,27 +362,12 @@ fun PackageInstallationStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // T4: Top-of-screen critical alert when Termux is too old.
-        // The inline warning inside PrerequisiteItem is easy to miss in a
-        // long list of cards — a prominent banner at the top of the screen
-        // makes the "uninstall Play Store, install v0.118.3 from GitHub"
-        // requirement unmissable.
-        if (isTermuxOutdated) {
-            TermuxVersionAlertBanner()
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
         // Termux
         PrerequisiteItem(
             name = "Termux",
             isInstalled = termuxInstalled.value,
-            isOutdated = isTermuxOutdated,
             version = if (termuxInstalled.value) StateManager.getTermuxVersion(context) else null,
-            apkStatus = termuxApkStatus,
-            progress = termuxProgress,
-            minVersionHint = "v0.118.3",
-            onDownload = { downloadTermux() },
-            onInstallApk = { installApk("termux.apk") }
+            onInstall = null
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -506,31 +377,24 @@ fun PackageInstallationStep(
             name = "Termux:X11",
             isInstalled = x11Installed.value,
             version = if (x11Installed.value) StateManager.getTermuxX11Version(context) else null,
-            apkStatus = x11ApkStatus,
-            progress = x11Progress,
-            onDownload = { downloadX11() },
-            onInstallApk = { installApk("termux_x11.apk") }
+            onInstall = null
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
-        val allAppsReady = termuxInstalled.value && x11Installed.value && !isTermuxOutdated
         // Continue Button
         Button(
             onClick = onContinue,
-            enabled = allAppsReady,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-            ),
+            enabled = termuxInstalled.value && x11Installed.value,
+            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                if (allAppsReady) "Continue" else "Install Required Apps",
-                color = if (allAppsReady) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                "Continue",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -783,13 +647,8 @@ fun PermissionRequestStep(
 fun PrerequisiteItem(
     name: String,
     isInstalled: Boolean,
-    isOutdated: Boolean = false,
     version: String?,
-    apkStatus: ApkStatus = ApkStatus.INSTALLED,
-    progress: Float = 0f,
-    minVersionHint: String? = null,
-    onDownload: (() -> Unit)? = null,
-    onInstallApk: (() -> Unit)? = null
+    onInstall: (() -> Unit)? // Optional install action
 ) {
     Column(
         modifier = Modifier
@@ -798,235 +657,57 @@ fun PrerequisiteItem(
             .background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f))
             .padding(16.dp)
     ) {
-        if (isInstalled) {
-            if (isOutdated) {
-                // Outdated version warning (Play Store Termux)
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Outdated",
-                            tint = Color(0xFFFF9800),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "$name — Version Too Old",
-                                color = Color(0xFFFF5252),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (version != null) {
-                                Text(
-                                    text = "Installed: v$version",
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                    fontSize = 12.sp
-                                )
-                            }
-                            Text(
-                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                    if (onDownload != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = onDownload,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Download v0.118.3 (GitHub)", color = Color.White, fontSize = 14.sp)
-                        }
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Installed",
-                        tint = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "$name ✓",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (version != null) {
-                            Text(
-                                text = version,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.7f),
-                                fontSize = 12.sp
-                            )
-                        }
-                        if (minVersionHint != null) {
-                            Text(
-                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f),
-                                fontSize = 11.sp,
-                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                                lineHeight = 14.sp
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            Column {
-                Text(
-                    text = name,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isInstalled) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Installed",
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                when (apkStatus) {
-                    ApkStatus.NOT_INSTALLED -> {
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "$name ✓",
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (version != null) {
                         Text(
-                            text = "Not Installed",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (onDownload != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = onDownload,
-                                colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Download", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                    ApkStatus.DOWNLOADING -> {
-                        LinearProgressIndicator(
-                            progress = { if (progress < 0f) 0f else progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(4.dp)),
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                            trackColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (progress < 0f) "Downloading..." else "%.0f%%".format(progress * 100),
+                            text = version,
                             color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.7f),
                             fontSize = 12.sp
                         )
                     }
-                    ApkStatus.DOWNLOADED -> {
-                        Text(
-                            text = "Ready to install",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (onInstallApk != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = onInstallApk,
-                                colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.tertiary),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Install", color = androidx.compose.material3.MaterialTheme.colorScheme.onTertiary, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                    ApkStatus.INSTALLED -> {
-                        Text(
-                            text = "✓ Installed",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    ApkStatus.CORRUPTED -> {
-                        Text(
-                            text = "Download Corrupted",
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (onDownload != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = onDownload,
-                                colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Redownload", color = androidx.compose.material3.MaterialTheme.colorScheme.onError, fontSize = 14.sp)
-                            }
-                        }
-                    }
                 }
-            }
-        }
-    }
-}
-
-/**
- * T4: Critical alert shown at the top of the prerequisite list when the
- * installed Termux is too old. Renders above the Termux install-check card
- * so the requirement (uninstall Play Store Termux, install v0.118.3 from
- * GitHub) is unmissable.
- */
-@Composable
-fun TermuxVersionAlertBanner() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFF5252).copy(alpha = 0.15f))
-            .border(
-                width = 1.dp,
-                color = Color(0xFFFF5252).copy(alpha = 0.6f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = "Outdated Termux",
-                tint = Color(0xFFFF5252),
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
+            } else {
                 Text(
-                    text = "Termux version is too old",
-                    color = Color(0xFFFF5252),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
+                    text = name,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
+                if (onInstall != null) {
+                    Button(
+                        onClick = onInstall,
+                        colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.outline),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Download", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary)
+                    }
+                } else {
+                    Text(
+                        text = "Not Installed",
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -2101,20 +1782,14 @@ fun BusyBoxInstallStep(
                     color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
                     fontSize = 12.sp
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(
-                    onClick = {
-                        val url = "https://xdaforums.com/attachments/update-busybox-installer-v1-36-1-all-signed-zip.6000117/"
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Download Module", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary)
-                }
+
+                Text(
+                    "Download the module from the osm0sis XDA thread or GitHub releases, then flash it in your root manager.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f),
+                    fontSize = 13.sp
+                )
             }
         }
 

@@ -1,4 +1,3 @@
 - KDE GPU renderer picker (Turnip/Software)
 - Vulkan llama.cpp + Qwen LLM support
-- In-app APK downloads
 - Themed icon support

@@ -7,6 +7,6 @@ FluxLinux brings full Linux desktops to Android. Install Debian with XFCE4, run 
 • XFCE4 desktop with themes
 • Rooted & Non-rooted support
 
-<b>Requirements:</b> Termux, Termux:X11
+<b>Requirements:</b> Termux (from F-Droid) and Termux:X11 (from F-Droid). Both are free.
 
-<b>Note:</b> Uses AccessibilityService API for system navigation actions (Back/Home) from the UI. No data is collected.
+FluxLinux does not collect any personal data and does not transmit data off-device.
