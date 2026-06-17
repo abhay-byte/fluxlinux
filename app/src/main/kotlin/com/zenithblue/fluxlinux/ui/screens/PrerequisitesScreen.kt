@@ -362,6 +362,41 @@ fun PackageInstallationStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Play Store Policy Warning
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().border(
+                1.dp,
+                androidx.compose.material3.MaterialTheme.colorScheme.error,
+                RoundedCornerShape(12.dp)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "Manual Install Required",
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Google Play Store policies prevent FluxLinux Pro from installing Termux or Termux:X11 for you. Please install both apps manually from the F-Droid app store (free and open-source) before continuing.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         // Termux
         PrerequisiteItem(
             name = "Termux",
@@ -380,12 +415,19 @@ fun PackageInstallationStep(
             onInstall = null
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
         // Continue Button
+        val allInstalled = termuxInstalled.value && x11Installed.value
+        val buttonText = when {
+            allInstalled -> "Continue"
+            !termuxInstalled.value && !x11Installed.value -> "Install Termux & Termux:X11 to continue"
+            !termuxInstalled.value -> "Install Termux to continue"
+            else -> "Install Termux:X11 to continue"
+        }
         Button(
             onClick = onContinue,
-            enabled = termuxInstalled.value && x11Installed.value,
+            enabled = allInstalled,
             colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
             modifier = Modifier
                 .fillMaxWidth()
@@ -393,10 +435,11 @@ fun PackageInstallationStep(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                "Continue",
+                buttonText,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = if (allInstalled) 18.sp else 15.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -1227,7 +1270,42 @@ fun EnvironmentSetupStep(
             textAlign = TextAlign.Center,
             lineHeight = 18.sp
         )
-        
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Termux Background Warning
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().border(
+                1.dp,
+                androidx.compose.material3.MaterialTheme.colorScheme.error,
+                RoundedCornerShape(12.dp)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "Keep Termux in Foreground",
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "If the script doesn't start running, Termux is likely not active. Open Termux via split-screen or a floating window and keep it visible — Android may kill the background process or throttle the script otherwise. Do not close or swipe Termux away while scripts are running.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
         
         // Setup Button (Background)

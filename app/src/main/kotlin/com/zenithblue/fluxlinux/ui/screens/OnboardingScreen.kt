@@ -1,13 +1,18 @@
 package com.zenithblue.fluxlinux.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +23,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -119,6 +125,10 @@ private fun PortraitLayout(
                 OnboardingFeatureCards(hazeState = hazeState)
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                OnboardingResourceLinks(hazeState = hazeState)
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -197,6 +207,10 @@ private fun LandscapeLayout(
             verticalArrangement = Arrangement.Center
         ) {
             OnboardingFeatureCards(hazeState = hazeState)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OnboardingResourceLinks(hazeState = hazeState)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -296,5 +310,108 @@ fun FeatureCard(
                 fontSize = 14.sp
             )
         }
+    }
+}
+
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+private fun OnboardingResourceLinks(hazeState: HazeState) {
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Helpful Resources",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        ResourceLinkRow(
+            hazeState = hazeState,
+            icon = "▶️",
+            title = "Setup Video (YouTube)",
+            subtitle = "Watch the full walkthrough",
+            url = "https://www.youtube.com/watch?v=BXRzlJnaiLU",
+            context = context
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        ResourceLinkRow(
+            hazeState = hazeState,
+            icon = "📖",
+            title = "How to Install PRoot",
+            subtitle = "Step-by-step Debian PRoot guide",
+            url = "https://github.com/abhay-byte/fluxlinux/blob/main/docs/tutorial/setup_debian_proot.md",
+            context = context
+        )
+    }
+}
+
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+private fun ResourceLinkRow(
+    hazeState: HazeState,
+    icon: String,
+    title: String,
+    subtitle: String,
+    url: String,
+    context: android.content.Context
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .hazeChild(
+                state = hazeState,
+                style = HazeStyle(
+                    backgroundColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    tint = null
+                )
+            )
+            .clickable {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "No app found to open link", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .border(
+                1.dp,
+                androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = icon,
+            fontSize = 22.sp,
+            modifier = Modifier.padding(end = 12.dp)
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                fontSize = 12.sp
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.OpenInNew,
+            contentDescription = "Open",
+            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
