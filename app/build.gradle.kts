@@ -11,16 +11,16 @@ plugins {
 }
 
 android {
-    namespace = "com.ivarna.fluxlinux"
+    namespace = "com.zenithblue.fluxlinux"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.ivarna.fluxlinux"
+        applicationId = "com.zenithblue.fluxlinux"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.8.0"
+        versionCode = 11
+        versionName = "1.8p"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

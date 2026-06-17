@@ -3,4 +3,4 @@
     android:description="@string/accessibility_service_description"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:canPerformGestures="true"
-    android:settingsActivity="com.ivarna.fluxlinux.MainActivity" />
+    android:settingsActivity="com.zenithblue.fluxlinux.MainActivity" />

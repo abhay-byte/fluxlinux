@@ -611,6 +611,20 @@ because the official pages are intentionally high-level):
 
 ## 7. Change Log for This Doc
 
+- **v3 (2026-06-17).** Package renamed back to
+  `com.zenithblue.fluxlinux` on the playstore track (the package the
+  Play Console listing was originally created with). `namespace` and
+  `applicationId` in `app/build.gradle.kts`, the FileProvider authority
+  in `AndroidManifest.xml`, the `settingsActivity` in
+  `accessibility_service_config.xml`, and every `package` /
+  `import com.ivarna.fluxlinux` line under
+  `app/src/main/kotlin/com/zenithblue/fluxlinux/` updated.
+  `versionName` bumped to `1.8p` (Play Store variant of v1.8) with
+  `versionCode = 11` (one higher than main's 10). The in-app Settings
+  "v1.8.0" footer updated to `v1.8p`. README Play badge back at
+  `com.zenithblue.fluxlinux`. F-Droid link in README unchanged — that
+  track stays at `com.ivarna.fluxlinux`.
+
 - **v2 (2026-06-17).** Play Store track rebased onto `main` @ v1.8.0.
   All §2 findings (`ApkDownloader.kt`, in-app APK download + install,
   Termux / Termux:X11 sideload, the
