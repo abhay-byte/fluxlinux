@@ -55,4 +55,40 @@
   images: null
   github_ref: GH-15
   plan: null
+- id: T5
+  title: Fully implement Arch distro scripts
+  type: feature
+  priority: high
+  difficulty: hard
+  why: Arch scripts are stubs (2 files vs Debian's 37) — need full setup/start/stop/addon coverage
+  really_needed: unknown
+  impact: scripts/arch/*, DistroRepository, DistroSpec
+  followups: null
+  images: null
+  github_ref: null
+  plan: null
+- id: T6
+  title: Fully implement Fedora distro scripts
+  type: feature
+  priority: high
+  difficulty: hard
+  why: Fedora scripts are stubs (1 file) — need full setup/start/stop/addon coverage
+  really_needed: unknown
+  impact: scripts/fedora/*, DistroRepository, DistroSpec
+  followups: null
+  images: null
+  github_ref: null
+  plan: null
+- id: T7
+  title: Add Ubuntu distro support
+  type: feature
+  priority: high
+  difficulty: hard
+  why: Ubuntu not present in scripts/ — referenced in DistroRepository/OnboardingScreen but no assets
+  really_needed: unknown
+  impact: scripts/ubuntu/*, DistroRepository, DistroSpec
+  followups: null
+  images: null
+  github_ref: null
+  plan: null
 ---
