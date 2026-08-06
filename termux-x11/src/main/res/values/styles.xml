@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="PrivateResource" tools:override="true">
+    <style name="AppTheme" parent="@style/Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:windowBackground">@color/nc_bg</item>
+        <item name="colorPrimary">@color/nc_primary</item>
+        <item name="colorAccent">@color/nc_primary</item>
+    </style>
+
+    <!-- X11 preferences — NativeCode cyber-brutalist dark (custom Toolbar, no system ActionBar overlay) -->
+    <style name="Theme.NativeCode.X11.Preferences" parent="@style/Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/nc_bg</item>
+        <item name="android:colorBackground">@color/nc_bg</item>
+        <item name="android:statusBarColor">@color/nc_bg</item>
+        <item name="android:navigationBarColor">@color/nc_bg</item>
+        <item name="android:textColorPrimary">@color/nc_on_surface</item>
+        <item name="android:textColorSecondary">#BBCBBC</item>
+        <item name="colorPrimary">@color/nc_primary</item>
+        <item name="colorPrimaryDark">@color/nc_bg</item>
+        <item name="colorAccent">@color/nc_primary</item>
+        <item name="android:colorControlActivated">@color/nc_primary</item>
+        <item name="colorControlActivated">@color/nc_primary</item>
+        <item name="android:colorControlNormal">@color/nc_outline_variant</item>
+        <item name="preferenceTheme">@style/Theme.NativeCode.X11.PreferenceTheme</item>
+        <item name="toolbarStyle">@style/Theme.NativeCode.X11.Toolbar</item>
+        <item name="switchStyle">@style/Widget.NativeCode.Switch</item>
+    </style>
+
+    <style name="Theme.NativeCode.X11.Toolbar" parent="@style/Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/nc_surface_container</item>
+        <item name="titleTextColor">@color/nc_on_surface</item>
+        <item name="subtitleTextColor">#BBCBBC</item>
+        <item name="colorControlNormal">@color/nc_primary</item>
+    </style>
+
+    <style name="Widget.NativeCode.Switch" parent="@style/Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:thumb">@drawable/nc_switch_thumb</item>
+        <item name="track">@drawable/nc_switch_track</item>
+        <item name="android:showText">false</item>
+        <item name="showText">false</item>
+    </style>
+
+    <style name="Theme.NativeCode.X11.PreferenceTheme" parent="@style/PreferenceThemeOverlay">
+        <item name="preferenceCategoryStyle">@style/Preference.Category.Material</item>
+        <item name="preferenceStyle">@style/Preference.Material</item>
+        <item name="switchPreferenceCompatStyle">@style/Preference.SwitchPreferenceCompat.Material</item>
+        <item name="seekBarPreferenceStyle">@style/Preference.SeekBarPreference.Material</item>
+        <item name="dialogPreferenceStyle">@style/Preference.DialogPreference.Material</item>
+        <item name="editTextPreferenceStyle">@style/Preference.DialogPreference.EditTextPreference.Material</item>
+        <item name="android:textColorPrimary">@color/nc_on_surface</item>
+        <item name="android:textColorSecondary">#BBCBBC</item>
+    </style>
+
+    <style name="Preference.Category.Material">
+        <item name="android:layout">@layout/preference_category_material</item>
+        <item name="allowDividerAbove">true</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="android:textColor">@color/nc_primary</item>
+    </style>
+    <style name="Preference.Material">
+        <item name="android:layout">@layout/preference_material</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Preference.SwitchPreferenceCompat.Material">
+        <item name="android:layout">@layout/preference_material</item>
+        <item name="android:widgetLayout">@layout/preference_widget_switch_nc</item>
+        <item name="widgetLayout">@layout/preference_widget_switch_nc</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Preference.SeekBarPreference.Material">
+        <item name="android:layout">@layout/preference_widget_seekbar_material</item>
+        <item name="adjustable">true</item>
+        <item name="showSeekBarValue">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Preference.DialogPreference.Material">
+        <item name="android:layout">@layout/preference_material</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Preference.DialogPreference.EditTextPreference.Material">
+        <item name="android:layout">@layout/preference_material</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">true</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+</resources>

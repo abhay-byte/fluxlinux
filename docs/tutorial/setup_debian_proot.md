@@ -10,16 +10,15 @@
 
 1. [🐧 Step 1: Select Debian Distribution](#-step-1-select-debian-distribution)
 2. [⚙️ Step 2: Configure Debian Settings](#️-step-2-configure-debian-settings)
-3. [📋 Step 3: Generate and Copy the Setup Command](#-step-3-generate-and-copy-the-setup-command)
-4. [⚡ Step 4: Execute the Command in Termux](#-step-4-execute-the-command-in-termux)
-5. [🎉 Step 5: Post-Installation Redirection](#-step-5-post-installation-redirection)
-6. [📦 Step 6: Customizing Modules](#-step-6-customizing-modules)
-7. [🚀 Step 7: Select Launch Mode](#-step-7-select-launch-mode)
-8. [💻 Step 8: Running in CLI Mode](#-step-8-running-in-cli-mode)
-9. [🖥️ Step 9: Running in GUI Mode (XFCE4)](#-step-9-running-in-gui-mode-xfce4)
-10. [🛑 Step 10: Controlling the Session](#-step-10-controlling-the-session)
-11. [✨ Step 11: Running Desktop Applications & Benchmarks](#-step-11-running-desktop-applications--benchmarks)
-12. [💡 Important Tips & Troubleshooting](#-important-tips--troubleshooting)
+3. [🖥️ Step 3: Install in Flux Terminal](#️-step-3-install-in-flux-terminal)
+4. [🎉 Step 4: Post-Installation Redirection](#-step-4-post-installation-redirection)
+5. [📦 Step 5: Customizing Modules](#-step-5-customizing-modules)
+6. [🚀 Step 6: Select Launch Mode](#-step-6-select-launch-mode)
+7. [💻 Step 7: Running in CLI Mode](#-step-7-running-in-cli-mode)
+8. [🖥️ Step 8: Running in GUI Mode (XFCE4)](#️-step-8-running-in-gui-mode-xfce4)
+9. [🛑 Step 9: Controlling the Session](#-step-9-controlling-the-session)
+10. [✨ Step 10: Running Desktop Applications & Benchmarks](#-step-10-running-desktop-applications--benchmarks)
+11. [💡 Important Tips & Troubleshooting](#-important-tips--troubleshooting)
 
 ---
 
@@ -60,48 +59,38 @@ Before generating the installation commands, you need to set up the container co
 
 ---
 
-## 📋 Step 3: Generate and Copy the Setup Command
+## 🖥️ Step 3: Install in Flux Terminal
 
-Once you finish setting up your preferences, FluxLinux will compile a customized bootstrap script for Termux.
+FluxLinux now ships its own embedded Linux host (bootstrap) inside the APK — no separate Termux app is required for Debian installs.
 
-1. Tap on the **Generate Setup Command** button (if you haven't already).
-2. Review the generated script and command options.
-3. Tap **Copy and Open Termux**. FluxLinux will copy the bootstrap command to your device clipboard and automatically launch Termux.
+1. On the configuration screen, tap **Install in Flux Terminal**.
+2. FluxLinux extracts the embedded host environment and opens an in-app terminal session running the install: the bundled Debian rootfs is installed locally via `proot-distro install <archive> --name debian` — **no network download of the rootfs and no paste-into-Termux**.
+3. Watch the progress in the terminal; the session stays alive even when you switch apps (foreground notification).
+4. On success the app marks Debian as installed automatically.
 
-| Action / State | Screenshot | Description |
-| :--- | :---: | :--- |
-| **Copy Setup Command** | <img src="img/debian-proot/step-3-copy-the-command-to-termux.png" width="500" /> | Review the generated bootstrap script, then tap **Copy and Open Termux** to copy the command and launch Termux. |
-
----
-
-## ⚡ Step 4: Execute the Command in Termux
-
-Once Termux opens, you need to run the bootstrap command to download and compile the Debian container.
-
-1. Long-press in the Termux terminal window and select **Paste** (or use the keyboard paste shortcut).
-2. Press **Enter** on your keyboard to execute the bootstrap command.
-3. Termux will now automatically download the Debian PRoot rootfs (root filesystem), extract it, configure system packages, and initialize your XFCE4 desktop.
-4. Once completed, your Debian desktop environment will start and open automatically via the Termux:X11 display.
+> [!TIP]
+> The Debian rootfs is pinned (SHA256-verified) and identical for the PRoot and Rooted (chroot) install paths.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Execute Command** | <img src="img/debian-proot/step-4-paste-and-run-the-command-on-termux.png" width="500" /> | Paste the copied bootstrap command in the Termux terminal and press enter to start the automated installation. |
+| **Install in Flux Terminal** | UI TBD | Review your selections, then tap **Install in Flux Terminal** to start the in-app install. |
+| **In-app install session** | UI TBD | The terminal runs `flux_install.sh debian` against the local rootfs archive. |
 
 ---
 
-## 🎉 Step 5: Post-Installation Redirection
+## 🎉 Step 4: Post-Installation Redirection
 
-Once the installation script finishes successfully in Termux, return to the FluxLinux app. You will find that the Debian distribution is now marked as installed and ready to be launched.
+Once the install script finishes successfully in the in-app terminal, return to the Distros page. You will find that the Debian distribution is now marked as installed and ready to be launched.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Post-Installation** | <img src="img/debian-proot/step-5-after-installed-u-will-be-redirected-to-app.png" width="500" /> | After the script runs, the app automatically updates the status to show Debian is installed. |
+| **Post-Installation** | <img src="img/debian-proot/step-5-after-installed-u-will-be-redirected-to-app.png" width="500" /> | After the install session completes, the app automatically updates the status to show Debian is installed. |
 
 ---
 
-## 📦 Step 6: Customizing Modules
+## 📦 Step 5: Customizing Modules
 
-In the distribution configuration settings, you can customize your installation by enabling or disabling any optional modules you want (such as audio, custom packages, extra drivers, or utilities).
+In the distribution configuration settings, you can customize your installation by enabling or disabling any optional modules you want (such as audio, custom packages, extra drivers, or utilities). Component installs run inside the same in-app Flux Terminal session (PRoot guest).
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
@@ -109,7 +98,7 @@ In the distribution configuration settings, you can customize your installation 
 
 ---
 
-## 🚀 Step 7: Select Launch Mode
+## 🚀 Step 6: Select Launch Mode
 
 Once the installation is complete, tapping the **Launch** button on the Debian distribution page inside FluxLinux will present you with options to choose your launch mode:
 - **CLI (Command Line Interface)**: Starts a lightweight terminal session.
@@ -121,17 +110,17 @@ Once the installation is complete, tapping the **Launch** button on the Debian d
 
 ---
 
-## 💻 Step 8: Running in CLI Mode
+## 💻 Step 7: Running in CLI Mode
 
-Selecting CLI mode launches a Debian session inside Termux. This is useful for using standard command-line tools, configuring packages via `apt`, or running background servers.
+Tap **Open Shell** on the installed Debian card to open an in-app Flux Terminal session logged into the Debian guest as user `flux` (tap **Open Root Shell** for `root`). This is useful for using standard command-line tools, configuring packages via `apt`, or running background servers.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Debian CLI Shell** | <img src="img/debian-proot/step-8-debian-cli-on-termux.png" width="500" /> | You are logged directly into the Debian shell. Run standard Linux CLI commands or install console packages. |
+| **Debian CLI Shell** | UI TBD | In-app terminal session logged directly into the Debian shell (`whoami` → `flux`). |
 
 ---
 
-## 🖥️ Step 9: Running in GUI Mode (XFCE4)
+## 🖥️ Step 8: Running in GUI Mode (XFCE4)
 
 Selecting GUI mode launches the X11 server backend and starts the XFCE4 desktop environment, opening it automatically via the Termux:X11 display companion.
 
@@ -141,11 +130,11 @@ Selecting GUI mode launches the X11 server backend and starts the XFCE4 desktop 
 
 ---
 
-## 🛑 Step 10: Controlling the Session
+## 🛑 Step 9: Controlling the Session
 
 While the distribution is running in GUI or CLI mode, you can control and monitor the active background session directly from the FluxLinux interface.
-- **Open X11**: Reopen the graphical display viewer window if you accidentally swiped it away.
-- **Stop**: Safely shut down all background Debian processes and Termux services.
+- **Open X11**: Reopen the graphical display viewer window if you accidentally swiped it away (GUI requires the Termux:X11 companion app — optional, CLI shells do not).
+- **Stop**: Safely shut down all background Debian processes and host services.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
@@ -153,7 +142,7 @@ While the distribution is running in GUI or CLI mode, you can control and monito
 
 ---
 
-## ✨ Step 11: Running Desktop Applications & Benchmarks
+## ✨ Step 10: Running Desktop Applications & Benchmarks
 
 Once inside the desktop environment, you have access to a variety of pre-installed applications and can run benchmarks to test performance.
 
@@ -169,8 +158,8 @@ Once inside the desktop environment, you have access to a variety of pre-install
 
 ## 💡 Important Tips & Troubleshooting
 
-### 🔄 Keep Termux Running in the Background
-Since the Debian distribution runs as a sub-process inside Termux, you must **never** close Termux from your recent apps. If Termux is terminated, your Debian desktop session will crash immediately.
+### 🔄 Keep the In-App Terminal Alive
+In-app terminal sessions run in a foreground service; they stay alive when you switch apps. Closing the Terminal screen does not kill sessions — close them via the tab × or **Terminal → close all**.
 
 ### ⚡ PRoot vs Chroot Mode
 * **PRoot Mode:** Used in this guide. It runs entirely in user-space, requires **no root permissions**, and intercepts system calls to simulate root actions.

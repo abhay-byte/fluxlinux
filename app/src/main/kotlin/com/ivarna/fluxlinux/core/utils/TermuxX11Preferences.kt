@@ -115,110 +115,39 @@ object TermuxX11Preferences {
     }
     
     /**
-     * Apply preferences by writing them to a script that start_gui.sh will execute.
-     */
-    /**
-     * Apply preferences by running the `termux-x11-preference` command in Termux.
+     * Apply preferences directly into the embedded X11's default SharedPreferences
+     * (same-package rendering — the X11 activity reads them on start).
      */
     fun applyToTermux(context: Context) {
         try {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            
-            // Build the command script
-            // Consolidate all preferences into a single command to avoid race conditions/hangs
-            val commandArgs = StringBuilder()
-            
-            fun addPref(key: String, value: String) {
-                // Formatting based on tool usage help: {key:value}
-                // Previous attempts with key=value failed. Switching to colon separator.
-                // We'll treat values as strings but minimize quoting to avoid shell issues unless spaces exist.
-                commandArgs.append(" $key:$value") 
-            }
-            
-            // Display
-            addPref("displayScale", prefs.getInt(KEY_DISPLAY_SCALE, 100).toString())
-            addPref("fullscreen", prefs.getBoolean(KEY_FULLSCREEN, true).toString())
-            addPref("hideCutout", prefs.getBoolean(KEY_HIDE_CUTOUT, true).toString())
-            addPref("keepScreenOn", prefs.getBoolean(KEY_KEEP_SCREEN_ON, true).toString())
-            addPref("displayResolutionMode", "scaled")
-            
-            // Input
-            addPref("pointerCapture", prefs.getBoolean(KEY_CAPTURE_POINTER, true).toString())
-            addPref("showAdditionalKbd", prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false).toString())
-            addPref("showIMEWhileExternalConnected", prefs.getBoolean(KEY_SHOW_IME, true).toString())
-            addPref("preferScancodes", prefs.getBoolean(KEY_PREFER_SCANCODES, true).toString())
-            addPref("hardwareKbdScancodesWorkaround", prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true).toString())
-            
-            // Other useful defaults we want to enforce
-            addPref("clipboardEnable", "true")
-            addPref("touchMode", "Trackpad")
-            addPref("scaleTouchpad", "true")
-
-            val allArgs = commandArgs.toString()
-            
-            // Build a complete, robust bash script
-            // Note: Removed 'read -p' as we are running in background now
-            val fullScript = """
-                #!/data/data/com.termux/files/usr/bin/bash
-                LOG_FILE="${'$'}HOME/.fluxlinux/x11_prefs.log"
-                exec > >(tee "${'$'}LOG_FILE") 2>&1
-                
-                echo "[$(date)] Applying X11 Preferences..."
-                
-                if ! command -v termux-x11-preference &> /dev/null; then
-                    echo "Error: termux-x11-preference tool not found!"
-                    echo "Please ensure Termux:X11 is installed correctly."
-                    exit 1
-                fi
-                
-                # Debug: List valid preferences to log
-                echo "--- Valid Preferences List ---"
-                termux-x11-preference list
-                echo "------------------------------"
-                
-                # Execute ALL preferences in one go
-                echo "Running: termux-x11-preference$allArgs"
-                termux-x11-preference$allArgs
-                
-                if [ ${'$'}? -eq 0 ]; then
-                    echo "✅ Preferences applied successfully."
-                    # Try toast, but don't fail if missing
-                    termux-toast "Termux:X11 Settings Applied" 2>/dev/null || true
-                    exit 0
-                else
-                    echo "❌ Failed to apply some preferences."
-                    exit 1
-                fi
-            """.trimIndent()
-            
-            // Encode to Base64 to avoid all here-doc/quoting issues
-            val scriptB64 = android.util.Base64.encodeToString(fullScript.toByteArray(), android.util.Base64.NO_WRAP)
-            
-            // Command to decode and run
-            val cmd = "mkdir -p \$HOME/.fluxlinux && echo \"$scriptB64\" | base64 -d > \$HOME/.fluxlinux/apply_x11_prefs.sh && chmod +x \$HOME/.fluxlinux/apply_x11_prefs.sh && \$HOME/.fluxlinux/apply_x11_prefs.sh"
-            
-            // Send command Intent (Background execution restored)
-            val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildRunCommandIntent(cmd, runInBackground = false)
-            context.startService(intent)
-            
-            android.util.Log.d("TermuxX11Prefs", "Applied preferences via termux-x11-preference")
+            val prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            prefs.edit()
+                .putInt("displayScale", prefs.getInt(KEY_DISPLAY_SCALE, 100))
+                .putBoolean("fullscreen", prefs.getBoolean(KEY_FULLSCREEN, true))
+                .putBoolean("hideCutout", prefs.getBoolean(KEY_HIDE_CUTOUT, true))
+                .putBoolean("keepScreenOn", prefs.getBoolean(KEY_KEEP_SCREEN_ON, true))
+                .putString("displayResolutionMode", "scaled")
+                .putBoolean("pointerCapture", prefs.getBoolean(KEY_CAPTURE_POINTER, true))
+                .putBoolean("showAdditionalKbd", prefs.getBoolean(KEY_SHOW_ADDITIONAL_KBD, false))
+                .putBoolean("showIMEWhileExternalConnected", prefs.getBoolean(KEY_SHOW_IME, true))
+                .putBoolean("preferScancodes", prefs.getBoolean(KEY_PREFER_SCANCODES, true))
+                .putBoolean("hardwareKbdScancodesWorkaround", prefs.getBoolean(KEY_SCANCODE_WORKAROUND, true))
+                .putBoolean("clipboardEnable", true)
+                .putString("touchMode", "1")
+                .putBoolean("scaleTouchpad", true)
+                .apply()
+            android.util.Log.d("TermuxX11Prefs", "Applied preferences to embedded X11")
         } catch (e: Exception) {
             android.util.Log.e("TermuxX11Prefs", "Failed to apply preferences", e)
         }
     }
     
     /**
-     * Open Termux:X11 preferences activity
+     * Open Termux:X11 preferences activity (embedded, in-app)
      */
     fun openTermuxX11Preferences(context: Context) {
-        try {
-            val intent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-            intent?.let {
-                it.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                context.startActivity(it)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("TermuxX11Prefs", "Failed to open Termux:X11", e)
+        if (!EmbeddedX11.launchPreferences(context)) {
+            android.util.Log.e("TermuxX11Prefs", "Failed to open embedded Termux:X11 preferences")
         }
     }
 }

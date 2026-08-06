@@ -9,15 +9,14 @@
 ## 📖 Table of Contents
 
 1. [📥 Step 1: Choose Your Download Method](#-step-1-choose-your-download-method)
-2. [⚙️ Step 2: Install Required Components (Termux & Termux:X11)](#️-step-2-install-required-components-termux--termuxx11)
-3. [🔧 Step 3: Configure Termux](#-step-3-configure-termux)
-4. [🔐 Step 4: Grant Required Permissions](#-step-4-grant-required-permissions)
-5. [🪟 Step 5: Overlay Permission (Draw Over Other Apps)](#-step-5-overlay-permission-draw-over-other-apps)
-6. [👻 Step 6: Disable Phantom Process Killer (Crucial)](#-step-6-disable-phantom-process-killer-crucial)
-7. [🧰 Step 7: Install BusyBox (Optional / Rooted Users Only)](#-step-7-install-busybox-optional--rooted-users-only)
-8. [📦 Step 8: Environment Setup](#-step-8-environment-setup)
-9. [💻 Step 9: System Requirements Check](#-step-9-system-requirements-check)
-10. [🎉 Step 10: Launch FluxLinux!](#-step-10-youre-ready)
+2. [⚙️ Step 2: Initialize the Embedded Environment](#️-step-2-initialize-the-embedded-environment)
+3. [🔐 Step 3: Grant Required Permissions](#-step-3-grant-required-permissions)
+4. [🪟 Step 4: Overlay Permission (Draw Over Other Apps)](#-step-4-overlay-permission-draw-over-other-apps)
+5. [👻 Step 5: Disable Phantom Process Killer (Crucial)](#-step-5-disable-phantom-process-killer-crucial)
+6. [🧰 Step 6: Install BusyBox (Optional / Rooted Users Only)](#-step-6-install-busybox-optional--rooted-users-only)
+7. [📦 Step 7: Environment Setup](#-step-7-environment-setup)
+8. [💻 Step 8: System Requirements Check](#-step-8-system-requirements-check)
+9. [🎉 Step 9: Launch FluxLinux!](#-step-9-youre-ready)
 
 ---
 
@@ -81,51 +80,21 @@ If you would like to support the ongoing development of FluxLinux, you can purch
 
 ---
 
-## ⚙️ Step 2: Install Required Components (Termux & Termux:X11)
+## ⚙️ Step 2: Initialize the Embedded Environment
 
-Once you open FluxLinux, the application requires **Termux** and **Termux:X11** to run. The setup behavior differs depending on your installation source:
+FluxLinux now ships its **own embedded Linux host** (bootstrap + proot-distro + rootfs) inside the APK — a separate Termux app is **no longer required** to install Debian.
 
-### 1. GitHub Releases & F-Droid (Automatic Download)
-The app will automatically download the correct versions of Termux and Termux:X11 and prompt you to install them.
-* Grant the necessary permission to install packages from FluxLinux if prompted.
+1. On the setup screen, tap **Initialize Environment**. FluxLinux extracts the embedded host prefix (first run takes a minute or two; a progress bar is shown).
+2. The host setup validates the bundled dependencies (`proot-distro`, `python`, `pulseaudio`, Termux:X11 loader).
+3. Once verified, tap **Continue**.
 
-### 2. Google Play Store (Manual Download)
-Due to Play Store policy restrictions, the app cannot automatically download external APK files. You must download and install them manually:
-* **Termux:** Download and install the version from F-Droid (do not use the outdated Play Store version of Termux).
-* **Termux:X11:** Download and install the companion APK.
-* Direct download links are provided in the app.
-
-### 🔍 Verification Check
-FluxLinux will check if both components are installed on your device. Once both dependencies are detected, you can click **Proceed** to continue with the setup.
-
-| Action / State | Screenshot | Description |
-| :--- | :---: | :--- |
-| **Download Required Components** | <img src="img/termux-download-page-flux.png" width="500" /> | **Download Prompts:** If Termux or Termux:X11 is not yet installed on your system, the app will provide download prompts. You must install both packages to continue. |
-| **Verification Check Done** | <img src="img/step-one-termux.png" width="500" /> | **Verification Check:** Once both components are successfully installed and active on your system, the app displays checkmarks for both. Tap **Continue** to proceed. |
+> [!NOTE]
+> **Termux:X11** is only needed for the optional **GUI desktop** launch (Step: Launch in GUI mode). Command-line (PRoot / chroot) shells work entirely in-app.
+> **BusyBox + root** are only needed for the **Debian (Rooted)** chroot path.
 
 ---
 
-## 🔧 Step 3: Configure Termux
-
-FluxLinux needs to communicate with Termux to execute background processes and set up your Linux environment. You must enable external apps in Termux.
-
-1. Click the **Copy & Open Termux** button in the FluxLinux app.
-2. The app will copy a command to your clipboard and open Termux.
-3. Paste the command into the Termux terminal and hit Enter:
-   ```bash
-   mkdir -p ~/.termux && echo "allow-external-apps = true" >> ~/.termux/termux.properties && termux-reload-settings
-   ```
-4. Return to FluxLinux, check the box confirming you ran the command, and click **Continue**.
-
-| Action / State | Screenshot | Description |
-| :--- | :---: | :--- |
-| **Configure Termux Screen** | <img src="img/step-two-communication.png" width="500" /> | The initial step in the app prompts you to configure Termux communication. Use the **Copy & Open Termux** button to copy the setup script. |
-| **Paste Command in Termux** | <img src="img/step-two-termux-paste-and-enter.png" width="500" /> | Paste the clipboard command in the Termux terminal and press enter to create files and reload Termux settings. |
-| **Check Box & Continue** | <img src="img/step-two-click-toggle-in-app-i-have-pasted.png" width="500" /> | Check the confirmation box **"I've pasted and run the command in Termux"** and click **Continue**. |
-
----
-
-## 🔐 Step 4: Grant Required Permissions
+## 🔐 Step 3: Grant Required Permissions
 
 FluxLinux requires a few basic Android permissions to function properly.
 
@@ -142,7 +111,7 @@ Click **Grant Permission** and accept the prompts that appear on your screen.
 
 ---
 
-## 🪟 Step 5: Overlay Permission (Draw Over Other Apps)
+## 🪟 Step 4: Overlay Permission (Draw Over Other Apps)
 
 For the best experience, FluxLinux uses a floating widget/menu over the Linux desktop environment (Termux:X11). This allows you to quickly access controls, keyboards, and settings.
 
@@ -171,7 +140,7 @@ For the best experience, FluxLinux uses a floating widget/menu over the Linux de
 
 ---
 
-## 👻 Step 6: Disable Phantom Process Killer (Crucial)
+## 👻 Step 5: Disable Phantom Process Killer (Crucial)
 
 Android 12 and above introduced an aggressive "Phantom Process Killer" that terminates background processes using too much CPU. Since running a full Linux environment requires sustained resources, this feature *must* be disabled, or your Linux environment will crash unexpectedly.
 
@@ -204,7 +173,7 @@ If your device is rooted (Magisk/KernelSU/APatch), simply click **Apply Fix via 
 
 ---
 
-## 🧰 Step 7: Install BusyBox (Optional / Rooted Users Only)
+## 🧰 Step 6: Install BusyBox (Optional / Rooted Users Only)
 
 For non-root users, BusyBox is not required on this screen, and you can skip this step or the app will pass it automatically.
 
@@ -222,7 +191,7 @@ If you are using a rooted device, you can download and install the BusyBox modul
 
 ---
 
-## 📦 Step 8: Environment Setup
+## 📦 Step 7: Environment Setup
 
 FluxLinux will now extract and configure the core Linux file system (rootfs) on your device.
 
@@ -237,7 +206,7 @@ FluxLinux will now extract and configure the core Linux file system (rootfs) on 
 
 ---
 
-## 💻 Step 9: System Requirements Check
+## 💻 Step 8: System Requirements Check
 
 Before launching the environment, FluxLinux will run a quick hardware check to ensure your device meets the minimum requirements for a smooth experience.
 
@@ -252,7 +221,7 @@ Click **Continue to Final Step** once you have reviewed your system status.
 
 ---
 
-## 🎉 Step 10: You're Ready!
+## 🎉 Step 9: You're Ready!
 
 Congratulations! You have successfully configured FluxLinux.
 

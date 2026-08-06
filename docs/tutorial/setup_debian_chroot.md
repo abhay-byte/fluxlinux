@@ -8,29 +8,29 @@
 
 ## 📖 Table of Contents
 
-0. [🔑 Step 0: Grant Root Access to Termux](#-step-0-grant-root-access-to-termux)
+0. [🔑 Step 0: Grant Root Access to FluxLinux](#-step-0-grant-root-access-to-fluxlinux)
 1. [🧰 Step 1: Install BusyBox NDK](#-step-1-install-busybox-ndk)
 2. [🐧 Step 2: Select Debian (Rooted) Distribution](#-step-2-select-debian-rooted-distribution)
 3. [⚙️ Step 3: Configure Debian Settings](#️-step-3-configure-debian-settings)
 4. [📋 Step 4: Generate and Copy the Setup Command](#-step-4-generate-and-copy-the-setup-command)
-5. [⚡ Step 5: Execute the Command in Termux](#-step-5-execute-the-command-in-termux)
+5. [⚡ Step 5: Execute the Install in Root Shell](#-step-5-execute-the-install-in-root-shell)
 6. [🎉 Step 6: Verify Installation in Home Screen](#-step-6-verify-installation-in-home-screen)
 7. [🛑 Step 7: Controlling the Session](#-step-7-controlling-the-session)
 8. [💡 Important Tips & Troubleshooting](#-important-tips--troubleshooting)
 
 ---
 
-## 🔑 Step 0: Grant Root Access to Termux
+## 🔑 Step 0: Grant Root Access to FluxLinux
 
-Before starting the installation, you must ensure that Termux has root access permissions granted by your superuser manager (e.g., Magisk or KernelSU).
+Before starting the installation, you must ensure that **FluxLinux** has root access permissions granted by your superuser manager (e.g., Magisk or KernelSU).
 
-1. Open Termux.
-2. Type `su` and press **Enter**.
-3. When prompted by your root manager, grant root access permanently.
+1. Open the FluxLinux app.
+2. Open the **Debian (Rooted)** card (or **Settings → Root Access**) — FluxLinux will request superuser access.
+3. When prompted by your root manager, grant root access permanently to FluxLinux.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Grant Root Access** | <img src="img/debian-chroot/step-zero-enable-root-for-termux.png" width="500" /> | Grant superuser (root) permissions to Termux to allow the Chroot container to run natively on your Android system. |
+| **Grant Root Access** | UI TBD | Grant superuser (root) permissions to FluxLinux to allow the Chroot container to run natively on your Android system. |
 
 ---
 
@@ -83,31 +83,27 @@ Before generating the installation commands, configure your container profile.
 
 ---
 
-## 📋 Step 4: Generate and Copy the Setup Command
+## 📋 Step 4: Configure and Start the Install
 
-Once you finish setting up your preferences, FluxLinux will compile a customized bootstrap script.
+Once you finish setting up your preferences, FluxLinux will prepare the Root Shell install.
 
-1. Tap on the **Generate Setup Command** button.
+1. Tap on the **Generate Setup Command** button (preview only).
 2. Review the generated script and options.
-3. Tap **Copy and Open Termux** to copy the command and automatically launch Termux.
+3. Tap **Install in Root Shell** to start the install inside FluxLinux's Root Shell component.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Copy Setup Command** | <img src="img/debian-chroot/step-two-copy-and-open-termux.png" width="500" /> | Review the script and tap **Copy and Open Termux** to proceed. |
+| **Install in Root Shell** | UI TBD | Review the script and tap **Install in Root Shell** to proceed in-app. |
 
 ---
 
-## ⚡ Step 5: Execute the Command in Termux
+## ⚡ Step 5: Execute the Install in Root Shell
 
-Once Termux opens, run the bootstrap command to compile the Debian container.
+FluxLinux opens an in-app Root Shell session and runs the setup with root privileges (`su`).
 
-1. Long-press in the Termux terminal window and select **Paste**.
-2. Press **Enter** on your keyboard to execute the bootstrap command.
-3. Since this is a Chroot installation, Termux will use root privileges (`su -c`) to mount native filesystems, extract the rootfs, and set up the desktop.
-
-| Action / State | Screenshot | Description |
-| :--- | :---: | :--- |
-| **Execute Command** | <img src="img/debian-chroot/step-three-paste-in-termux.png" width="500" /> | Paste the bootstrap command into Termux and execute it. Termux will handle the rest. |
+1. The Root Shell session uses the same pinned Debian rootfs asset as the PRoot path (no re-download).
+2. `setup_debian13_chroot.sh` mounts the native filesystems (idempotently, via the SSOT helper), extracts the rootfs to `/data/local/tmp/chrootDebian13`, and sets up the desktop.
+3. When it finishes, FluxLinux marks Debian (Rooted) as installed.
 
 ---
 
@@ -125,7 +121,7 @@ Once the installation finishes, return to the FluxLinux app. The home screen wil
 
 You can launch and manage your Debian Chroot session directly from the Home screen.
 
-- **Start Session**: Launch into CLI or GUI mode.
+- **Start Session**: Open Shell (in-app Root Shell → helper `login --user flux`) or GUI mode.
 - **Open X11**: Access the graphical display window if it was minimized.
 - **Stop Session**: Safely shut down all background Debian processes and unmount native filesystems.
 
@@ -142,8 +138,8 @@ You can launch and manage your Debian Chroot session directly from the Home scre
 * **Chroot Mode:** Used in this guide. Requires root permissions. It provides **near-native performance** and full hardware access by directly utilizing the Linux kernel capabilities of your Android device.
 
 ### 🛡️ Root Access Issues
-* If the installation fails immediately in Termux, verify that you ran `su` at least once before to grant root permissions to Termux via Magisk or KernelSU.
-* Check your superuser app to ensure Termux has persistent root permissions without a timeout.
+* If the installation fails immediately in the Root Shell, verify you granted root to **FluxLinux** (not Termux) in Magisk/KernelSU, and that a root-capable BusyBox is present (Step 1).
+* Check your superuser app to ensure FluxLinux has persistent root permissions without a timeout.
 
 ### 🏎️ Troubleshooting Hardware Acceleration (GPU)
 * Because Chroot runs natively, GPU access is more direct than in PRoot.

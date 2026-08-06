@@ -147,8 +147,13 @@ fun InstallConfigScreen(
                         ),
                         shape = RoundedCornerShape(28.dp)
                     ) {
-                        // Dynamic Total Size
-                        Text("Install Now (~${String.format("%.1f", totalSizeGB)} GB)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        // Primary CTA routes to the in-app terminal component for this distro
+                        // (termux-flux-terminal for proot, chroot-root-shell for chroot).
+                        val ctaLabel = when (distro.id) {
+                            "debian13_chroot", "debian_chroot" -> "Install in Root Shell"
+                            else -> "Install in Flux Terminal"
+                        }
+                        Text("$ctaLabel (~${String.format("%.1f", totalSizeGB)} GB)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

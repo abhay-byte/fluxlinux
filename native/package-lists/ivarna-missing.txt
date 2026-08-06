@@ -1,0 +1,19 @@
+# SSOT packages not yet mirrored for com.ivarna.fluxlinux
+# Shared termux-packages/output has these for com.zenithblue.nativecode only
+libidn2
+libunistring
+libnettle
+libunbound
+libogg
+flac
+libvorbis
+libopus
+speexdsp
+libsndfile
+libltdl
+libcap
+libevent
+dbus
+glib
+pulseaudio
+xkeyboard-config

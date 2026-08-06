@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# Build termux-packages .debs for a FluxLinux applicationId.
+#
+# Usage:
+#   ./scripts/build_packages_for_appid.sh com.ivarna.fluxlinux bash
+#   ./scripts/build_packages_for_appid.sh com.ivarna.fluxlinux --list bootstrap-host
+#   ./scripts/build_packages_for_appid.sh com.zenithblue.fluxlinux --list bootstrap-host
+#   ARCH=arm ./scripts/build_packages_for_appid.sh com.ivarna.fluxlinux coreutils
+#
+# Env:
+#   ARCH                 default aarch64
+#   FORCE=1              pass -f (force rebuild package)
+#   FORCE_DEPS=1         pass -F (force rebuild package + deps)
+#   CONTINUE_ON_FAIL=1   keep going after a package failure
+#   TERMUX_PACKAGES_DIR  override path to termux-packages
+#   TERMUX_DOCKER_RUN_EXTRA_ARGS  default: --network host --cpus 10 --memory 10g
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CUSTOM_PACKAGE="${1:?usage: $0 <applicationId> <pkg…|--list name>}"
+shift
+
+ARCH="${ARCH:-aarch64}"
+TP="${TERMUX_PACKAGES_DIR:-$ROOT/native/termux-packages}"
+# Resolve symlink so paths match the docker volume root (termux-packages repo).
+TP="$(cd "$TP" && pwd -P)"
+# termux-packages puts *dependencies* in the default output/ even when -o is set.
+# See termux_step_get_dependencies.sh. We always build into TP/output, then
+# mirror only packages whose data paths match CUSTOM_PACKAGE into OUT_DIR.
+BUILD_OUT_DIR="$TP/output"
+OUT_DIR="$ROOT/native/output/${CUSTOM_PACKAGE}"
+LOG_DIR="$ROOT/native/output/logs"
+LOG="$LOG_DIR/${CUSTOM_PACKAGE//./_}-$(date +%Y%m%dT%H%M%S).log"
+LIST_DIR="$ROOT/native/package-lists"
+
+if [[ ! -d "$TP" ]]; then
+  echo "error: termux-packages not found at $TP" >&2
+  echo "  ln -s ~/repos/termux-lib/termux-packages $ROOT/native/termux-packages" >&2
+  exit 1
+fi
+
+mkdir -p "$BUILD_OUT_DIR" "$OUT_DIR" "$LOG_DIR"
+
+# Resolve package list
+PKGS=()
+if [[ "${1:-}" == "--list" ]]; then
+  list_name="${2:?--list requires a name (e.g. bootstrap-host)}"
+  list_file="$LIST_DIR/${list_name}.txt"
+  if [[ ! -f "$list_file" ]]; then
+    # allow bootstrap-host without .txt already handled; also bare name
+    if [[ -f "$LIST_DIR/${list_name}" ]]; then
+      list_file="$LIST_DIR/${list_name}"
+    else
+      echo "error: package list not found: $list_file" >&2
+      exit 1
+    fi
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -z "$line" ]] && continue
+    PKGS+=("$line")
+  done < "$list_file"
+else
+  if [[ $# -lt 1 ]]; then
+    echo "error: pass package names or --list bootstrap-host" >&2
+    exit 1
+  fi
+  PKGS=("$@")
+fi
+
+echo "[*] applicationId: $CUSTOM_PACKAGE"
+echo "[*] arch:          $ARCH"
+echo "[*] packages:      ${#PKGS[@]} → ${PKGS[*]}"
+echo "[*] build output:  $BUILD_OUT_DIR  (inside docker volume)"
+echo "[*] mirror output: $OUT_DIR"
+echo "[*] log:           $LOG"
+echo "[*] termux-packages: $TP"
+
+"$ROOT/scripts/set_termux_package_name.sh" "$CUSTOM_PACKAGE" | tee -a "$LOG"
+
+export TERMUX_DOCKER_RUN_EXTRA_ARGS="${TERMUX_DOCKER_RUN_EXTRA_ARGS:---network host --cpus 10 --memory 10g}"
+echo "[*] TERMUX_DOCKER_RUN_EXTRA_ARGS=$TERMUX_DOCKER_RUN_EXTRA_ARGS" | tee -a "$LOG"
+
+# Default output under termux-packages (docker-writable). Deps always land here.
+BUILD_FLAGS=(-a "$ARCH")
+if [[ "${FORCE_DEPS:-0}" == "1" ]]; then
+  BUILD_FLAGS+=(-F)
+elif [[ "${FORCE:-0}" == "1" ]]; then
+  BUILD_FLAGS+=(-f)
+fi
+
+cd "$TP"
+# Recreate container only when forced or missing. Destroying the container drops
+# /data/data/.built-packages and forces full dep rebuilds on every script run.
+if [[ "${RECREATE_BUILDER:-0}" == "1" ]]; then
+  echo "[*] RECREATE_BUILDER=1 — removing termux-package-builder" | tee -a "$LOG"
+  docker rm -f termux-package-builder 2>/dev/null || true
+elif ! docker inspect termux-package-builder >/dev/null 2>&1; then
+  echo "[*] no builder container — will create on first package" | tee -a "$LOG"
+else
+  echo "[*] reusing existing termux-package-builder (set RECREATE_BUILDER=1 to reset)" | tee -a "$LOG"
+fi
+
+ok=0
+fail=0
+failed_pkgs=()
+
+for pkg in "${PKGS[@]}"; do
+  echo "=== building $pkg for $CUSTOM_PACKAGE ($(date +%T)) ===" | tee -a "$LOG"
+  if ./scripts/run-docker.sh ./build-package.sh "${BUILD_FLAGS[@]}" "$pkg" 2>&1 | tee -a "$LOG"; then
+    echo "OK  $pkg" | tee -a "$LOG"
+    ok=$((ok + 1))
+  else
+    echo "FAIL $pkg" | tee -a "$LOG"
+    fail=$((fail + 1))
+    failed_pkgs+=("$pkg")
+    if [[ "${CONTINUE_ON_FAIL:-0}" != "1" ]]; then
+      echo "[!] aborting (set CONTINUE_ON_FAIL=1 to keep going)" | tee -a "$LOG"
+      break
+    fi
+  fi
+done
+
+# Mirror only debs whose archive paths match this applicationId.
+# (Shared termux-packages/output may still contain other app-id debs.)
+echo "[*] mirroring matching-prefix debs → $OUT_DIR" | tee -a "$LOG"
+mkdir -p "$OUT_DIR"
+mirrored=0
+skipped=0
+for deb in "$BUILD_OUT_DIR"/*.deb; do
+  [[ -f "$deb" ]] || continue
+  if "$ROOT/scripts/verify_deb_prefix.sh" "$deb" "$CUSTOM_PACKAGE" >/dev/null 2>&1; then
+    cp -a "$deb" "$OUT_DIR/"
+    mirrored=$((mirrored + 1))
+  else
+    skipped=$((skipped + 1))
+  fi
+done
+echo "[*] mirrored=$mirrored skipped_other_prefix=$skipped" | tee -a "$LOG"
+
+echo "" | tee -a "$LOG"
+echo "[*] done: ok=$ok fail=$fail" | tee -a "$LOG"
+if (( fail > 0 )); then
+  echo "[*] failed: ${failed_pkgs[*]}" | tee -a "$LOG"
+fi
+echo "[*] debs in: $OUT_DIR"
+ls -la "$OUT_DIR" 2>/dev/null | tail -30 | tee -a "$LOG" || true
+
+# Explicit verify for requested seed packages when present
+for pkg in "${PKGS[@]}"; do
+  hit="$(ls -1 "$OUT_DIR"/${pkg}_*"${ARCH}".deb "$OUT_DIR"/${pkg}_*_all.deb 2>/dev/null | head -1 || true)"
+  if [[ -n "$hit" ]]; then
+    echo "[*] verifying $(basename "$hit")..." | tee -a "$LOG"
+    "$ROOT/scripts/verify_deb_prefix.sh" "$hit" "$CUSTOM_PACKAGE" | tee -a "$LOG" || true
+  fi
+done
+
+(( fail == 0 ))

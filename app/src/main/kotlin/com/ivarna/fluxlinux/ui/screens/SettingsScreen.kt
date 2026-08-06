@@ -166,46 +166,31 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
 
-                            // Setup State Tracking
-                            val setupCompleted = remember(refreshKey.value) { mutableStateOf(StateManager.isTermuxInitialized(context) || StateManager.getScriptStatus(context, "setup_termux")) }
+                            // Setup State Tracking (embedded host, no external Termux)
+                            val setupCompleted = remember(refreshKey.value) { mutableStateOf(com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context)) }
                             val tweaksApplied = remember(refreshKey.value) { mutableStateOf(StateManager.getScriptStatus(context, "termux_tweaks")) }
                             
+                            var initializing by remember { mutableStateOf(false) }
 
                             
                             // Setup Environment Button
                             Button(
                                 onClick = {
-                                    if (permissionState.status.isGranted) {
-                                        val scriptManager = ScriptManager(context)
-                                        val setupScript = scriptManager.getScriptContent("termux/setup_termux.sh")
-                                        val fluxInstallScript = scriptManager.getScriptContent("debian/proot/setup/flux_install.sh")
-                                        val startGuiScript = scriptManager.getScriptContent("debian/proot/start/start_gui.sh")
-                                        
-                                        val compositeCommand = buildString {
-                                            append("cat << 'EOF_FLUX' > \$HOME/flux_install.sh\n")
-                                            append(fluxInstallScript)
-                                            append("\nEOF_FLUX\n")
-                                            append("chmod +x \$HOME/flux_install.sh\n\n")
-                                            
-                                            append("cat << 'EOF_GUI' > \$HOME/start_gui.sh\n")
-                                            append(startGuiScript)
-                                            append("\nEOF_GUI\n")
-                                            append("chmod +x \$HOME/start_gui.sh\n\n")
-                                            
-                                            append("rm -f \$HOME/.fluxlinux/setup_termux.done\n")
-                                            append(setupScript)
+                                    if (initializing) return@Button
+                                    initializing = true
+                                    com.ivarna.fluxlinux.core.terminal.TerminalLauncher.prepareHost(
+                                        context,
+                                        forceHostSetup = true,
+                                        onDone = { ok ->
+                                            initializing = false
+                                            setupCompleted.value = com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context)
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                if (setupCompleted.value) "Host environment ready" else "Host setup failed — see Troubleshooting",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
                                         }
-                                        
-                                        val intent = TermuxIntentFactory.buildRunCommandIntent(compositeCommand)
-                                        try {
-                                            onStartService(intent)
-                                            android.widget.Toast.makeText(context, "Initializing Environment...", android.widget.Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            android.util.Log.e("FluxLinux", "Setup failed", e)
-                                        }
-                                    } else {
-                                        permissionState.launchPermissionRequest()
-                                    }
+                                    )
                                 },
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
                                 colors = ButtonDefaults.buttonColors(
@@ -227,9 +212,9 @@ fun SettingsScreen(
                                             tint = MaterialTheme.colorScheme.secondary
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Environment Initialized", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                        Text("Host Environment Ready", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                                     } else {
-                                        Text("Initialize Environment (Setup)", fontWeight = FontWeight.Bold)
+                                        Text(if (initializing) "Initializing…" else "Initialize Host Environment", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -239,7 +224,7 @@ fun SettingsScreen(
                             // Tweaks Button
                              Button(
                                 onClick = {
-                                    if (permissionState.status.isGranted) {
+                                    if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
                                         val scriptManager = ScriptManager(context)
                                         val tweaksScript = scriptManager.getScriptContent("termux/termux_tweaks.sh")
                                         val forceTweaksScript = "rm -f \$HOME/.fluxlinux/termux_tweaks.done\n" + tweaksScript
@@ -357,7 +342,7 @@ fun SettingsScreen(
                             
                             Text("Fix Termux Connection", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Run this if distros fail to install or launch.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
+                            Text("Legacy (optional): only needed if you still use external Termux for GUI/debug flows. Embedded host installs do not require it.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                             Spacer(modifier = Modifier.height(12.dp))
                             
                             val fixCommand = "mkdir -p ~/.termux && echo \"allow-external-apps = true\" >> ~/.termux/termux.properties && termux-reload-settings"

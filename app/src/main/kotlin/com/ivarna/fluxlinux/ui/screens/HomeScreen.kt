@@ -53,7 +53,10 @@ fun HomeScreen(
     onStartService: (android.content.Intent) -> Unit,
     onStartActivity: (android.content.Intent) -> Unit,
     onNavigateToInstall: (com.ivarna.fluxlinux.core.data.Distro) -> Unit,
-    onNavigateToSettings: (com.ivarna.fluxlinux.core.data.Distro) -> Unit
+    onNavigateToSettings: (com.ivarna.fluxlinux.core.data.Distro) -> Unit,
+    onOpenTerminal: (distroId: String, root: Boolean) -> Unit = { _, _ -> },
+    /** Switch bottom-nav to Terminal after an in-app session is opened (e.g. Qwen). */
+    onShowTerminal: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -87,10 +90,12 @@ fun HomeScreen(
             refreshKey.value++
         }
         
-        // Installed Distros Detection
+        // Installed Distros Detection — filesystem truth (plan P4-T13): a stale
+        // "installed" pref without a rootfs on disk must show Install, not a broken shell.
         val installedDistros = remember(refreshKey.value) {
-            val installedIds = StateManager.getInstalledDistros(context)
-            DistroRepository.supportedDistros.filter { installedIds.contains(it.id) }
+            DistroRepository.supportedDistros.filter {
+                com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id)
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -145,15 +150,12 @@ fun HomeScreen(
                     onNavigateToSettings = { onNavigateToSettings(distro) },
                     onNavigateToStart = { distroToLaunch.value = distro },
                     onOpenDisplay = {
-                        val launchIntent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-                        if (launchIntent != null) {
-                            context.startActivity(launchIntent)
-                        } else {
-                            android.widget.Toast.makeText(context, "Termux:X11 not installed", android.widget.Toast.LENGTH_SHORT).show()
+                        if (!com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)) {
+                            android.widget.Toast.makeText(context, "Termux:X11 not available", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     onStop = {
-                        if (permissionState.status.isGranted) {
+                        if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
                             val runningType = StateManager.getGuiRunningType(context, distro.id)
                             val intent = if (runningType == "kde") {
                                 TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
@@ -309,67 +311,46 @@ fun HomeScreen(
                     
                     Spacer(modifier = Modifier.height(32.dp))
                     
-                    // CLI Button
-                    if (distro.id != "termux") {
-                        Button(
-                            onClick = {
-                                if (permissionState.status.isGranted) {
-                                    val intent = TermuxIntentFactory.buildLaunchCliIntent(distro.id)
-                                    try {
-                                        onStartService(intent)
-                                        distroToLaunch.value = null
-                                    } catch (e: Exception) {
-                                        android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    permissionState.launchPermissionRequest()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Launch Terminal (CLI)", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Root Terminal Button (Only for Chroot Distros)
-                        if (distro.id.contains("chroot")) {
-                            Button(
-                                onClick = {
-                                    if (permissionState.status.isGranted) {
-                                        val intent = TermuxIntentFactory.buildLaunchRootCliIntent(distro.id)
-                                        try {
-                                            onStartService(intent)
-                                            distroToLaunch.value = null
-                                        } catch (e: Exception) {
-                                            android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                                        }
-                                    } else {
-                                        permissionState.launchPermissionRequest()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                ),
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(56.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🔓 Root Terminal", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                                }
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
+                    // CLI Button — opens in-app terminal session (termux-flux-terminal /
+                    // chroot-root-shell), no external Termux required.
+                    Button(
+                        onClick = {
+                            onOpenTerminal(distro.id, false)
+                            distroToLaunch.value = null
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Open Shell", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                         }
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Root Terminal Button (chroot → chroot-root-shell; proot → shell-root card)
+                    Button(
+                        onClick = {
+                            onOpenTerminal(distro.id, true)
+                            distroToLaunch.value = null
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🔓 Open Root Shell", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     // LLM Model Button (Qwen3.5 interactive chat)
                     val llmInstalled = StateManager.isComponentInstalled(context, distro.id, "vulkan_llamacpp")
@@ -378,17 +359,24 @@ fun HomeScreen(
                     if (llmInstalled && modelInstalled) {
                         Button(
                             onClick = {
-                                if (permissionState.status.isGranted) {
-                                    val intent = TermuxIntentFactory.buildRunLlmIntent(context, distro.id)
-                                    try {
-                                        onStartService(intent)
-                                        distroToLaunch.value = null
-                                    } catch (e: Exception) {
-                                        android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                // Run Qwen inside the in-app proot terminal (no Termux intent)
+                                val scriptManager = ScriptManager(context)
+                                val scriptContent = scriptManager.getScriptContent("debian/common/addon/launch_qwen25.sh")
+                                val scriptB64 = android.util.Base64.encodeToString(
+                                    scriptContent.toByteArray(), android.util.Base64.NO_WRAP
+                                )
+                                val payload = "echo '$scriptB64' | base64 -d | bash"
+                                com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openSessionAfterHost(
+                                    context,
+                                    type = "shell",
+                                    title = "Qwen2.5-1.5B",
+                                    shellCmd = payload,
+                                    method = com.ivarna.fluxlinux.core.data.terminalComponentFor(distro.id).method,
+                                    onDone = { ok ->
+                                        if (ok) onShowTerminal()
                                     }
-                                } else {
-                                    permissionState.launchPermissionRequest()
-                                }
+                                )
+                                distroToLaunch.value = null
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF7C4DFF).copy(alpha = 0.85f),
@@ -411,17 +399,14 @@ fun HomeScreen(
                     // XFCE4
                     Button(
                         onClick = {
-                            if (permissionState.status.isGranted) {
+                            if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
                                 val intent = TermuxIntentFactory.buildLaunchGuiIntent(context, distro.id)
                                 try {
                                     onStartService(intent)
                                     StateManager.setGuiRunning(context, distro.id, true)
                                     StateManager.setGuiRunningType(context, distro.id, "xfce4")
-                                    val x11Intent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-                                    if (x11Intent != null) {
-                                        context.startActivity(x11Intent)
-                                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                                    }
+                                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
+                                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
                                     distroToLaunch.value = null
                                 } catch (e: Exception) {
                                     android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -445,7 +430,7 @@ fun HomeScreen(
                     // KDE Plasma — opens GPU picker if installed
                     Button(
                         onClick = {
-                            if (kdeInstalled && permissionState.status.isGranted) {
+                            if (kdeInstalled && com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
                                 // Show GPU mode picker sub-dialog
                                 showKdeGpuPicker.value = distro
                             } else if (!kdeInstalled) {
@@ -530,11 +515,8 @@ fun HomeScreen(
                     onStartService(intent)
                     StateManager.setGuiRunning(context, distro.id, true)
                     StateManager.setGuiRunningType(context, distro.id, "kde")
-                    val x11Intent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-                    if (x11Intent != null) {
-                        context.startActivity(x11Intent)
-                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                    }
+                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
+                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -547,11 +529,8 @@ fun HomeScreen(
                     onStartService(intent)
                     StateManager.setGuiRunning(context, distro.id, true)
                     StateManager.setGuiRunningType(context, distro.id, "kde")
-                    val x11Intent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-                    if (x11Intent != null) {
-                        context.startActivity(x11Intent)
-                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                    }
+                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
+                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -564,11 +543,8 @@ fun HomeScreen(
                     onStartService(intent)
                     StateManager.setGuiRunning(context, distro.id, true)
                     StateManager.setGuiRunningType(context, distro.id, "kde")
-                    val x11Intent = context.packageManager.getLaunchIntentForPackage("com.termux.x11")
-                    if (x11Intent != null) {
-                        context.startActivity(x11Intent)
-                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                    }
+                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
+                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }

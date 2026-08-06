@@ -1,0 +1,63 @@
+# Minimum host packages for interactive terminal + proot/proot-distro
+# Matches nativecode host shell path (no pulseaudio/X11).
+# Includes runtime shared-library packages so bootstrap extract is self-contained.
+
+# Shell
+bash
+termux-exec
+coreutils
+findutils
+grep
+sed
+gawk
+psmisc
+procps
+tar
+xz-utils
+gzip
+less
+diffutils
+curl
+ca-certificates
+
+# Termux host plumbing
+termux-tools
+termux-am
+termux-core
+termux-am-socket
+
+# Proot stack
+proot
+proot-distro
+python
+python-pip
+libtalloc
+libandroid-shmem
+
+# Runtime libs (shell / curl / python / proot)
+libandroid-support
+readline
+ncurses
+libcurl
+openssl
+libnghttp2
+libssh2
+zlib
+libiconv
+libgmp
+liblzma
+libc++
+pcre2
+libffi
+libsqlite
+libbz2
+gdbm
+libandroid-selinux
+libandroid-glob
+libacl
+libcrypt
+libexpat
+libmpfr
+libnghttp3
+libngtcp2
+brotli

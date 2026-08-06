@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
-import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.utils.InstallationQueueManager
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.components.DistroCard
@@ -73,14 +72,18 @@ fun DistroScreen(
         
         Spacer(modifier = Modifier.height(20.dp))
         
-        // Distro List
+        // Distro List — installed state = filesystem truth (plan P4-T13); stale
+        // prefs without a rootfs on disk keep the card available for Install.
         val installedDistroIds = remember(refreshKey.value) {
-            StateManager.getInstalledDistros(context)
+            DistroRepository.supportedDistros
+                .filter { com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id) }
+                .map { it.id }
+                .toSet()
         }
         
         val availableDistros = DistroRepository.supportedDistros.filter { 
             !installedDistroIds.contains(it.id)
-        }.sortedWith(compareBy<Distro> { it.comingSoon }.thenByDescending { it.id == "termux" }.thenBy { it.name })
+        }.sortedWith(compareBy<Distro> { it.comingSoon }.thenBy { it.name })
         
         if (availableDistros.isEmpty()) {
             Box(
@@ -112,7 +115,7 @@ fun DistroScreen(
                         onInstall = {
                             if (installState.isInstalling && installState.currentDistroId != distro.id) {
                                 Toast.makeText(context, "Installation already in progress for another distro", Toast.LENGTH_LONG).show()
-                            } else if (permissionState.status.isGranted) {
+                            } else if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
                                 onNavigateToInstall(distro)
                             } else {
                                 permissionState.launchPermissionRequest()

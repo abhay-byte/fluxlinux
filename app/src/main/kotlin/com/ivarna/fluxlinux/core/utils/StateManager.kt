@@ -18,6 +18,15 @@ object StateManager {
     fun triggerRefresh() {
         _refreshTrigger.value += 1
     }
+
+    /**
+     * Commands can run when either the embedded host is ready (in-app execution,
+     * no external Termux) or an external Termux with RUN_COMMAND is installed.
+     */
+    fun canRunCommands(context: Context): Boolean {
+        return com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context) ||
+            isTermuxInstalled(context)
+    }
     
     /**
      * Check if a package is installed
@@ -56,12 +65,10 @@ object StateManager {
     }
     
     /**
-     * Check if Termux:X11 is installed
+     * Termux:X11 is embedded in this app (same-package rendering) — always available.
      */
     fun isTermuxX11Installed(context: Context): Boolean {
-        val result = isPackageInstalled(context, "com.termux.x11")
-        android.util.Log.d("StateManager", "isTermuxX11Installed: $result")
-        return result
+        return true
     }
     
     /**
@@ -72,10 +79,10 @@ object StateManager {
     }
     
     /**
-     * Get Termux:X11 version
+     * Termux:X11 is embedded in this app.
      */
     fun getTermuxX11Version(context: Context): String {
-        return getPackageVersion(context, "com.termux.x11") ?: "Not Installed"
+        return "1.03.01 (embedded)"
     }
     
     /**
