@@ -61,6 +61,10 @@ object FluxTerminalSessionManager {
         method: String
     ): Boolean = GuestSessionFactory.openSession(ctx, type, title, shellCmd, method)
 
+    /** Interactive host (embedded Termux prefix) shell — HOST selector card. */
+    fun openHostShell(ctx: Context, title: String = "Host Shell"): Boolean =
+        GuestSessionFactory.openHostShell(ctx, title)
+
     /** Host script session (e.g. `flux_install.sh debian`). */
     fun openHostScriptSession(
         ctx: Context,

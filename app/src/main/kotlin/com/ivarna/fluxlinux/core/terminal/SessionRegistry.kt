@@ -1,5 +1,7 @@
 package com.ivarna.fluxlinux.core.terminal
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -9,6 +11,8 @@ import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * SessionRegistry — owns open terminal tabs, view attachment, session client,
@@ -48,6 +52,13 @@ object SessionRegistry {
     @Volatile
     private var attachedClient: TerminalSessionClient? = null
 
+    /** App context cached on first session add — needed by clipboard session client. */
+    @Volatile
+    private var appContext: Context? = null
+
+    /** Background executor for paste (clipboard → emulator writes). */
+    private val pasteExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
     val activeSession: ManagedSession?
         get() = sessionsList.getOrNull(_activeIndex.value)
 
@@ -60,6 +71,7 @@ object SessionRegistry {
     /** Add a session (factory-created) and focus it. */
     fun add(ctx: Context, managed: ManagedSession): Boolean {
         if (!hasFreeTab()) return false
+        if (appContext == null) appContext = ctx.applicationContext
         sessionsList.add(managed)
         _revision.value++
         switchSession(sessionsList.size - 1)
@@ -75,10 +87,16 @@ object SessionRegistry {
         _activeIndex.value = index
         attachedView?.let { view ->
             val session = sessionsList[index].session
-            view.attachSession(session)
-            view.onScreenUpdated()
+            try {
+                view.attachSession(session)
+                view.onScreenUpdated()
+            } catch (e: Exception) {
+                Log.w(TAG, "attachSession failed on switch: ${e.message}")
+            }
+            // T3: focus parity — TerminalView must take touch + IME focus, never stay blank.
             view.isFocusable = true
             view.isFocusableInTouchMode = true
+            view.requestFocus()
         }
     }
 
@@ -116,9 +134,17 @@ object SessionRegistry {
         attachedView = view
         val idx = _activeIndex.value
         if (idx in sessionsList.indices) {
-            view.attachSession(sessionsList[idx].session)
-            view.onScreenUpdated()
+            try {
+                view.attachSession(sessionsList[idx].session)
+                view.onScreenUpdated()
+            } catch (e: Exception) {
+                Log.w(TAG, "attachSession failed on attach: ${e.message}")
+            }
         }
+        // T3: focus parity — TerminalView must take touch + IME focus, never stay blank.
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
+        view.requestFocus()
     }
 
     fun detachView() {
@@ -143,8 +169,34 @@ object SessionRegistry {
                     sessionsList.find { it.session === session }?.onFinished?.invoke()
                 }
             }
-            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {}
-            override fun onPasteTextFromClipboard(session: TerminalSession) {}
+            // T3: clipboard parity (nativecode) — copy puts text on the system
+            // clipboard; paste reads it and feeds the terminal emulator.
+            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
+                val ctx = appContext ?: return
+                try {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("terminal", text))
+                } catch (e: Exception) {
+                    Log.w(TAG, "copy to clipboard failed: ${e.message}")
+                }
+            }
+            override fun onPasteTextFromClipboard(session: TerminalSession) {
+                val ctx = appContext ?: return
+                val text = try {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()
+                } catch (e: Exception) {
+                    Log.w(TAG, "read clipboard failed: ${e.message}")
+                    null
+                } ?: return
+                pasteExecutor.execute {
+                    try {
+                        session.emulator?.paste(text) ?: session.write(text)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "paste failed: ${e.message}")
+                    }
+                }
+            }
             override fun onBell(session: TerminalSession) {}
             override fun onColorsChanged(session: TerminalSession) {}
             override fun onTerminalCursorStateChange(state: Boolean) {}

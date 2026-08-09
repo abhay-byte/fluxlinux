@@ -41,6 +41,30 @@ object GuestSessionFactory {
     }
 
     /**
+     * Interactive host (embedded Termux prefix) shell under libbash — no guest login.
+     * Used by the HOST card in the terminal tool selector (plan §5.1).
+     * Host env carries PREFIX/HOME/TMPDIR/package identity via [HostCommandBuilder].
+     */
+    fun openHostShell(ctx: Context, title: String = "Host Shell"): Boolean {
+        if (!SessionRegistry.hasFreeTab()) return false
+        val shell = TermuxHostPaths.libBash(ctx).absolutePath
+        val (_, envMap) = HostCommandBuilder.build(ctx, shell, forceHostSetup = false)
+        val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
+        val session = TerminalSession(
+            shell,
+            TermuxHostPaths.homeDir(ctx).absolutePath,
+            arrayOf(shell, "-l"),
+            env,
+            10000,
+            SessionRegistry.sessionClient()
+        )
+        return SessionRegistry.add(
+            ctx,
+            SessionRegistry.ManagedSession(session, "host", title, "host")
+        )
+    }
+
+    /**
      * Component install/uninstall session for a distro. The component script is
      * base64-injected and runs INSIDE the guest (proot: `zsh -c '…'`; chroot: SSOT
      * helper `b64` as flux). Same component as the parent distro — never Termux intent.
