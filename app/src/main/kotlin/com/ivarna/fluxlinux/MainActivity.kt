@@ -396,8 +396,8 @@ class MainActivity : ComponentActivity() {
                         type = type,
                         title = title,
                         method = method,
-                        onDone = { ok ->
-                            if (ok) {
+                        onResult = { result ->
+                            if (result == com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult.OPENED) {
                                 openTerminalTab()
                             } else {
                                 android.widget.Toast.makeText(

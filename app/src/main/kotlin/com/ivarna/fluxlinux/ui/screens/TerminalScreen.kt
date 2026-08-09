@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager
+import com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult
 import com.ivarna.fluxlinux.ui.terminal.TerminalExtraKeys
 import com.ivarna.fluxlinux.ui.terminal.TerminalModifierState
 import com.ivarna.fluxlinux.ui.terminal.TerminalToolSelector
@@ -82,7 +83,9 @@ fun TerminalScreen(
     var fontSize by remember { mutableStateOf(24) }
     var terminalViewRef by remember { mutableStateOf<TerminalView?>(null) }
     var showNewSessionSheet by remember { mutableStateOf(false) }
-    // Avoid SIGWINCH spam on every Compose recomposition — only on real cols/rows/pid change.
+    // Avoid SIGWINCH spam on every Compose recomposition — only when the emulator's
+    // cols/rows or the attached pid actually change (R2: pinch zoom changes cols/rows
+    // without a view-size change, so pixel width/height is NOT a valid guard key).
     val lastWinchKey = remember { intArrayOf(-1, -1, -1) } // cols, rows, pid
 
     fun toast(message: String) {
@@ -91,21 +94,33 @@ fun TerminalScreen(
 
     fun openCard(type: String, title: String, method: String) {
         if (method == "host") {
-            val ok = FluxTerminalSessionManager.openHostShell(context, title)
-            if (!ok) toast("Host shell failed to open")
+            // R4: gate on host ready — prepare when missing, toast "Host not ready".
+            FluxTerminalSessionManager.openHostShellAfterReady(context, title) { result ->
+                when (result) {
+                    SessionOpenResult.OPENED -> {}
+                    SessionOpenResult.MAX_TABS -> toast("Tab limit reached (${FluxTerminalSessionManager.MAX_TABS})")
+                    SessionOpenResult.HOST_NOT_READY -> toast("Host not ready — check Settings")
+                    else -> toast("Host shell failed to open")
+                }
+            }
             return
         }
         FluxTerminalSessionManager.openSessionAfterHost(
             context, type = type, title = title, method = method,
-            onDone = { ok ->
-                if (!ok) {
-                    toast(if (method == "chroot") "Chroot session failed" else "Host bootstrap failed")
+            onResult = { result ->
+                when (result) {
+                    SessionOpenResult.OPENED -> {}
+                    SessionOpenResult.MAX_TABS -> toast("Tab limit reached (${FluxTerminalSessionManager.MAX_TABS})")
+                    SessionOpenResult.HOST_PREPARE_FAILED -> toast("Host bootstrap not ready — check Settings")
+                    SessionOpenResult.OPEN_FAILED ->
+                        toast(if (method == "chroot") "Chroot session failed to open" else "Session failed to open")
+                    SessionOpenResult.HOST_NOT_READY -> toast("Host not ready — check Settings")
                 }
             }
         )
     }
 
-    /** Nativecode `forceTerminalResize` parity — post to view; SIGWINCH only when running. */
+    /** Nativecode `forceTerminalResize` parity — post to view; SIGWINCH on cols/rows change. */
     fun forceTerminalResize(tv: TerminalView) {
         tv.post {
             try {
@@ -113,13 +128,16 @@ fun TerminalScreen(
                 tv.updateSize()
                 tv.onScreenUpdated()
                 val session = tv.currentSession ?: return@post
+                val emulator = session.emulator ?: return@post
                 if (!session.isRunning) return@post
+                val cols = emulator.mColumns
+                val rows = emulator.mRows
                 val pid = session.pid
                 if (pid > 0 &&
-                    (tv.width != lastWinchKey[0] || tv.height != lastWinchKey[1] || pid != lastWinchKey[2])
+                    (cols != lastWinchKey[0] || rows != lastWinchKey[1] || pid != lastWinchKey[2])
                 ) {
-                    lastWinchKey[0] = tv.width
-                    lastWinchKey[1] = tv.height
+                    lastWinchKey[0] = cols
+                    lastWinchKey[1] = rows
                     lastWinchKey[2] = pid
                     runCatching { Os.kill(pid, OsConstants.SIGWINCH) }
                 }

@@ -72,8 +72,11 @@ object TerminalShellCatalog {
 
     /**
      * Build grid sections for the current availability. Proot / chroot cards stay
-     * visible but are disabled (grayed) with a reason when the guest is missing;
-     * chroot-root additionally requires device root (su probe).
+     * visible but are disabled (grayed) with a reason when the guest is missing.
+     * Chroot sessions always run via su (`RootShell.shellRootCommand`), so ALL
+     * chroot cards additionally require device root — no root, no chroot card
+     * (R1: previously only shell-root was gated and Chroot Shell (flux) looked
+     * openable without su).
      */
     fun sections(ctx: Context, avail: TerminalShellAvailability): List<TerminalShellSection> {
         val prootCards = prootDefs().map { def ->
@@ -85,15 +88,13 @@ object TerminalShellCatalog {
             )
         }
         val chrootCards = chrootDefs().map { def ->
-            val enabled = avail.chrootInstalled &&
-                (def.type != "shell-root" || avail.rootAvailable)
+            val enabled = avail.chrootInstalled && avail.rootAvailable
             TerminalShellCardUi(
                 def = def,
                 enabled = enabled,
                 disabledReason = when {
                     !avail.chrootInstalled -> "Chroot not installed"
-                    def.type == "shell-root" && !avail.rootAvailable -> "Root required"
-                    else -> null
+                    else -> "Root required"
                 }
             )
         }

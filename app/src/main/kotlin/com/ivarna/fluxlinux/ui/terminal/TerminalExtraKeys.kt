@@ -5,8 +5,10 @@ package com.ivarna.fluxlinux.ui.terminal
 import android.view.KeyEvent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
@@ -224,9 +227,9 @@ fun TerminalExtraKeys(
     ) {
         // ── Row 1: modifiers + core keys (equal weight, 44dp) ───────────────
         Row(modifier = Modifier.fillMaxWidth().height(44.dp)) {
-            ModifierKey("CTRL", modState.ctrlActive, { modState.toggleCtrl() }, { modState.lockCtrl() }, Modifier.weight(1f))
-            ModifierKey("ALT", modState.altActive, { modState.toggleAlt() }, { modState.lockAlt() }, Modifier.weight(1f))
-            ModifierKey("SHFT", modState.shiftActive, { modState.toggleShift() }, { modState.lockShift() }, Modifier.weight(1f))
+            ModifierKey("CTRL", modState.ctrlActive, modState.ctrlLocked, { modState.toggleCtrl() }, { modState.lockCtrl() }, Modifier.weight(1f))
+            ModifierKey("ALT", modState.altActive, modState.altLocked, { modState.toggleAlt() }, { modState.lockAlt() }, Modifier.weight(1f))
+            ModifierKey("SHFT", modState.shiftActive, modState.shiftLocked, { modState.toggleShift() }, { modState.lockShift() }, Modifier.weight(1f))
             CoreKey("ESC", { press("ESC") }, Modifier.weight(1f))
             CoreKey("TAB", { press("TAB") }, Modifier.weight(1f))
             CoreKey("ENT", { press("ENTER") }, Modifier.weight(1f))
@@ -274,6 +277,7 @@ fun TerminalExtraKeys(
 private fun ModifierKey(
     label: String,
     active: Boolean,
+    locked: Boolean,
     onPress: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier
@@ -286,6 +290,12 @@ private fun ModifierKey(
                 if (active) FluxAccentMagenta.copy(alpha = 0.85f)
                 else MaterialTheme.colorScheme.surface
             )
+            // R5: LOCKED (long-press) gets an outline ring + badge dot so it is
+            // visually distinct from a one-shot active modifier.
+            .then(
+                if (locked) Modifier.border(2.dp, MaterialTheme.colorScheme.onPrimary)
+                else Modifier
+            )
             .combinedClickable(onClick = onPress, onLongClick = onLongPress)
     ) {
         Text(
@@ -295,6 +305,15 @@ private fun ModifierKey(
             color = if (active) MaterialTheme.colorScheme.onPrimary
             else MaterialTheme.colorScheme.onSurface
         )
+        if (locked) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(3.dp)
+                    .size(6.dp)
+                    .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
+            )
+        }
     }
 }
 

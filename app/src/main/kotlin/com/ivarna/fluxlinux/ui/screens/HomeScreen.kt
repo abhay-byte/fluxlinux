@@ -373,8 +373,10 @@ fun HomeScreen(
                                     title = "Qwen2.5-1.5B",
                                     shellCmd = payload,
                                     method = com.ivarna.fluxlinux.core.data.terminalComponentFor(distro.id).method,
-                                    onDone = { ok ->
-                                        if (ok) onShowTerminal()
+                                    onResult = { result ->
+                                        if (result == com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult.OPENED) {
+                                            onShowTerminal()
+                                        }
                                     }
                                 )
                                 distroToLaunch.value = null

@@ -17,6 +17,23 @@ object FluxTerminalSessionManager {
 
     const val MAX_TABS = SessionRegistry.MAX_TABS
 
+    /**
+     * Outcome of a session-open request — lets UI show distinct toasts
+     * (R3: tab limit vs host prepare vs open failure).
+     */
+    enum class SessionOpenResult {
+        /** Session opened and attached to a tab. */
+        OPENED,
+        /** Tab limit reached (MAX_TABS). */
+        MAX_TABS,
+        /** Host bootstrap extract / setup_termux failed (guest paths). */
+        HOST_PREPARE_FAILED,
+        /** Embedded host not ready and prepare failed (host shell). */
+        HOST_NOT_READY,
+        /** Unexpected registry add failure. */
+        OPEN_FAILED
+    }
+
     val activeIndex: StateFlow<Int> get() = SessionRegistry.activeIndex
     val revision: StateFlow<Int> get() = SessionRegistry.revision
     val sessionCount: Int get() = SessionRegistry.sessionCount
@@ -34,6 +51,7 @@ object FluxTerminalSessionManager {
     /**
      * Interactive guest session after ensuring the host is prepared. Use from UI threads.
      * [method] MUST come from `terminalComponentFor(distroId).method` for card actions (plan §2.6).
+     * Reports a distinct [SessionOpenResult] so the UI can toast the right failure (R3).
      */
     fun openSessionAfterHost(
         ctx: Context,
@@ -41,14 +59,24 @@ object FluxTerminalSessionManager {
         title: String = type,
         shellCmd: String = "exec zsh",
         method: String,
-        onDone: (Boolean) -> Unit = {}
+        onResult: (SessionOpenResult) -> Unit = {}
     ) {
+        if (!SessionRegistry.hasFreeTab()) {
+            onResult(SessionOpenResult.MAX_TABS)
+            return
+        }
         TerminalLauncher.prepareHost(ctx) { ok ->
             if (!ok) {
-                onDone(false)
+                onResult(SessionOpenResult.HOST_PREPARE_FAILED)
                 return@prepareHost
             }
-            onDone(GuestSessionFactory.openSession(ctx, type, title, shellCmd, method))
+            onResult(
+                if (GuestSessionFactory.openSession(ctx, type, title, shellCmd, method)) {
+                    SessionOpenResult.OPENED
+                } else {
+                    SessionOpenResult.OPEN_FAILED
+                }
+            )
         }
     }
 
@@ -61,9 +89,51 @@ object FluxTerminalSessionManager {
         method: String
     ): Boolean = GuestSessionFactory.openSession(ctx, type, title, shellCmd, method)
 
-    /** Interactive host (embedded Termux prefix) shell — HOST selector card. */
+    /**
+     * Interactive host (embedded Termux prefix) shell — HOST selector card.
+     * Synchronous fast path; callers that need the R4 host-ready gate should use
+     * [openHostShellAfterReady] instead.
+     */
     fun openHostShell(ctx: Context, title: String = "Host Shell"): Boolean =
         GuestSessionFactory.openHostShell(ctx, title)
+
+    /**
+     * Interactive host shell after ensuring the embedded host is ready (async).
+     * Probes libbash + bootstrap extraction; prepares the host when missing (R4).
+     */
+    fun openHostShellAfterReady(
+        ctx: Context,
+        title: String = "Host Shell",
+        onResult: (SessionOpenResult) -> Unit = {}
+    ) {
+        if (!SessionRegistry.hasFreeTab()) {
+            onResult(SessionOpenResult.MAX_TABS)
+            return
+        }
+        if (GuestSessionFactory.hostShellReady(ctx)) {
+            onResult(
+                if (GuestSessionFactory.openHostShell(ctx, title)) {
+                    SessionOpenResult.OPENED
+                } else {
+                    SessionOpenResult.OPEN_FAILED
+                }
+            )
+            return
+        }
+        TerminalLauncher.prepareHost(ctx) { ok ->
+            if (!ok) {
+                onResult(SessionOpenResult.HOST_NOT_READY)
+                return@prepareHost
+            }
+            onResult(
+                if (GuestSessionFactory.openHostShell(ctx, title)) {
+                    SessionOpenResult.OPENED
+                } else {
+                    SessionOpenResult.OPEN_FAILED
+                }
+            )
+        }
+    }
 
     /** Host script session (e.g. `flux_install.sh debian`). */
     fun openHostScriptSession(

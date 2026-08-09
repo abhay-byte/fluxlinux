@@ -41,6 +41,14 @@ object GuestSessionFactory {
     }
 
     /**
+     * True when the embedded host is present enough to open an interactive host
+     * shell: libbash.so available and the bootstrap extracted (R4 — host shell
+     * previously skipped `prepareHost` and could fail weakly on a missing tree).
+     */
+    fun hostShellReady(ctx: Context): Boolean =
+        TermuxHostPaths.libBash(ctx).isFile && TerminalLauncher.isBootstrapExtracted(ctx)
+
+    /**
      * Interactive host (embedded Termux prefix) shell under libbash — no guest login.
      * Used by the HOST card in the terminal tool selector (plan §5.1).
      * Host env carries PREFIX/HOME/TMPDIR/package identity via [HostCommandBuilder].
