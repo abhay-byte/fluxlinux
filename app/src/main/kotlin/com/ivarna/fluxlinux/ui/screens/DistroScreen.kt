@@ -115,10 +115,9 @@ fun DistroScreen(
                         onInstall = {
                             if (installState.isInstalling && installState.currentDistroId != distro.id) {
                                 Toast.makeText(context, "Installation already in progress for another distro", Toast.LENGTH_LONG).show()
-                            } else if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
-                                onNavigateToInstall(distro)
                             } else {
-                                permissionState.launchPermissionRequest()
+                                // Embedded host — no external Termux / RUN_COMMAND required
+                                onNavigateToInstall(distro)
                             }
                         },
                         onUninstall = {}, // Not used

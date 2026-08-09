@@ -10,8 +10,8 @@ import java.security.MessageDigest
  * Deploys host + distro shell scripts from assets into `$HOME` and copies the
  * pinned Debian rootfs archive into `$HOME` for proot/chroot installs.
  *
- * Pass 2: all deploy methods return success so [TerminalLauncher.prepareHost]
- * can fail closed when the rootfs is missing/corrupt.
+ * Fail-closed: missing/corrupt rootfs or any [HostScript.required] asset
+ * makes [deployScripts] return false so [TerminalLauncher.prepareHost] fails.
  */
 object HostScriptDeployer {
 
@@ -21,16 +21,37 @@ object HostScriptDeployer {
     const val ROOTFS_SHA256 = "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803"
     const val ROOTFS_MIN_BYTES = 50L * 1024L * 1024L
 
-    /** Scripts copied to `$HOME`; asset path derived per script. */
-    private val HOST_SCRIPTS = listOf(
-        "setup_termux.sh",
-        "flux_install.sh",
-        "setup_debian_family.sh",
-        "setup_customization_debian.sh",
-        "setup_hw_accel_debian.sh",
-        "setup_debian13_chroot.sh",
-        "uninstall_debian13_chroot.sh",
-        "fluxlinux_chroot.sh"
+    /**
+     * Single source of truth: home script name → asset path + required flag.
+     * Add new scripts here only — no parallel lists / when-chains.
+     */
+    private data class HostScript(
+        val name: String,
+        val assetPath: String,
+        val required: Boolean = true
+    )
+
+    private val HOST_SCRIPTS: List<HostScript> = listOf(
+        HostScript("setup_termux.sh", "scripts/host/setup_termux.sh"),
+        HostScript("flux_install.sh", "scripts/debian/proot/setup/flux_install.sh"),
+        HostScript("setup_debian_family.sh", "scripts/debian/common/setup/setup_debian_family.sh"),
+        HostScript("setup_customization_debian.sh", "scripts/debian/common/setup/setup_customization_debian.sh"),
+        HostScript(
+            "setup_hw_accel_debian.sh",
+            "scripts/debian/common/setup/setup_hw_accel_debian.sh",
+            required = false
+        ),
+        HostScript("setup_debian13_chroot.sh", "scripts/chroot/setup_debian13_chroot.sh"),
+        HostScript("uninstall_debian13_chroot.sh", "scripts/chroot/uninstall_debian13_chroot.sh"),
+        HostScript("fluxlinux_chroot.sh", "scripts/chroot/fluxlinux_chroot.sh"),
+        // Desktop (proot)
+        HostScript("start_gui.sh", "scripts/debian/proot/start/start_gui.sh"),
+        HostScript("stop_gui.sh", "scripts/debian/proot/stop/stop_gui.sh"),
+        // Desktop (chroot host wrappers + root guest)
+        HostScript("start_gui_chroot.sh", "scripts/chroot/start_gui_chroot.sh"),
+        HostScript("stop_gui_chroot.sh", "scripts/chroot/stop_gui_chroot.sh"),
+        HostScript("start_debian13_gui.sh", "scripts/chroot/start_debian13_gui.sh"),
+        HostScript("stop_debian13_gui.sh", "scripts/chroot/stop_debian13_gui.sh"),
     )
 
     /** @return false when any required deploy step fails (fail-closed contract). */
@@ -40,21 +61,15 @@ object HostScriptDeployer {
             val homeDir = File(ctx.filesDir, "home").also { it.mkdirs() }
             var ok = true
             for (script in HOST_SCRIPTS) {
-                val assetPath = when {
-                    script == "setup_termux.sh" -> "scripts/host/$script"
-                    script == "flux_install.sh" -> "scripts/debian/proot/setup/$script"
-                    script.contains("chroot") -> "scripts/chroot/$script"
-                    else -> "scripts/debian/common/setup/$script"
-                }
-                val out = File(homeDir, script)
+                val out = File(homeDir, script.name)
                 try {
-                    ctx.assets.open(assetPath).use { input ->
+                    ctx.assets.open(script.assetPath).use { input ->
                         FileOutputStream(out).use { input.copyTo(it) }
                     }
                     out.setExecutable(true, false)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Script $assetPath not found in assets", e)
-                    ok = false
+                    Log.w(TAG, "Script ${script.assetPath} not found in assets", e)
+                    if (script.required) ok = false
                 }
             }
             // Optional terminal font (best-effort; terminal falls back to default)
@@ -70,7 +85,6 @@ object HostScriptDeployer {
             }
             val rootfsOk = deployRootfsFromAssets(ctx)
             if (!rootfsOk) Log.w(TAG, "rootfs deploy failed — host not ready")
-            // M2: loader is required by setup_termux.sh — include it in fail-closed.
             val loaderOk = deployLoaderApk(ctx)
             if (!loaderOk) Log.w(TAG, "loader.apk deploy failed — host not ready")
             ok && rootfsOk && loaderOk

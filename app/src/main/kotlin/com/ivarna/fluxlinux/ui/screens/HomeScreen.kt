@@ -155,24 +155,25 @@ fun HomeScreen(
                         }
                     },
                     onStop = {
-                        if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
-                            val runningType = StateManager.getGuiRunningType(context, distro.id)
-                            val intent = if (runningType == "kde") {
-                                TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
+                        val runningType = StateManager.getGuiRunningType(context, distro.id)
+                        try {
+                            if (runningType == "kde") {
+                                // KDE still uses legacy intent until fully ported
+                                if (StateManager.canRunCommands(context)) {
+                                    val intent = TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
+                                    onStartService(intent)
+                                    StateManager.setGuiRunning(context, distro.id, false)
+                                    StateManager.setGuiRunningType(context, distro.id, "")
+                                    android.widget.Toast.makeText(context, "Stopping KDE Plasma...", android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    permissionState.launchPermissionRequest()
+                                }
                             } else {
-                                TermuxIntentFactory.buildStopGuiIntent(context, distro.id)
+                                // Embedded XFCE stop — no Termux-era canRunCommands gate
+                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(context, distro.id)
                             }
-                            try {
-                                onStartService(intent)
-                                StateManager.setGuiRunning(context, distro.id, false)
-                                StateManager.setGuiRunningType(context, distro.id, "")
-                                val label = if (runningType == "kde") "KDE Plasma" else "XFCE4"
-                                android.widget.Toast.makeText(context, "Stopping $label...", android.widget.Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, "Stop failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            permissionState.launchPermissionRequest()
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Stop failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -396,23 +397,15 @@ fun HomeScreen(
                     // GUI Buttons — separate for XFCE4 and KDE
                     val kdeInstalled = StateManager.isComponentInstalled(context, distro.id, "kde_plasma")
 
-                    // XFCE4
+                    // XFCE4 — embedded host start_gui + in-app X11 (no external Termux)
                     Button(
                         onClick = {
-                            if (com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
-                                val intent = TermuxIntentFactory.buildLaunchGuiIntent(context, distro.id)
-                                try {
-                                    onStartService(intent)
-                                    StateManager.setGuiRunning(context, distro.id, true)
-                                    StateManager.setGuiRunningType(context, distro.id, "xfce4")
-                                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
-                                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                                    distroToLaunch.value = null
-                                } catch (e: Exception) {
-                                    android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                permissionState.launchPermissionRequest()
+                            try {
+                                // Flags + X11 prefs owned by DesktopLauncher on success
+                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(context, distro.id)
+                                distroToLaunch.value = null
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -461,14 +454,16 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = {
-                                val intent = if (runningType == "kde") {
-                                    TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
+                                if (runningType == "kde") {
+                                    // KDE still uses legacy intent until fully ported
+                                    val intent = TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
+                                    onStartService(intent)
+                                    StateManager.setGuiRunning(context, distro.id, false)
+                                    StateManager.setGuiRunningType(context, distro.id, "")
                                 } else {
-                                    TermuxIntentFactory.buildStopGuiIntent(context, distro.id)
+                                    // Flags cleared inside DesktopLauncher.stop
+                                    com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(context, distro.id)
                                 }
-                                onStartService(intent)
-                                StateManager.setGuiRunning(context, distro.id, false)
-                                StateManager.setGuiRunningType(context, distro.id, "")
                                 distroToLaunch.value = null
                             },
                             colors = ButtonDefaults.buttonColors(

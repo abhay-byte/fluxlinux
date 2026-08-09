@@ -77,6 +77,17 @@
                 android:value="Keeps user-started in-app terminal / distro install sessions alive with a visible notification so shells are not killed when the user switches apps." />
         </service>
 
+        <!-- Desktop / XFCE keep-alive while graphical session is running -->
+        <service
+            android:name=".core.service.DesktopSessionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps host GUI services (X11 / Pulse / desktop session) alive with a visible notification while XFCE is running." />
+        </service>
+
     </application>
 
 </manifest>

@@ -551,19 +551,27 @@ class MainActivity : ComponentActivity() {
                 // Show appropriate screen based on state
                 when (currentScreen) {
                     Screen.ONBOARDING -> {
-                        val showPrerequisites = remember { mutableStateOf(false) }
-                        if (!showPrerequisites.value) {
-                            com.ivarna.fluxlinux.ui.screens.OnboardingScreen(
-                                onGetStarted = { showPrerequisites.value = true }
-                            )
-                        } else {
-                            com.ivarna.fluxlinux.ui.screens.PrerequisitesScreen(
-                                onComplete = {
-                                    StateManager.setOnboardingComplete(this@MainActivity, true)
-                                    currentScreen = Screen.HOME
-                                }
-                            )
-                        }
+                        com.ivarna.fluxlinux.ui.onboarding.OnboardingFlowScreen(
+                            onFinished = {
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.HOME
+                            },
+                            onOpenTerminal = {
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.TERMINAL
+                            },
+                            onStartDesktop = { distroId ->
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.HOME
+                                // GUI flags owned by DesktopLauncher
+                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(
+                                    this@MainActivity, distroId
+                                )
+                            }
+                        )
                     }
                     Screen.HOME -> {
                         val hazeState = remember { HazeState() }
@@ -631,40 +639,15 @@ class MainActivity : ComponentActivity() {
                     Screen.INSTALL_WIZARD -> {
                          val hazeState = remember { HazeState() }
                          if (selectedDistro != null) {
+                             // Shared runner with onboarding: rootfs + XFCE + customization
+                             // for both proot and chroot (no feature modules).
                              com.ivarna.fluxlinux.ui.screens.InstallConfigScreen(
                                  distro = selectedDistro!!,
-                                 onBack = { currentScreen = Screen.HOME }, // Or Screen.DISTROS depending on where they came from? Let's just go Home for now or maintain history.
-                                 // Actually for simplicity, back goes to tab view.
+                                 onBack = { currentScreen = Screen.HOME },
                                  hazeState = hazeState,
-                                 onInstallStart = { components, theme, gpu, desktopEnv ->
-                                     // EMBEDDED INSTALL: build setup payload and run it in the
-                                     // in-app terminal (termux-flux-terminal / chroot-root-shell).
-                                     // No clipboard, no external Termux.
-                                     val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(this@MainActivity)
-                                     val baseSetup = try {
-                                         scriptManager.getScriptContent("debian/common/setup/setup_debian_family.sh")
-                                     } catch (_: Exception) {
-                                         ""
-                                     }
-                                     val envBlock = if (baseSetup.isNotEmpty()) {
-                                         "export FLUX_THEME='$theme'\nexport FLUX_GPU='$gpu'\nexport FLUX_DESKTOP_ENV='$desktopEnv'\n\n" +
-                                             baseSetup
-                                     } else {
-                                         ""
-                                     }
-                                     val setupB64 = if (envBlock.isNotEmpty()) {
-                                         android.util.Base64.encodeToString(
-                                             envBlock.toByteArray(),
-                                             android.util.Base64.NO_WRAP
-                                         )
-                                     } else {
-                                         null
-                                     }
-                                     startEmbeddedInstall(selectedDistro!!, setupB64) {
-                                         // M1: run wizard-selected components after base success
-                                         runComponentChain(selectedDistro!!, components, theme, gpu)
-                                     }
-                                     // Install session already switches to Terminal tab via openTerminalTab.
+                                 onInstallComplete = {
+                                     currentScreen = Screen.HOME
+                                     currentTab = BottomTab.HOME
                                  }
                              )
                          } else {
@@ -693,7 +676,9 @@ class MainActivity : ComponentActivity() {
                                        )
                                    },
                                    onReinstallDistro = {
-                                       startEmbeddedInstall(selectedDistro!!, null) { }
+                                       // Full base reinstall (rootfs + XFCE + customization)
+                                       // via InstallConfig / OnboardingInstallRunner — not rootfs-only.
+                                       currentScreen = Screen.INSTALL_WIZARD
                                    },
                                  onUninstallDistro = {
                                      // Embedded uninstall: proot → proot-distro remove in Flux
@@ -714,21 +699,19 @@ class MainActivity : ComponentActivity() {
                                   onStartActivity = onStartActivityStub,
                                   onNavigateToStart = { /* Not used in Settings, but if needed */ },
                                   onLaunchXfce = {
-                                      if (permissionState.status.isGranted) {
-                                          try {
-                                              val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildLaunchGuiIntent(this@MainActivity, selectedDistro!!.id)
-                                              onStartServiceStub(intent)
-                                          } catch (e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Launch XFCE4 failed", e)
-                                          }
-                                      } else {
-                                          permissionState.launchPermissionRequest()
+                                      try {
+                                          com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(
+                                              this@MainActivity, selectedDistro!!.id
+                                          )
+                                      } catch (e: Exception) {
+                                          android.util.Log.e("FluxLinux", "Launch XFCE4 failed", e)
                                       }
                                   },
                                   onStopXfce = {
                                       try {
-                                          val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildStopGuiIntent(this, selectedDistro!!.id)
-                                          onStartServiceStub(intent)
+                                          com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(
+                                              this@MainActivity, selectedDistro!!.id
+                                          )
                                       } catch (e: Exception) {
                                           android.util.Log.e("FluxLinux", "Stop XFCE4 failed", e)
                                       }

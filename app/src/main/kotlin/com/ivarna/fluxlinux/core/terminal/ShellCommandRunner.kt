@@ -82,15 +82,27 @@ object ShellCommandRunner {
     fun runCaptureExit(
         ctx: Context,
         cmd: Array<String>,
-        envMap: Map<String, String>? = null
+        envMap: Map<String, String>? = null,
+        /** Optional: store the live Process so callers can destroyForcibly on cancel. */
+        processHolder: java.util.concurrent.atomic.AtomicReference<Process?>? = null
     ): Pair<Int, String> {
         val pb = ProcessBuilder(*adjustHostCmd(cmd)); setHostCwd(pb, cmd)
         applyEnvironment(ctx, pb, envMap)
         pb.redirectErrorStream(true)
         val proc = pb.start()
-        val text = proc.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        val exit = proc.waitFor()
-        return exit to text
+        processHolder?.set(proc)
+        return try {
+            val text = proc.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val exit = try {
+                proc.waitFor()
+            } catch (_: InterruptedException) {
+                proc.destroyForcibly()
+                -1
+            }
+            exit to text
+        } finally {
+            processHolder?.compareAndSet(proc, null)
+        }
     }
 
     /** Runs a command and streams each output line to [onLine] on the main thread. */
