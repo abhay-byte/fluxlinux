@@ -43,6 +43,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.FluxLinux">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -59,6 +60,12 @@
 
         <service
             android:name=".core.service.InstallServerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Keep-alive during base desktop / onboarding install (rootfs + XFCE). -->
+        <service
+            android:name=".core.service.BaseInstallService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

@@ -10,6 +10,7 @@ import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * RootShell — Singleton for executing commands as root via KernelSU / Magisk su.
@@ -81,44 +82,104 @@ object RootShell {
      * Background thread only.
      *
      * @param timeoutMs 0 = wait forever; >0 kills process after timeout (exitCode -2).
+     * @param onLine optional live line callback (reader thread) for install UIs.
+     * @param processHolder optional live Process for cancel/destroyForcibly.
      * @return [CaptureResult] with exitCode -1 if no su / exception, -2 on timeout.
      */
-    fun captureResult(cmd: String, timeoutMs: Long = 0L): CaptureResult {
+    fun captureResult(
+        cmd: String,
+        timeoutMs: Long = 0L,
+        onLine: ((String) -> Unit)? = null,
+        processHolder: AtomicReference<Process?>? = null
+    ): CaptureResult {
         val inv = resolveSuInvocation() ?: return CaptureResult(-1, "")
         return try {
             val args = buildSuArgs(inv, cmd)
             val pb = ProcessBuilder(args).redirectErrorStream(true).start()
-            val outFuture = executor.submit<String> {
-                pb.inputStream.bufferedReader().use { it.readText() }
-            }
-            val finished = if (timeoutMs > 0L) {
-                pb.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            } else {
-                pb.waitFor()
-                true
-            }
-            if (!finished) {
-                pb.destroyForcibly()
-                val partial = try {
-                    outFuture.get(500, TimeUnit.MILLISECONDS)
-                } catch (_: Exception) {
-                    ""
+            processHolder?.set(pb)
+            try {
+                if (onLine != null) {
+                    // Stream lines while process runs (install progress).
+                    val sb = StringBuilder()
+                    val readerThread = Thread {
+                        try {
+                            pb.inputStream.bufferedReader().use { reader ->
+                                var line: String?
+                                while (reader.readLine().also { line = it } != null) {
+                                    val l = line ?: continue
+                                    synchronized(sb) { sb.append(l).append('\n') }
+                                    try {
+                                        onLine(l)
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }.also { it.isDaemon = true; it.start() }
+
+                    val finished = if (timeoutMs > 0L) {
+                        pb.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                    } else {
+                        pb.waitFor()
+                        true
+                    }
+                    if (!finished) {
+                        pb.destroyForcibly()
+                        try {
+                            readerThread.join(500)
+                        } catch (_: Exception) {
+                        }
+                        Log.w(TAG, "capture timeout after ${timeoutMs}ms cmd=${cmd.take(80)}")
+                        val partial = synchronized(sb) { sb.toString() }
+                        return CaptureResult(-2, partial)
+                    }
+                    try {
+                        readerThread.join(5_000)
+                    } catch (_: Exception) {
+                    }
+                    val code = try {
+                        pb.exitValue()
+                    } catch (_: Exception) {
+                        -1
+                    }
+                    CaptureResult(code, synchronized(sb) { sb.toString() })
+                } else {
+                    val outFuture = executor.submit<String> {
+                        pb.inputStream.bufferedReader().use { it.readText() }
+                    }
+                    val finished = if (timeoutMs > 0L) {
+                        pb.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                    } else {
+                        pb.waitFor()
+                        true
+                    }
+                    if (!finished) {
+                        pb.destroyForcibly()
+                        val partial = try {
+                            outFuture.get(500, TimeUnit.MILLISECONDS)
+                        } catch (_: Exception) {
+                            ""
+                        }
+                        Log.w(TAG, "capture timeout after ${timeoutMs}ms cmd=${cmd.take(80)}")
+                        return CaptureResult(-2, partial)
+                    }
+                    val out = try {
+                        outFuture.get(5, TimeUnit.SECONDS)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "capture read failed: ${e.message}")
+                        ""
+                    }
+                    val code = try {
+                        pb.exitValue()
+                    } catch (_: Exception) {
+                        -1
+                    }
+                    CaptureResult(code, out)
                 }
-                Log.w(TAG, "capture timeout after ${timeoutMs}ms cmd=${cmd.take(80)}")
-                return CaptureResult(-2, partial)
+            } finally {
+                processHolder?.compareAndSet(pb, null)
             }
-            val out = try {
-                outFuture.get(5, TimeUnit.SECONDS)
-            } catch (e: Exception) {
-                Log.w(TAG, "capture read failed: ${e.message}")
-                ""
-            }
-            val code = try {
-                pb.exitValue()
-            } catch (_: Exception) {
-                -1
-            }
-            CaptureResult(code, out)
         } catch (e: Exception) {
             Log.w(TAG, "capture failed: ${e.message}")
             CaptureResult(-1, "")
@@ -348,7 +409,9 @@ object RootShell {
         user: String = "flux",
         chrootPath: String = ChrootPaths.CHROOT_PATH,
         timeoutMs: Long = 60_000L,
-        context: Context? = null
+        context: Context? = null,
+        onLine: ((String) -> Unit)? = null,
+        processHolder: AtomicReference<Process?>? = null
     ): CaptureResult {
         context?.let { ensureChrootHelper(it) }
         val u = if (user == "root") "root" else "flux"
@@ -356,7 +419,12 @@ object RootShell {
             cmd.toByteArray(Charsets.UTF_8),
             android.util.Base64.NO_WRAP
         )
-        return captureResult(buildChrootHelperCmd(u, b64, chrootPath), timeoutMs)
+        return captureResult(
+            buildChrootHelperCmd(u, b64, chrootPath),
+            timeoutMs,
+            onLine = onLine,
+            processHolder = processHolder
+        )
     }
 
     /**

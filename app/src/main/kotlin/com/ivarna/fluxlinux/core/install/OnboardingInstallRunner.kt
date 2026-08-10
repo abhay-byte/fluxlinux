@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.ivarna.fluxlinux.core.root.RootShell
+import com.ivarna.fluxlinux.core.service.BaseInstallService
 import com.ivarna.fluxlinux.core.terminal.HostCommandBuilder
 import com.ivarna.fluxlinux.core.terminal.ShellCommandRunner
 import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
@@ -46,10 +47,15 @@ class OnboardingInstallRunner(private val ctx: Context) {
     private val generation = AtomicInteger(0)
     private val activeProcess = AtomicReference<Process?>(null)
     private val busy = AtomicBoolean(false)
+    /** Throttle FGS notification updates (percent/label change only). */
+    @Volatile private var lastNotifPercent: Int = -1
+    @Volatile private var lastNotifLabel: String = ""
 
     fun cancel() {
         cancelled.set(true)
         activeProcess.getAndSet(null)?.destroyForcibly()
+        // Drop keep-alive when user aborts (also safe if FGS was never started)
+        BaseInstallService.stop(appCtx)
     }
 
     fun isBusy(): Boolean = busy.get()
@@ -57,6 +63,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
     /**
      * Start (or restart) install. If a previous job is still running, it is cancelled
      * and the new job is queued on the single-thread executor.
+     *
+     * Starts [BaseInstallService] FGS immediately so the system does not kill the
+     * process during long rootfs / package work.
      */
     fun start(
         distroId: String,
@@ -72,6 +81,19 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val method = BaseDesktopInstallPlan.methodFor(distroId)
         val phases = BaseDesktopInstallPlan.phasesFor(method)
         busy.set(true)
+        lastNotifPercent = -1
+        lastNotifLabel = ""
+        // FGS first — before any long work — so backgrounding mid-install is safe
+        try {
+            BaseInstallService.start(
+                appCtx,
+                title = "FluxLinux — Installing",
+                text = if (method == "chroot") "Debian chroot base desktop" else "Debian proot base desktop",
+                percent = 0
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "BaseInstallService.start failed", e)
+        }
         executor.execute {
             try {
                 if (isStale(gen)) {
@@ -93,6 +115,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             } finally {
                 if (generation.get() == gen) {
                     busy.set(false)
+                    BaseInstallService.stop(appCtx)
                 }
             }
         }
@@ -120,10 +143,15 @@ class OnboardingInstallRunner(private val ctx: Context) {
     ) {
         enter(phases, 0, onProgress, "Extracting bootstrap + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
+        var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
             if (isStale(gen)) return@prepareHostBlocking
             val frac = if (total > 0) done.toFloat() / total else 0f
             updateFraction(phases, 0, frac, onProgress, phase)
+            if (phase.isNotBlank() && phase != lastHostPhase) {
+                lastHostPhase = phase
+                log(phases, 0, onProgress, phase)
+            }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!hostOk) {
@@ -137,17 +165,22 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val bash = TermuxHostPaths.libBash(appCtx).absolutePath
         val installScript = TermuxHostPaths.hostScript(appCtx, "flux_install.sh").absolutePath
         val setupB64 = BaseDesktopInstallPlan.familySetupB64(appCtx, theme)
-        val env = HostCommandBuilder.envMap(appCtx, forceHostSetup = false, includeTerm = false)
-        val (exitInstall, outInstall) = ShellCommandRunner.runCaptureExit(
+        val env = HostCommandBuilder.envMap(appCtx, forceHostSetup = false, includeTerm = false).apply {
+            put("PYTHONUNBUFFERED", "1")
+        }
+        // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
+        // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
+        // and fails with EACCES (error 13). Stream lines as the pipe delivers them.
+        val (exitInstall, _) = ShellCommandRunner.runCaptureExit(
             appCtx,
             arrayOf(bash, installScript, "debian", setupB64),
             env,
-            processHolder = activeProcess
+            processHolder = activeProcess,
+            onLine = { line ->
+                if (!isStale(gen) && line.isNotBlank()) log(phases, 1, onProgress, line)
+            }
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
-        outInstall.lineSequence().forEach { line ->
-            if (line.isNotBlank()) log(phases, 1, onProgress, line)
-        }
         if (exitInstall != 0) {
             postFail(onProgress, phases, "Debian install failed (exit $exitInstall)")
             return
@@ -208,10 +241,15 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, 1, onProgress, "Extracting bootstrap + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
+        var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
             if (isStale(gen)) return@prepareHostBlocking
             val frac = if (total > 0) done.toFloat() / total else 0f
             updateFraction(phases, 1, frac, onProgress, phase)
+            if (phase.isNotBlank() && phase != lastHostPhase) {
+                lastHostPhase = phase
+                log(phases, 1, onProgress, phase)
+            }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!hostOk) {
@@ -225,16 +263,22 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val staged = RootShell.stageAsset(appCtx, "scripts/chroot/setup_debian13_chroot.sh")
             ?: TermuxHostPaths.hostScript(appCtx, "setup_debian13_chroot.sh").absolutePath
         val envHome = TermuxHostPaths.HOME
+        // Do not wrap with $PREFIX/bin/stdbuf — host W^X denies exec from app data.
         val rootCmd =
             "export FLUX_ROOTFS_PATH='$envHome/debian_13_rootfs.tar.xz'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +
                 "export TERMUX__HOME='$envHome'; " +
+                "export PYTHONUNBUFFERED=1; " +
                 "sh '$staged'"
-        val rootResult = RootShell.captureResult(rootCmd, timeoutMs = 0L)
+        val rootResult = RootShell.captureResult(
+            rootCmd,
+            timeoutMs = 0L,
+            onLine = { line ->
+                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+            },
+            processHolder = activeProcess
+        )
         if (abortIfCancelled(gen, phases, onProgress)) return
-        rootResult.stdout.lineSequence().forEach { line ->
-            if (line.isNotBlank()) log(phases, 2, onProgress, line)
-        }
         val installed = TerminalLauncher.isDebianChrootInstalled()
         if (rootResult.exitCode != 0) {
             postFail(onProgress, phases, "Chroot install failed (exit ${rootResult.exitCode})")
@@ -302,19 +346,25 @@ class OnboardingInstallRunner(private val ctx: Context) {
             }
             dest.setExecutable(true)
             val bash = TermuxHostPaths.libBash(appCtx).absolutePath
+            // libbash.so only — never prefix stdbuf (W^X EACCES on $PREFIX/bin)
             val cmd = arrayOf(
                 bash, "-c",
                 "exec python ${TermuxHostPaths.PROOT_DISTRO} login debian --shared-tmp -- " +
-                    "env $envPrefix bash /tmp/$name"
+                    "env $envPrefix PYTHONUNBUFFERED=1 bash /tmp/$name"
             )
-            val env = HostCommandBuilder.envMap(appCtx, includeTerm = false)
-            val (exit, out) = ShellCommandRunner.runCaptureExit(
-                appCtx, cmd, env, processHolder = activeProcess
+            val env = HostCommandBuilder.envMap(appCtx, includeTerm = false).apply {
+                put("PYTHONUNBUFFERED", "1")
+            }
+            val (exit, _) = ShellCommandRunner.runCaptureExit(
+                appCtx, cmd, env,
+                processHolder = activeProcess,
+                onLine = { line ->
+                    if (!isStale(gen) && line.isNotBlank()) {
+                        log(phases, phaseIndex, onProgress, line)
+                    }
+                }
             )
             if (isStale(gen)) return false
-            out.lineSequence().forEach { line ->
-                if (line.isNotBlank()) log(phases, phaseIndex, onProgress, line)
-            }
             exit == 0
         } catch (e: Exception) {
             if (!isStale(gen)) {
@@ -337,11 +387,19 @@ class OnboardingInstallRunner(private val ctx: Context) {
         )
         val guest =
             "echo '$b64' | base64 -d > /tmp/flux_onboard.sh && chmod +x /tmp/flux_onboard.sh && " +
-                "bash /tmp/flux_onboard.sh; RC=\$?; rm -f /tmp/flux_onboard.sh; exit \$RC"
-        val result = RootShell.captureInChroot(guest, user = user, context = appCtx, timeoutMs = 0L)
-        result.stdout.lineSequence().forEach { line ->
-            if (line.isNotBlank()) log(phases, phaseIndex, onProgress, line)
-        }
+                "export PYTHONUNBUFFERED=1; " +
+                "bash /tmp/flux_onboard.sh; " +
+                "RC=\$?; rm -f /tmp/flux_onboard.sh; exit \$RC"
+        val result = RootShell.captureInChroot(
+            guest,
+            user = user,
+            context = appCtx,
+            timeoutMs = 0L,
+            onLine = { line ->
+                if (line.isNotBlank()) log(phases, phaseIndex, onProgress, line)
+            },
+            processHolder = activeProcess
+        )
         return result.exitCode
     }
 
@@ -362,7 +420,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseIndex = index,
                 phaseCount = phases.size,
                 overallPercent = weightedPercent(phases, index, 0f),
-                detail = detail
+                detail = detail,
+                logLine = "── ${p.label}: $detail"
             )
         )
     }
@@ -382,7 +441,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseIndex = index,
                 phaseCount = phases.size,
                 overallPercent = weightedPercent(phases, index, 1f),
-                detail = detail
+                detail = detail,
+                logLine = "✓ $detail"
             )
         )
     }
@@ -493,7 +553,41 @@ class OnboardingInstallRunner(private val ctx: Context) {
     }
 
     private fun post(onProgress: (Progress) -> Unit, progress: Progress) {
-        main.post { onProgress(progress) }
+        main.post {
+            onProgress(progress)
+            updateInstallNotification(progress)
+        }
+    }
+
+    private fun updateInstallNotification(progress: Progress) {
+        val label = when {
+            progress.failed -> "Install failed"
+            progress.finished -> "Install complete"
+            progress.phaseLabel.isNotBlank() -> progress.phaseLabel
+            else -> "Installing…"
+        }
+        val detail = progress.detail.ifBlank { "Base desktop setup" }
+        val percent = progress.overallPercent
+        // Avoid spamming NotificationManager on every log line
+        if (!progress.finished &&
+            !progress.failed &&
+            percent == lastNotifPercent &&
+            label == lastNotifLabel
+        ) {
+            return
+        }
+        lastNotifPercent = percent
+        lastNotifLabel = label
+        try {
+            BaseInstallService.update(
+                appCtx,
+                title = "FluxLinux — $label",
+                text = detail,
+                percent = percent
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "FGS update failed: ${e.message}")
+        }
     }
 
     private fun isProotXfceInstalled(ctx: Context): Boolean =

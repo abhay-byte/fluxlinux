@@ -396,9 +396,18 @@ if [ -d "$USER_HOME/.oh-my-zsh" ] && [ ! -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh"
     rm -rf "$USER_HOME/.oh-my-zsh"
 fi
 
-# Install Oh My Zsh if missing
-if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
-    su -s /bin/bash - "$CUSTOM_USER" -c 'RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"' 2>/dev/null
+# Install Oh My Zsh if missing (curl installer, then git clone fallback)
+if [ ! -d "$USER_HOME/.oh-my-zsh" ] || [ ! -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    rm -rf "$USER_HOME/.oh-my-zsh"
+    su -s /bin/bash - "$CUSTOM_USER" -c 'RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"' 2>/dev/null || true
+fi
+if [ ! -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    echo "FluxLinux: Oh My Zsh installer failed — trying git clone fallback..."
+    rm -rf "$USER_HOME/.oh-my-zsh"
+    su -s /bin/bash - "$CUSTOM_USER" -c "git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git '$USER_HOME/.oh-my-zsh'" 2>/dev/null || true
+fi
+if [ ! -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    echo "FluxLinux: WARNING: Oh My Zsh not installed — .zshrc will skip source (no hard fail)"
 fi
 
 ZSH_CUSTOM="$USER_HOME/.oh-my-zsh/custom"
@@ -433,6 +442,7 @@ ZSHRC="$USER_HOME/.zshrc"
 # - DISABLE_AUTO_UPDATE / DISABLE_UPDATE_PROMPT (no prompts on launch)
 # - ZSH_DISABLE_COMPFIX (no compaudit, faster init)
 echo "FluxLinux: Writing optimized .zshrc..."
+# Defensive: never hard-fail on missing oh-my-zsh / pokemon (network installs often skip).
 cat > "$ZSHRC" << 'ZSHEOF'
 # PATH setup - local bin, npm global modules
 export PATH="$HOME/.local/bin:/opt/nodejs/bin:$PATH"
@@ -444,20 +454,27 @@ export LC_ALL=en_US.UTF-8
 # Fix XDG_RUNTIME_DIR (not set in PRoot/chroot — no systemd-logind)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 
-# Background visuals - don't block shell startup
-{ fastfetch --config termux; pokemon-colorscripts --no-title -r 1,2,3 } &!
+# Background visuals - don't block shell startup; skip missing tools (no error spam)
+{
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+  fi
+  if command -v pokemon-colorscripts >/dev/null 2>&1; then
+    pokemon-colorscripts --no-title -r 1,2,3 2>/dev/null || true
+  fi
+} &!
 
-# oh-my-zsh optimizations
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="agnosterzak"
-DISABLE_UPDATE_PROMPT=true
-DISABLE_AUTO_UPDATE=true
-ZSH_DISABLE_COMPFIX=true
-
-# Removed zsh-autocomplete (very slow), kept essential plugins
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
-
-source $ZSH/oh-my-zsh.sh
+# oh-my-zsh (optional — install may fail offline; shell still usable without it)
+export ZSH="${ZSH:-$HOME/.oh-my-zsh}"
+if [ -f "$ZSH/oh-my-zsh.sh" ]; then
+  ZSH_THEME="agnosterzak"
+  DISABLE_UPDATE_PROMPT=true
+  DISABLE_AUTO_UPDATE=true
+  ZSH_DISABLE_COMPFIX=true
+  # Removed zsh-autocomplete (very slow), kept essential plugins
+  plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+  source "$ZSH/oh-my-zsh.sh"
+fi
 ZSHEOF
 chown "$CUSTOM_USER:$CUSTOM_GROUP" "$ZSHRC"
 

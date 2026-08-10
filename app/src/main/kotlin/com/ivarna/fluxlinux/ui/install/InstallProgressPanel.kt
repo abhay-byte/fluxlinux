@@ -23,6 +23,7 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +53,18 @@ fun InstallProgressPanel(
     isDone: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val logScroll = rememberScrollState()
+    LaunchedEffect(logText) {
+        if (logText.isNotEmpty()) {
+            logScroll.animateScrollTo(logScroll.maxValue)
+        }
+    }
+
+    // Dark theme primary is near-black (filled buttons); TextButtons need cream/secondary.
+    val linkColor = MaterialTheme.colorScheme.secondary
+    val bodyColor = MaterialTheme.colorScheme.onSurface
+    val mutedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -61,7 +74,7 @@ fun InstallProgressPanel(
             if (failed) "Setup failed" else if (isDone) "Install complete" else "Setting up environment",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = bodyColor
         )
         Spacer(Modifier.height(16.dp))
 
@@ -82,9 +95,9 @@ fun InstallProgressPanel(
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
         Spacer(Modifier.height(12.dp))
-        Text(phaseLabel, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(phaseLabel, fontWeight = FontWeight.SemiBold, color = bodyColor)
         if (detail.isNotBlank()) {
-            Text(detail, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(detail, fontSize = 13.sp, color = mutedColor)
         }
         if (failed && errorMessage != null) {
             Spacer(Modifier.height(8.dp))
@@ -92,8 +105,14 @@ fun InstallProgressPanel(
         }
 
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onToggleLog) {
-            Text(if (showLog) "Hide log" else "Show log")
+        TextButton(
+            onClick = onToggleLog,
+            colors = ButtonDefaults.textButtonColors(contentColor = linkColor)
+        ) {
+            Text(
+                if (showLog) "Hide log" else "Show log",
+                fontWeight = FontWeight.SemiBold
+            )
         }
 
         if (showLog) {
@@ -103,14 +122,17 @@ fun InstallProgressPanel(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFF0A0A0C))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                     .padding(12.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(logScroll)
             ) {
                 Text(
                     logText.ifBlank { "Waiting for output…" },
-                    color = Color(0xFFB0BEC5),
+                    // High-contrast on near-black log surface (not theme onSurfaceVariant)
+                    color = if (logText.isBlank()) Color(0xFF90A4AE) else Color(0xFFE0E6EB),
                     fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 15.sp
                 )
             }
         } else {
@@ -123,14 +145,21 @@ fun InstallProgressPanel(
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary
+                    ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Retry", fontWeight = FontWeight.Bold)
                 }
                 if (onBack != null) {
-                    TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                        Text("Back")
+                    TextButton(
+                        onClick = onBack,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = linkColor)
+                    ) {
+                        Text("Back", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -138,7 +167,10 @@ fun InstallProgressPanel(
                 Button(
                     onClick = onDone,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary
+                    ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Done", fontWeight = FontWeight.Bold)
@@ -176,8 +208,16 @@ fun InstallThemePickRow(
             colors = RadioButtonDefaults.colors(selectedColor = FluxAccentMagenta)
         )
         Column {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text(desc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                desc,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+            )
         }
     }
 }

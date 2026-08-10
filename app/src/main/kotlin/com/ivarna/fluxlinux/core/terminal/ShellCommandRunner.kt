@@ -78,13 +78,22 @@ object ShellCommandRunner {
         return text
     }
 
-    /** Blocking capture with exit code (call from bg thread). */
+    /**
+     * Blocking capture with exit code (call from bg thread).
+     *
+     * When [onLine] is set, each stdout/stderr line is delivered as it arrives
+     * (same thread as the caller) so install UIs can show live logs.
+     * Note: do not wrap with $PREFIX/bin/stdbuf — W^X (targetSdk 36) denies
+     * exec from app-data prefix (EACCES). Host argv0 must be nativeLibraryDir.
+     */
     fun runCaptureExit(
         ctx: Context,
         cmd: Array<String>,
         envMap: Map<String, String>? = null,
         /** Optional: store the live Process so callers can destroyForcibly on cancel. */
-        processHolder: java.util.concurrent.atomic.AtomicReference<Process?>? = null
+        processHolder: java.util.concurrent.atomic.AtomicReference<Process?>? = null,
+        /** Optional: live line callback (bg thread). */
+        onLine: ((String) -> Unit)? = null
     ): Pair<Int, String> {
         val pb = ProcessBuilder(*adjustHostCmd(cmd)); setHostCwd(pb, cmd)
         applyEnvironment(ctx, pb, envMap)
@@ -92,7 +101,29 @@ object ShellCommandRunner {
         val proc = pb.start()
         processHolder?.set(proc)
         return try {
-            val text = proc.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            // Close stdin so interactive scripts (`read -p "Press Enter…"`) get EOF
+            // instead of hanging forever under onboarding / non-TTY ProcessBuilder.
+            try {
+                proc.outputStream.close()
+            } catch (_: Exception) {
+            }
+            val text = if (onLine != null) {
+                val sb = StringBuilder()
+                proc.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        val l = line ?: continue
+                        sb.append(l).append('\n')
+                        try {
+                            onLine(l)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+                sb.toString()
+            } else {
+                proc.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }
             val exit = try {
                 proc.waitFor()
             } catch (_: InterruptedException) {

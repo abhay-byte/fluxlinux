@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -47,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -146,11 +149,20 @@ fun TerminalScreen(
         }
     }
 
+    // When the soft keyboard is open, lift ExtraKeys above the IME (nativecode pads by
+    // ime.bottom). Drop the fixed bottom-nav spacer while IME is visible so we do not
+    // double-pad and leave a dead gap between toolbar and keyboard.
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val imeOpen = imeBottomPx > 0
+    val navBottomPad = if (embeddedInBottomNav && !imeOpen) 120.dp else 0.dp
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .then(if (embeddedInBottomNav) Modifier.padding(bottom = 120.dp) else Modifier)
+            .imePadding()
+            .padding(bottom = navBottomPad)
     ) {
         Row(
             modifier = Modifier

@@ -258,7 +258,8 @@ Fix these before treating the plan as fully closed. Prefer before or during T6.
 | **R3** | bug (UX) | `TerminalScreen.kt` `openCard` | Failures (max tabs, open fail) all toast as `"Host bootstrap failed"` / `"Chroot session failed"`. | Differentiate prepare fail vs open fail vs tab limit (`SessionOpenResult`). | **FIXED** |
 | **R4** | suggestion | Host open path | Host shell skips `prepareHost`; weak failure if bootstrap missing. | Probe `libbash` / prepare host; toast `"Host not ready"`. | **FIXED** |
 | **R5** | suggestion | `TerminalExtraKeys` | Locked mods look same as one-shot active. | Distinct locked style (outline / badge). | **FIXED** |
-| **R6** | nit | Icons | Shared Debian webp for all guest cards; no `assets/images/cli/`. | Optional distinct art later; non-blocking. | Deferred (user: reuse Flux distro icons) |
+| **R6** | nit | Icons | Shared Debian webp for all guest cards; no `assets/images/cli/`. | Optional distinct art later; non-blocking. |
+| **R7** | bug (device) | `.zshrc` / ExtraKeys | (1) Hard `source oh-my-zsh` + bare `pokemon-colorscripts` spam when network install skipped. (2) Soft keyboard covered ExtraKeys toolbar. | **Fixed:** defensive zshrc in customization scripts + `GuestZshrcRepair` on session open; `imePadding` + `adjustResize` + drop nav pad while IME open. | Deferred (user: reuse Flux distro icons) |
 
 ---
 

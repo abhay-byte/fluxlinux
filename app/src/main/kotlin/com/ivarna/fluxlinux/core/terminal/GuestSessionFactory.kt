@@ -24,6 +24,8 @@ object GuestSessionFactory {
         method: String
     ): Boolean {
         if (!SessionRegistry.hasFreeTab()) return false
+        // Patch guest .zshrc if it still hard-sources missing oh-my-zsh / pokemon.
+        GuestZshrcRepair.repairIfNeeded(ctx, method)
         val user = LinuxCommandBuilder.sessionUserForType(type)
         val (args, envMap) = LinuxCommandBuilder.build(ctx, shellCmd, user = user, method = method)
 

@@ -278,13 +278,22 @@ private fun DistroPickPage(
 
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = onBack, modifier = Modifier.weight(1f)) {
-                Text("Back")
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("Back", fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = onNext,
                 modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Continue", fontWeight = FontWeight.Bold)
@@ -431,13 +440,23 @@ private fun OptionsPage(
 
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = onBack, modifier = Modifier.weight(1f)) {
-                Text("Back")
+            // Dark primary is near-black — TextButton default contentColor is unreadable.
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("Back", fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = onInstall,
                 modifier = Modifier.weight(1f).height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Install", fontWeight = FontWeight.Bold)
@@ -506,7 +525,11 @@ private fun PrimaryButton(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        // Cream secondary on dark = high contrast (primary is near-black in dark theme)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary
+        ),
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(label, fontWeight = FontWeight.Bold, fontSize = 17.sp)
