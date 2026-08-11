@@ -1,0 +1,86 @@
+# Full host bootstrap packages for FluxLinux native terminal (termux-lib parity).
+# One package name per line. Comments and blank lines ignored.
+# For *building*: prefer termux-lib-ssot seeds; note subpackages are produced by parents:
+#   curl <- libcurl, xz-utils <- liblzma, flac <- libflac, libltdl <- libtool
+# Assemble with: --list termux-lib-ssot.txt (exact termux-lib PACKAGES names)
+
+# Shell & core
+bash
+termux-exec
+coreutils
+findutils
+grep
+sed
+gawk
+psmisc
+procps
+tar
+xz-utils
+gzip
+less
+diffutils
+
+# Net / TLS
+curl
+libcurl
+ca-certificates
+openssl
+libnghttp2
+libssh2
+libidn2
+libunistring
+zlib
+libiconv
+brotli
+
+# Proot stack
+proot
+proot-distro
+libtalloc
+python
+
+# Termux plumbing
+termux-tools
+termux-am
+
+# Audio (X11 guest)
+pulseaudio
+libandroid-shmem
+libsndfile
+libvorbis
+libogg
+flac
+libopus
+speexdsp
+dbus
+
+# XKB
+xkeyboard-config
+
+# Base libs commonly required by the above
+libandroid-support
+readline
+ncurses
+libc++
+libgmp
+liblzma
+pcre2
+libffi
+glib
+libexpat
+libltdl
+libcap
+libcap-ng
+libevent
+libsqlite
+libbz2
+gdbm
+libandroid-selinux
+libandroid-glob
+libacl
+libx11
+libxau
+libxcb
+libxdmcp
+libunbound
+libnettle

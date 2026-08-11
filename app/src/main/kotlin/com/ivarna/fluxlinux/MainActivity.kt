@@ -46,10 +46,14 @@ enum class Screen {
     PREREQUISITES,
     HOME,
     SETTINGS,
+    SETTINGS_TERMINAL,
+    SETTINGS_X11,
+    SETTINGS_CHROOT,
     TROUBLESHOOTING,
     ROOT_ACCESS,
     INSTALL_WIZARD,
-    DISTRO_SETTINGS
+    DISTRO_SETTINGS,
+    TERMINAL
 }
 
 class MainActivity : ComponentActivity() {
@@ -57,7 +61,20 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         handleScriptCallback(intent)
+        if (intent.getStringExtra("EXTRA_TARGET_PAGE") == "terminal") {
+            // FGS notification tap → jump to in-app terminal (bottom-nav tab)
+            setIntent(intent)
+            lifecycleScope.launch { }
+            currentScreenRef?.value = Screen.HOME
+            currentTabRef?.value = BottomTab.TERMINAL
+        }
     }
+
+    /** Screen state holder set by onCreate (used by FGS notification tap). */
+    private var currentScreenRef: kotlinx.coroutines.flow.MutableStateFlow<Screen>? = null
+
+    /** Bottom-tab holder so FGS / external intents can select Terminal. */
+    private var currentTabRef: kotlinx.coroutines.flow.MutableStateFlow<BottomTab>? = null
 
     private fun handleScriptCallback(intent: android.content.Intent) {
         android.util.Log.d("FluxLinux", "handleScriptCallback called with action: ${intent.action}, data: ${intent.data}")
@@ -159,70 +176,199 @@ class MainActivity : ComponentActivity() {
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    private fun processNextInstallTask() {
-        val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-        if (!queueManager.hasPending()) {
-            android.widget.Toast.makeText(this, "All Installation Steps Complete! 🎉", android.widget.Toast.LENGTH_LONG).show()
-            
-            // Mark Distro Installed
-            val distroId = queueManager.activeDistroId
-            if (distroId != null) {
-                com.ivarna.fluxlinux.core.utils.StateManager.setDistroInstalled(this, distroId, true)
-                // Trigger UI refresh via StateFlow
-                com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
-            }
-            
-            queueManager.clear()
-            // Reset Progress UI state effectively done by clear()
-            return
-        }
+    /**
+     * Component chain after a successful base install (M1): runs the wizard's
+     * selected components sequentially in the parent distro's terminal component.
+     * Each step only advances after the previous session exits 0 (B3 gate).
+     */
+    private fun runComponentChain(
+        distro: com.ivarna.fluxlinux.core.data.Distro,
+        components: List<com.ivarna.fluxlinux.core.data.DistroComponent>,
+        theme: String,
+        gpu: String
+    ) {
+        if (components.isEmpty()) return
+        runComponentStep(distro, components, 0, theme, gpu)
+    }
 
-        val nextTask = queueManager.next() ?: return // advances queue state internal
-        
-        // Log Update
-        android.util.Log.d("FluxLinux", "Processing Task: ${nextTask.name}")
-        
-        android.widget.Toast.makeText(this, "Starting: ${nextTask.name}...", android.widget.Toast.LENGTH_SHORT).show()
-        
-        if (nextTask.type == com.ivarna.fluxlinux.core.utils.TaskType.HW_ACCEL || nextTask.type == com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT) {
-            val scriptName = nextTask.scriptName
-            val distroId = nextTask.distroId
-            
-            if (scriptName != null) {
-                // Fetch Script Content
-                // We need ScriptManager. Since we are in Activity, we can instantiate it.
+    private fun isCustomizationComponent(component: com.ivarna.fluxlinux.core.data.DistroComponent): Boolean =
+        component.id == "customization" || component.id == "kde_customization" ||
+            component.scriptName.contains("setup_customization")
+
+    /**
+     * Host-stage theme/icons + Oh My Zsh into the proot rootfs before guest
+     * customization runs. Distro Settings used to skip this (only onboarding
+     * did), so guest hung on missing git / corrupt OMZ rm. Merges skip flags
+     * into [extraEnv]. Safe to call off the main thread.
+     */
+    private fun stageCustomizationHostEnv(
+        activity: android.content.Context,
+        extraEnv: Map<String, String>
+    ): Map<String, String> {
+        val theme = extraEnv["FLUX_THEME"] ?: "dark"
+        val merged = extraEnv.toMutableMap()
+        try {
+            val themeOk = com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.install(
+                activity, theme
+            ) { line ->
+                android.util.Log.i("FluxLinux", "Host theme: $line")
+            }
+            if (themeOk) merged["FLUX_SKIP_THEME_ICONS"] = "1"
+        } catch (e: Exception) {
+            android.util.Log.w("FluxLinux", "Host theme stage failed", e)
+        }
+        try {
+            val omzOk = com.ivarna.fluxlinux.core.install.ProotZshBootstrap.install(activity) { line ->
+                android.util.Log.i("FluxLinux", "Host OMZ: $line")
+            }
+            if (omzOk) merged["FLUX_SKIP_OMZ"] = "1"
+        } catch (e: Exception) {
+            android.util.Log.w("FluxLinux", "Host OMZ stage failed", e)
+        }
+        // Default: skip pokemon (gitlab often stalls under proot)
+        if (!merged.containsKey("FLUX_SKIP_POKEMON")) {
+            merged["FLUX_SKIP_POKEMON"] = "1"
+        }
+        return merged
+    }
+
+    private fun runComponentStep(
+        distro: com.ivarna.fluxlinux.core.data.Distro,
+        components: List<com.ivarna.fluxlinux.core.data.DistroComponent>,
+        index: Int,
+        theme: String,
+        gpu: String
+    ) {
+        if (index >= components.size) return
+        val component = components[index]
+        val baseEnv = if (component.id == "hw_accel") {
+            mapOf("FLUX_GPU" to gpu)
+        } else {
+            mapOf("FLUX_THEME" to theme)
+        }
+        fun openWith(extraEnv: Map<String, String>) {
+            val scriptContent = try {
                 val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(this)
-                var scriptContent = scriptManager.getScriptContent(scriptName)
-                
-                // Inject Environment Variables from Task
-                if (nextTask.extraEnv.isNotEmpty()) {
-                    val envBlock = nextTask.extraEnv.entries.joinToString("\n") { "export ${it.key}=\"${it.value}\"" }
-                    // Prepend to script content
-                    scriptContent = "$envBlock\n\n$scriptContent"
+                val envBlock = extraEnv.entries.joinToString("\n") {
+                    "export ${it.key}=\"${it.value}\""
                 }
-                
-                // Build Intent with Callback
-                val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildRunFeatureScriptIntent(
-                    distroId = distroId,
-                    scriptContent = scriptContent,
-                    callbackName = nextTask.id,
-                    isUninstall = nextTask.isUninstall
-                )
-                
-                try {
-                    startService(intent) // or startActivity depending on IntentFactory implementation.
-                    // buildRunFeatureScriptIntent returns RunCommandService intent?
-                    // No, TermuxIntentFactory returns Intent for RUN_COMMAND usually.
-                    // Actually buildRunCommandIntent uses 'com.termux.permission.RUN_COMMAND'.
-                    // So startService is correct IF it targets Termux Service, 
-                    // BUT for Termux RUN_COMMAND we usually use startService.
-                    // However, my stub 'onStartServiceStub' used startService.
-                } catch (e: Exception) {
-                    android.util.Log.e("FluxLinux", "Failed to start task: ${nextTask.name}", e)
-                    android.widget.Toast.makeText(this, "Failed to start ${nextTask.name}", android.widget.Toast.LENGTH_SHORT).show()
+                val base = scriptManager.getScriptContent(component.scriptName)
+                if (extraEnv.isNotEmpty()) "$envBlock\n\n$base" else base
+            } catch (e: Exception) {
+                android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
+                null
+            }
+            if (scriptContent == null) {
+                runComponentStep(distro, components, index + 1, theme, gpu)
+                return
+            }
+            val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
+                this,
+                distro = distro,
+                scriptContent = scriptContent,
+                title = component.name,
+                extraEnv = extraEnv,
+                isUninstall = false,
+                onFinished = {
+                    com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
+                        this, distro.id, component.id, true
+                    )
+                    com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                    runComponentStep(distro, components, index + 1, theme, gpu)
                 }
+            )
+            if (!opened) {
+                android.widget.Toast.makeText(
+                    this, "Max tabs reached — ${component.name} skipped (retry in Distro Settings)",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                runComponentStep(distro, components, index + 1, theme, gpu)
             }
         }
+        if (isCustomizationComponent(component)) {
+            Thread {
+                val env = stageCustomizationHostEnv(this, baseEnv)
+                runOnUiThread { openWith(env) }
+            }.start()
+        } else {
+            openWith(baseEnv)
+        }
+    }
+
+    /**
+     * Embedded component install/uninstall: run the component script inside the
+     * guest via the parent distro's terminal component (proot session or chroot
+     * SSOT helper). Marks state when the session finishes.
+     */
+    private fun runEmbeddedComponent(
+        activity: MainActivity,
+        distro: com.ivarna.fluxlinux.core.data.Distro,
+        component: com.ivarna.fluxlinux.core.data.DistroComponent,
+        extraEnv: Map<String, String>,
+        isUninstall: Boolean,
+        onOpenTerminalScreen: () -> Unit = {}
+    ) {
+        com.ivarna.fluxlinux.core.terminal.TerminalLauncher.prepareHost(activity) { ok ->
+            if (!ok) {
+                android.widget.Toast.makeText(
+                    activity, "Host bootstrap not ready — check Settings",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@prepareHost
+            }
+            fun openWith(env: Map<String, String>) {
+                val scriptContent = try {
+                    val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(activity)
+                    val envBlock = env.entries.joinToString("\n") {
+                        "export ${it.key}=\"${it.value}\""
+                    }
+                    val base = scriptManager.getScriptContent(component.scriptName)
+                    if (env.isNotEmpty()) "$envBlock\n\n$base" else base
+                } catch (e: Exception) {
+                    android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
+                    null
+                }
+                if (scriptContent == null) return
+                val title = (if (isUninstall) "Uninstall " else "Install ") + component.name
+                val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
+                    activity,
+                    distro = distro,
+                    scriptContent = scriptContent,
+                    title = title,
+                    extraEnv = env,
+                    isUninstall = isUninstall,
+                    onFinished = {
+                        com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
+                            activity, distro.id, component.id, !isUninstall
+                        )
+                        com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                    }
+                )
+                if (opened) {
+                    onOpenTerminalScreen()
+                }
+            }
+            if (!isUninstall && isCustomizationComponent(component)) {
+                android.widget.Toast.makeText(
+                    activity, "Preparing themes & Oh My Zsh on host…",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                Thread {
+                    val env = stageCustomizationHostEnv(activity, extraEnv)
+                    activity.runOnUiThread { openWith(env) }
+                }.start()
+            } else {
+                openWith(extraEnv)
+            }
+        }
+    }
+
+    /**
+     * Legacy queue runner: the clipboard→Termux flow was replaced by in-app
+     * terminal sessions. Kept as a no-op that clears any stale queue state.
+     */
+    private fun processNextInstallTask() {
+        com.ivarna.fluxlinux.core.utils.InstallationQueueManager.clear()
     }
 
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
@@ -245,8 +391,29 @@ class MainActivity : ComponentActivity() {
                 var currentScreen by remember { 
                     mutableStateOf(if (onboardingComplete) Screen.HOME else Screen.ONBOARDING) 
                 }
+                currentScreenRef = remember { kotlinx.coroutines.flow.MutableStateFlow(currentScreen) }
+                LaunchedEffect(currentScreen) { currentScreenRef?.value = currentScreen }
                 
                 var currentTab by remember { mutableStateOf(BottomTab.HOME) }
+                currentTabRef = remember { kotlinx.coroutines.flow.MutableStateFlow(currentTab) }
+                LaunchedEffect(currentTab) { currentTabRef?.value = currentTab }
+                // FGS / external intent may flip tab via currentTabRef
+                val externalTab by (currentTabRef ?: kotlinx.coroutines.flow.MutableStateFlow(BottomTab.HOME))
+                    .collectAsState()
+                LaunchedEffect(externalTab) {
+                    if (externalTab != currentTab) currentTab = externalTab
+                }
+                val externalScreen by (currentScreenRef
+                    ?: kotlinx.coroutines.flow.MutableStateFlow(Screen.HOME)).collectAsState()
+                LaunchedEffect(externalScreen) {
+                    if (externalScreen != currentScreen) currentScreen = externalScreen
+                }
+
+                /** Open the Terminal bottom-nav page (termux-lib style). */
+                val openTerminalTab: () -> Unit = {
+                    currentScreen = Screen.HOME
+                    currentTab = BottomTab.TERMINAL
+                }
                 
                 // Selected Distro for Wizard/Settings
                 var selectedDistro by remember { mutableStateOf<com.ivarna.fluxlinux.core.data.Distro?>(null) }
@@ -285,6 +452,72 @@ class MainActivity : ComponentActivity() {
                     selectedDistro = distro
                     currentScreen = Screen.DISTRO_SETTINGS
                 }
+
+                // ── In-app terminal actions (termux-flux-terminal / chroot-root-shell) ──
+                val onOpenTerminal: (String, Boolean) -> Unit = { distroId, root ->
+                    val method = try {
+                        com.ivarna.fluxlinux.core.data.terminalComponentFor(distroId).method
+                    } catch (_: Exception) {
+                        "proot"
+                    }
+                    val type = if (root) "shell-root" else "shell"
+                    val title = when (method) {
+                        "chroot" -> if (root) "Debian Rooted Shell" else "Debian (Rooted) Shell"
+                        else -> if (root) "Debian Shell Rooted" else "Debian Shell"
+                    }
+                    com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openSessionAfterHost(
+                        this@MainActivity,
+                        type = type,
+                        title = title,
+                        method = method,
+                        onResult = { result ->
+                            if (result == com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult.OPENED) {
+                                openTerminalTab()
+                            } else {
+                                android.widget.Toast.makeText(
+                                    this@MainActivity,
+                                    "Host bootstrap not ready — check Settings",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    )
+                }
+
+                val startEmbeddedInstall: (com.ivarna.fluxlinux.core.data.Distro, String?, () -> Unit) -> Unit =
+                    { distro, setupB64, onBaseInstalled ->
+                        com.ivarna.fluxlinux.core.terminal.TerminalLauncher.prepareHost(
+                            this@MainActivity,
+                            onDone = { ok ->
+                                if (!ok) {
+                                    android.widget.Toast.makeText(
+                                        this@MainActivity,
+                                        "Host bootstrap failed to extract",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                    return@prepareHost
+                                }
+                                val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager
+                                    .openInstallSession(
+                                        this@MainActivity,
+                                        distro,
+                                        setupB64,
+                                        onFinished = {
+                                            // B3: fires only when the install session exited 0
+                                            com.ivarna.fluxlinux.core.utils.StateManager.setDistroInstalled(
+                                                this@MainActivity, distro.id, true
+                                            )
+                                            com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                                            onBaseInstalled()
+                                        }
+                                    )
+                                if (opened) {
+                                    openTerminalTab()
+                                }
+                            }
+                        )
+                    }
+
                 
                 @Composable
                 fun MainScreenContent(
@@ -301,7 +534,9 @@ class MainActivity : ComponentActivity() {
                                 onStartActivity = onStartActivityStub,
                                 // Pass navigation callbacks
                                 onNavigateToInstall = onNavigateToInstall,
-                                onNavigateToSettings = onNavigateToDistroSettings
+                                onNavigateToSettings = onNavigateToDistroSettings,
+                                onOpenTerminal = onOpenTerminal,
+                                onShowTerminal = openTerminalTab
                             )
                         }
                         BottomTab.DISTROS -> {
@@ -311,6 +546,14 @@ class MainActivity : ComponentActivity() {
                                 onStartService = onStartServiceStub,
                                 onStartActivity = onStartActivityStub,
                                 onNavigateToInstall = onNavigateToInstall
+                            )
+                        }
+                        BottomTab.TERMINAL -> {
+                            // Terminal as first-class bottom-nav page (like termux-lib).
+                            // Hide scaffold top bar chrome for max terminal area — content owns title.
+                            com.ivarna.fluxlinux.ui.screens.TerminalScreen(
+                                onBack = null,
+                                embeddedInBottomNav = true
                             )
                         }
                     }
@@ -358,9 +601,9 @@ class MainActivity : ComponentActivity() {
                             }
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (StateManager.isTermuxInstalled(LocalContext.current)) {
+                                if (com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isBootstrapExtracted(LocalContext.current)) {
                                    Text(
-                                       text = StateManager.getPackageSize(LocalContext.current, "com.termux"),
+                                       text = "Host: embedded",
                                        style = MaterialTheme.typography.labelSmall,
                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                                        modifier = Modifier.padding(end = 8.dp)
@@ -382,29 +625,40 @@ class MainActivity : ComponentActivity() {
                 // Show appropriate screen based on state
                 when (currentScreen) {
                     Screen.ONBOARDING -> {
-                        val showPrerequisites = remember { mutableStateOf(false) }
-                        if (!showPrerequisites.value) {
-                            com.ivarna.fluxlinux.ui.screens.OnboardingScreen(
-                                onGetStarted = { showPrerequisites.value = true }
-                            )
-                        } else {
-                            com.ivarna.fluxlinux.ui.screens.PrerequisitesScreen(
-                                onComplete = {
-                                    StateManager.setOnboardingComplete(this@MainActivity, true)
-                                    currentScreen = Screen.HOME
-                                }
-                            )
-                        }
+                        com.ivarna.fluxlinux.ui.onboarding.OnboardingFlowScreen(
+                            onFinished = {
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.HOME
+                            },
+                            onOpenTerminal = {
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.TERMINAL
+                            },
+                            onStartDesktop = { distroId ->
+                                StateManager.setOnboardingComplete(this@MainActivity, true)
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.HOME
+                                // GUI flags owned by DesktopLauncher
+                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(
+                                    this@MainActivity, distroId
+                                )
+                            }
+                        )
                     }
                     Screen.HOME -> {
                         val hazeState = remember { HazeState() }
+                        val showTopBar = currentTab != BottomTab.TERMINAL
                         GlassScaffold(
                             hazeState = hazeState,
                             topBar = {
-                                TopBar(
-                                    hazeState = hazeState,
-                                    onSettingsClick = { currentScreen = Screen.SETTINGS }
-                                )
+                                if (showTopBar) {
+                                    TopBar(
+                                        hazeState = hazeState,
+                                        onSettingsClick = { currentScreen = Screen.SETTINGS }
+                                    )
+                                }
                             },
                             bottomBar = {
                                 GlassBottomNavigation(
@@ -431,13 +685,55 @@ class MainActivity : ComponentActivity() {
                                 currentScreen = Screen.ONBOARDING
                             },
                             onNavigateToTroubleshooting = { currentScreen = Screen.TROUBLESHOOTING },
-                            onNavigateToRootCheck = { currentScreen = Screen.ROOT_ACCESS }
+                            onNavigateToRootCheck = { currentScreen = Screen.ROOT_ACCESS },
+                            onNavigateToTerminalSettings = {
+                                currentScreen = Screen.SETTINGS_TERMINAL
+                            },
+                            onNavigateToX11Settings = {
+                                currentScreen = Screen.SETTINGS_X11
+                            },
+                            onNavigateToChrootSettings = {
+                                currentScreen = Screen.SETTINGS_CHROOT
+                            }
+                        )
+                    }
+                    Screen.SETTINGS_TERMINAL -> {
+                        com.ivarna.fluxlinux.ui.screens.TerminalSettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS }
+                        )
+                    }
+                    Screen.SETTINGS_X11 -> {
+                        com.ivarna.fluxlinux.ui.screens.X11SettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS }
+                        )
+                    }
+                    Screen.SETTINGS_CHROOT -> {
+                        com.ivarna.fluxlinux.ui.screens.ChrootSettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS },
+                            onNavigateToInstall = {
+                                // Route to distro install for rooted Debian
+                                selectedDistro = com.ivarna.fluxlinux.core.data.DistroRepository
+                                    .supportedDistros
+                                    .firstOrNull { it.id == "debian13_chroot" }
+                                currentScreen = if (selectedDistro != null) {
+                                    Screen.INSTALL_WIZARD
+                                } else {
+                                    Screen.HOME
+                                }
+                            }
                         )
                     }
                     Screen.TROUBLESHOOTING -> {
                         com.ivarna.fluxlinux.ui.screens.TroubleshootingScreen(
                             onBack = { currentScreen = Screen.SETTINGS }
                         )
+                    }
+                    Screen.TERMINAL -> {
+                        // Legacy full-screen route — redirect to bottom-nav Terminal tab.
+                        LaunchedEffect(Unit) {
+                            currentScreen = Screen.HOME
+                            currentTab = BottomTab.TERMINAL
+                        }
                     }
                     Screen.PREREQUISITES -> { currentScreen = Screen.HOME }
                     Screen.ROOT_ACCESS -> {
@@ -452,163 +748,15 @@ class MainActivity : ComponentActivity() {
                     Screen.INSTALL_WIZARD -> {
                          val hazeState = remember { HazeState() }
                          if (selectedDistro != null) {
+                             // Shared runner with onboarding: rootfs + XFCE + customization
+                             // for both proot and chroot (no feature modules).
                              com.ivarna.fluxlinux.ui.screens.InstallConfigScreen(
                                  distro = selectedDistro!!,
-                                 onBack = { currentScreen = Screen.HOME }, // Or Screen.DISTROS depending on where they came from? Let's just go Home for now or maintain history.
-                                 // Actually for simplicity, back goes to tab view.
+                                 onBack = { currentScreen = Screen.HOME },
                                  hazeState = hazeState,
-                                 onInstallStart = { components, theme, gpu, desktopEnv ->
-                                     if (permissionState.status.isGranted) {
-                                         // NEW QUEUE-BASED WORKFLOW
-                                         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                              withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                  android.widget.Toast.makeText(this@MainActivity, "Preparing Queue...", android.widget.Toast.LENGTH_SHORT).show()
-                                              }
-                                              
-                                              val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-                                              queueManager.clear()
-                                              
-                                              val tasks = mutableListOf<com.ivarna.fluxlinux.core.utils.InstallTask>()
-                                              
-                                              // 1. Base Task (Manual)
-                                              tasks.add(com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                  id = "base_install",
-                                                  name = "Base System Install",
-                                                  type = com.ivarna.fluxlinux.core.utils.TaskType.BASE_INSTALL,
-                                                  isManual = true,
-                                                  distroId = selectedDistro!!.id,
-                                                  extraEnv = mapOf("FLUX_THEME" to theme, "FLUX_GPU" to gpu, "FLUX_DESKTOP_ENV" to desktopEnv)
-                                              ))
-                                              
-                                              // 2. Hardware Acceleration
-                                              // Determine if we should run it based on selection
-                                              val runHwAccel = gpu != "manual" && selectedDistro!!.id != "termux"
-                                              // Even if auto, we run the script which detects.
-                                              // If 'virgl' or 'turnip', we pass via Env.
-                                              if (selectedDistro!!.id != "termux") {
-                                                  // Pass the GPU pref to the script if not 'ask'/'manual'
-                                                  // 'ask' means script runs interactively? Queue is non-interactive usually.
-                                                  // HwAccel script needs to handle 'ask' by blocking? No, 'proot' execution is tricky for interactivity if wrapped.
-                                                  // But here we are automating. 'ask' might just default to 'auto' logic or prompt if we handle it?
-                                                  // Best approach: Force explicit choice or auto.
-                                                  tasks.add(com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                      id = "hw_accel",
-                                                      name = "Hardware Acceleration",
-                                                      type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
-                                                      scriptName = "debian/common/setup/setup_hw_accel_debian.sh",
-                                                      distroId = selectedDistro!!.id,
-                                                      extraEnv = mapOf("FLUX_GPU" to gpu)
-                                                  ))
-                                              }
-                                              
-                                              // 3. If KDE selected, inject kde_plasma component automatically
-                                              if (desktopEnv == "KDE") {
-                                                  val kdeComp = selectedDistro!!.components.find { it.id == "kde_plasma" }
-                                                  if (kdeComp != null) {
-                                                      tasks.add(com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                          id = "kde_plasma",
-                                                          name = kdeComp.name,
-                                                          type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
-                                                          scriptName = kdeComp.scriptName,
-                                                          distroId = selectedDistro!!.id,
-                                                          extraEnv = emptyMap()
-                                                      ))
-                                                  }
-                                              }
-                                              
-                                              // 4. User-selected Components (filter mandatory ones already added above)
-                                              val alreadyQueued = setOf("hw_accel", "kde_plasma")
-                                              components.filter { it.id !in alreadyQueued }.forEach { comp ->
-                                                  tasks.add(com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                      id = comp.id,
-                                                      name = comp.name,
-                                                      type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
-                                                      scriptName = comp.scriptName,
-                                                      distroId = selectedDistro!!.id,
-                                                      extraEnv = mapOf("FLUX_THEME" to theme) // Pass theme if needed by component
-                                                  ))
-                                              }
-                                              
-                                               queueManager.enqueue(tasks)
-
-                                               // Start the first task (Base Install)
-                                               val firstTask = queueManager.next()
-                                               if (firstTask != null && firstTask.type == com.ivarna.fluxlinux.core.utils.TaskType.BASE_INSTALL) {
-                                                    // Generate Base Script
-                                                    val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
-
-                                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                          // Start the foreground service so Android keeps the bridge alive
-                                                          // even when the activity is backgrounded (T3 / GH-9).
-                                                          com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity, script)
-                                                          android.widget.Toast.makeText(this@MainActivity, "Starting install server…", android.widget.Toast.LENGTH_SHORT).show()
-                                                          lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                              val port = com.ivarna.fluxlinux.core.service.InstallServerService.awaitPort()
-                                                              if (port == null) {
-                                                                  withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                                      android.widget.Toast.makeText(this@MainActivity, "Server failed to start", android.widget.Toast.LENGTH_LONG).show()
-                                                                  }
-                                                                  return@launch
-                                                              }
-                                                              withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                                  // INTERACTIVE COMMAND: Download then Run
-                                                                  // Prepend Exports based on Selection
-                                                                  // Use one-shot env var syntax: VAR=val command
-                                                                  val exports = "FLUX_THEME=$theme FLUX_GPU=$gpu"
-                                                                  
-                                                                  // Determine Root/Chroot status
-                                                                  val isChroot = selectedDistro!!.chrootSupported && !selectedDistro!!.prootSupported
-                                                                  
-                                                                  // Define Clipboard
-                                                                  val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-
-                                                                  if (isChroot) {
-                                                                       // Chroot/Root Command: simpler, avoids Termux 'pkg' commands
-                                                                       // Assumes /system/bin/curl exists (standard on rooted Android 10+)
-                                                                       val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && $exports sh install.sh"
-                                                                       
-                                                                       val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
-                                                                       clipboard.setPrimaryClip(clip)
-
-                                                                       android.app.AlertDialog.Builder(this@MainActivity)
-                                                                        .setTitle("⚠️ Root Access Required")
-                                                                        .setMessage("This distro requires Root/Chroot.\n\n1. Open Termux\n2. Type 'su' and press Enter 🔑\n3. Paste the command and Run it.\n4. Follow prompts.")
-                                                                        .setPositiveButton("Open Termux") { _, _ ->
-                                                                            val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                            if (launchIntent != null) startActivity(launchIntent)
-                                                                            // Stay on Install Wizard/DistroSettings so user sees progress
-                                                                        }
-                                                                         .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
-                                                                         .setCancelable(false)
-                                                                         .show()
-                                                                   } else {
-                                                                        // Standard Proot Command
-                                                                        val installCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && $exports bash install.sh"
-                                                                        val clip = android.content.ClipData.newPlainText("FluxLinux Install", installCommand)
-                                                                        clipboard.setPrimaryClip(clip)
-
-                                                                        android.app.AlertDialog.Builder(this@MainActivity)
-                                                                         .setTitle("Phase 1: Base Install 🚀")
-                                                                         .setMessage("Queue initialized!\n\n1. Open Termux\n2. Paste command\n3. Follow prompts (GPU/Theme)\n4. App will auto-launch next steps.")
-                                                                         .setPositiveButton("Open Termux") { _, _ ->
-                                                                             // The service observes InstallationQueueManager.installState; it will
-                                                                             // tear itself down when the install completes.
-                                                                             val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                             if (launchIntent != null) startActivity(launchIntent)
-                                                                             currentScreen = Screen.HOME
-                                                                         }
-                                                                         .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
-                                                                         .setCancelable(false)
-                                                                         .show()
-                                                                   }
-                                                             }
-                                                         }
-                                                   }
-                                              }
-                                         }
-                                     } else {
-                                         permissionState.launchPermissionRequest()
-                                     }
+                                 onInstallComplete = {
+                                     currentScreen = Screen.HOME
+                                     currentTab = BottomTab.HOME
                                  }
                              )
                          } else {
@@ -623,166 +771,56 @@ class MainActivity : ComponentActivity() {
                                   onBack = { currentScreen = Screen.HOME },
                                   hazeState = hazeState,
                                    onInstallComponent = { component, extraEnv ->
-                                       if (permissionState.status.isGranted) {
-                                           // Start the foreground service so the install progress notification
-                                           // stays alive when the user backgrounds the app (T3 / GH-9).
-                                           com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity)
-                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-                                               queueManager.clear()
-
-                                               val task = com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                   id = component.id,
-                                                   name = component.name,
-                                                   type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
-                                                   scriptName = component.scriptName,
-                                                   distroId = selectedDistro!!.id,
-                                                   extraEnv = extraEnv,
-                                                   isUninstall = false
-                                               )
-                                               queueManager.enqueue(listOf(task))
-
-                                               withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                   processNextInstallTask()
-                                               }
-                                           }
-                                       } else {
-                                           permissionState.launchPermissionRequest()
-                                       }
+                                       // Embedded: run component script inside the guest via
+                                       // the same terminal component as the parent distro.
+                                       runEmbeddedComponent(
+                                           this@MainActivity, selectedDistro!!, component, extraEnv,
+                                           isUninstall = false, onOpenTerminalScreen = openTerminalTab
+                                       )
                                    },
-                                  onUninstallComponent = { component ->
-                                      if (permissionState.status.isGranted) {
-                                          com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity)
-                                          lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                              val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-                                              queueManager.clear()
-
-                                              val task = com.ivarna.fluxlinux.core.utils.InstallTask(
-                                                  id = component.id,
-                                                  name = "Uninstall ${component.name}",
-                                                  type = com.ivarna.fluxlinux.core.utils.TaskType.COMPONENT,
-                                                  scriptName = component.scriptName,
-                                                  distroId = selectedDistro!!.id,
-                                                  extraEnv = emptyMap(),
-                                                  isUninstall = true
-                                              )
-                                              queueManager.enqueue(listOf(task))
-
-                                              withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                  processNextInstallTask()
-                                              }
-                                          }
-                                      } else {
-                                          permissionState.launchPermissionRequest()
-                                      }
-                                  },
-                                  onReinstallDistro = {
-                                       if (permissionState.status.isGranted) {
-                                           lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                               val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
-                                                                                               // No need to enqueue a task here since the base install is handled manually via curl/Termux.
-                                                 // Enqueueing it causes the UI to permanently stay in 'isInstalling' (Busy) mode.
-
-                                               withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                    // Reuse InstallConfigScreen logic for Base Install handling
-                                                    // We manually trigger the logic here because it's a manual script execution in Termux.
-
-                                                    val script = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getBaseInstallScript(this@MainActivity, selectedDistro!!)
-
-                                                    // Start the foreground service so Android keeps the bridge alive
-                                                    // across backgrounding (T3 / GH-9).
-                                                    com.ivarna.fluxlinux.core.service.InstallServerService.start(this@MainActivity, script)
-
-                                                    lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                         val port = com.ivarna.fluxlinux.core.service.InstallServerService.awaitPort()
-                                                         if (port == null) {
-                                                             withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                                 android.widget.Toast.makeText(this@MainActivity, "Server failed to start", android.widget.Toast.LENGTH_LONG).show()
-                                                             }
-                                                             return@launch
-                                                         }
-                                                         withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                               val isChroot = selectedDistro!!.chrootSupported && !selectedDistro!!.prootSupported
-                                                               val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-
-                                                               if (isChroot) {
-                                                                    // Chroot Logic
-                                                                    val chrootCommand = "curl -L -o install.sh http://127.0.0.1:$port/install && sh install.sh"
-                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", chrootCommand)
-                                                                    clipboard.setPrimaryClip(clip)
-
-                                                                    android.app.AlertDialog.Builder(this@MainActivity)
-                                                                     .setTitle("⚠️ Root Required (Reinstall)")
-                                                                     .setMessage("1. Open Termux\n2. Type 'su' -> Enter 🔑\n3. Paste & Run command.")
-                                                                     .setPositiveButton("Open Termux") { _, _ ->
-                                                                         val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                         if (launchIntent != null) startActivity(launchIntent)
-                                                                     }
-                                                                     .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
-                                                                     .setCancelable(false)
-                                                                     .show()
-                                                               } else {
-                                                                    // Proot Logic
-                                                                    val curlCommand = "pkg update -y && pkg install curl -y && curl -L -o install.sh http://127.0.0.1:$port/install && bash install.sh"
-                                                                    val clip = android.content.ClipData.newPlainText("FluxLinux Install", curlCommand)
-                                                                    clipboard.setPrimaryClip(clip)
-
-                                                                    android.app.AlertDialog.Builder(this@MainActivity)
-                                                                     .setTitle("Reinstalling Base System 🚀")
-                                                                     .setMessage("Command copied!\n\n1. Open Termux\n2. Paste command")
-                                                                     .setPositiveButton("Open Termux") { _, _ ->
-                                                                         val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(this@MainActivity)
-                                                                         if (launchIntent != null) startActivity(launchIntent)
-                                                                     }
-                                                                     .setNegativeButton("Cancel") { _, _ -> com.ivarna.fluxlinux.core.service.InstallServerService.stop(this@MainActivity) }
-                                                                     .setCancelable(false)
-                                                                     .show()
-                                                               }
-                                                         }
-                                                    }
-                                              }
-                                          }
-                                      } else {
-                                          permissionState.launchPermissionRequest()
-                                      }
-                                 },
+                                   onUninstallComponent = { component ->
+                                       runEmbeddedComponent(
+                                           this@MainActivity, selectedDistro!!, component, emptyMap(),
+                                           isUninstall = true, onOpenTerminalScreen = openTerminalTab
+                                       )
+                                   },
+                                   onReinstallDistro = {
+                                       // Full base reinstall (rootfs + XFCE + customization)
+                                       // via InstallConfig / OnboardingInstallRunner — not rootfs-only.
+                                       currentScreen = Screen.INSTALL_WIZARD
+                                   },
                                  onUninstallDistro = {
-                                     // Navigate to Home first, then trigger uninstall
-                                     // The uninstall script sends a callback to the app when complete
-                                     // which triggers handleScriptCallback to update state
-                                      if (permissionState.status.isGranted) {
-                                          val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildUninstallIntent(selectedDistro!!.id)
-                                          try {
-                                              onStartServiceStub(intent)
-                                              // DON'T update state here - let the callback handle it
-                                              // StateManager will be updated when script sends am start callback
-                                              android.widget.Toast.makeText(this@MainActivity, "Uninstalling...", android.widget.Toast.LENGTH_SHORT).show()
-                                              currentScreen = Screen.HOME
-                                          } catch(e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Uninstall failed", e)
-                                          }
-                                      } else {
-                                          permissionState.launchPermissionRequest()
-                                      }
-                                  },
+                                     // Embedded uninstall: proot → proot-distro remove in Flux
+                                     // Terminal; chroot → uninstall_debian13_chroot.sh in Root Shell.
+                                     val distro = selectedDistro ?: return@DistroSettingsScreen
+                                     com.ivarna.fluxlinux.core.terminal.TerminalLauncher.prepareHost(
+                                         this@MainActivity,
+                                         onDone = { ok ->
+                                             if (!ok) return@prepareHost
+                                             val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager
+                                                 .openUninstallSession(this@MainActivity, distro)
+                                             if (opened) {
+                                                 openTerminalTab()
+                                             }
+                                         }
+                                     )
+                                 },
                                   onStartActivity = onStartActivityStub,
                                   onNavigateToStart = { /* Not used in Settings, but if needed */ },
                                   onLaunchXfce = {
-                                      if (permissionState.status.isGranted) {
-                                          try {
-                                              val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildLaunchGuiIntent(this@MainActivity, selectedDistro!!.id)
-                                              onStartServiceStub(intent)
-                                          } catch (e: Exception) {
-                                              android.util.Log.e("FluxLinux", "Launch XFCE4 failed", e)
-                                          }
-                                      } else {
-                                          permissionState.launchPermissionRequest()
+                                      try {
+                                          com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(
+                                              this@MainActivity, selectedDistro!!.id
+                                          )
+                                      } catch (e: Exception) {
+                                          android.util.Log.e("FluxLinux", "Launch XFCE4 failed", e)
                                       }
                                   },
                                   onStopXfce = {
                                       try {
-                                          val intent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildStopGuiIntent(this, selectedDistro!!.id)
-                                          onStartServiceStub(intent)
+                                          com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(
+                                              this@MainActivity, selectedDistro!!.id
+                                          )
                                       } catch (e: Exception) {
                                           android.util.Log.e("FluxLinux", "Stop XFCE4 failed", e)
                                       }

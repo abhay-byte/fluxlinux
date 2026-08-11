@@ -142,47 +142,6 @@ object DistroRepository {
         )
     )
 
-    // Shared Components for Termux Native
-    private val termuxComponents = listOf(
-        DistroComponent(
-            id = "xfce4_desktop",
-            name = "XFCE4 Desktop",
-            description = "Native XFCE4 desktop via Termux:X11 — no container overhead.",
-            scriptName = "termux/setup/setup_xfce4_termux.sh",
-            sizeEstimate = "300 MB",
-            isMandatory = false
-        ),
-        DistroComponent(
-            id = "hw_accel",
-            name = "Hardware Acceleration",
-            description = "VirGL & Turnip GPU drivers for native Termux acceleration.",
-            scriptName = "termux/setup/setup_hw_accel_termux.sh",
-            sizeEstimate = "50 MB",
-            isMandatory = true
-        ),
-        DistroComponent(
-            id = "customization",
-            name = "XFCE4 Customization",
-            description = "FluxLinux theme, wallpapers, and fonts for XFCE4.",
-            scriptName = "termux/setup/setup_customization_termux.sh",
-            sizeEstimate = "200 MB"
-        ),
-        DistroComponent(
-            id = "kde_plasma",
-            name = "KDE Plasma Desktop",
-            description = "Full KDE Plasma desktop running natively in Termux.",
-            scriptName = "termux/setup/setup_kde_termux.sh",
-            sizeEstimate = "800 MB"
-        ),
-        DistroComponent(
-            id = "kde_customization",
-            name = "KDE Desktop Customization",
-            description = "FluxLinux theme, Papirus icons & Zsh for native KDE Plasma.",
-            scriptName = "termux/setup/setup_customization_kde_termux.sh",
-            sizeEstimate = "200 MB"
-        )
-    )
-
     // Shared Components for Arch-based distros
     private val archComponents = listOf(
         DistroComponent(
@@ -205,24 +164,10 @@ object DistroRepository {
             iconRes = R.drawable.distro_debian,
             comingSoon = false,
             prootSupported = true,
-            chrootSupported = true,
+            chrootSupported = false, // Pass 2: debian card is ALWAYS termux-flux-terminal (proot)
             configuration = SupportedDistro.DEBIAN,
             components = debianComponents
         ),
-        
-        Distro(
-            id = "termux",
-            name = "Termux Native",
-            description = "Run XFCE4/KDE directly in Termux for max performance (No Proot, No Container).",
-            color = FluxAccentCyan,
-            iconRes = R.drawable.distro_termux,
-            comingSoon = false,
-            prootSupported = false,
-            chrootSupported = false,
-            configuration = SupportedDistro.TERMUX,
-            components = termuxComponents
-        ),
-
 
         Distro(
             id = "debian13_chroot",

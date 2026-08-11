@@ -429,41 +429,17 @@ fun DistroSettingsScreen(
                     }
                     
                     Button(
-                        onClick = { 
-                            if (isChroot) {
-                                // ... (Script generation logic) ...
-                                val scriptName = when(distro.id) {
-                                    "debian_chroot" -> "debian/chroot/setup/uninstall_debian_chroot.sh"
-                                    "debian13_chroot" -> "debian/chroot/setup/uninstall_debian13.sh"
-                                    else -> "debian/chroot/setup/uninstall_debian_chroot.sh"
-                                }
-                                
-                                try {
-                                    val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(context)
-                                    val scriptContent = scriptManager.getScriptContent(scriptName)
-                                    val command = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.getSafeRootManualCommand(scriptContent, "uninstall_${distro.id}.sh")
-                                    
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("FluxLinux Uninstall", command)
-                                    clipboard.setPrimaryClip(clip)
-                                    
-                                    val launchIntent = com.ivarna.fluxlinux.core.data.TermuxIntentFactory.buildOpenTermuxIntent(context)
-                                    if (launchIntent != null) {
-                                        // StateManager.setDistroInstalled(context, distro.id, false) // REMOVED: Wait for callback
-                                        onStartActivity(launchIntent)
-                                        onBack() 
-                                        android.widget.Toast.makeText(context, "Command Copied!", android.widget.Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {}
-                            } else {
-                                onUninstallDistro()
-                            }
-                            showUninstallDialog = false 
+                        onClick = {
+                            // Embedded uninstall only (plan §4.5): chroot → SSOT
+                            // uninstall script via Root Shell; proot → proot-distro remove.
+                            // No Termux intent, no clipboard.
+                            onUninstallDistro()
+                            showUninstallDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252), contentColor = Color.White),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if(isChroot) "Proceed" else "Uninstall")
+                        Text("Uninstall")
                     }
                 }
             }

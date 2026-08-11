@@ -23,5 +23,11 @@
     static ** CREATOR;
 }
 
-# Keep app classes
--keep class com.zenithblue.fluxlinux.** { *; }
+# Keep app code package (applicationId may be com.zenithblue.fluxlinux but
+# Kotlin sources stay under com.ivarna.fluxlinux for both flavors).
+-keep class com.ivarna.fluxlinux.** { *; }
+
+# Embedded Termux:X11 (cloned module) — keep everything; CmdEntryPoint is
+# launched by class name from app_process and activities via reflection.
+-dontwarn com.termux.x11.**
+-keep class com.termux.x11.** { *; }

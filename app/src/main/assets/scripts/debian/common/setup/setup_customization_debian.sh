@@ -10,24 +10,40 @@ ASSETS_DIR="$(dirname "$0")/../../../assets"
 THEME_DIR="/usr/share/themes"
 ICON_DIR="/usr/share/icons"
 
-# Error Handler
+# Error Handler — never block on stdin (onboarding / ProcessBuilder has no TTY)
 handle_error() {
     echo ""
     echo "❌ FluxLinux Error: Script failed at step: $1"
     echo "---------------------------------------------------"
     echo "Please check the error message above for details."
     echo "---------------------------------------------------"
-    read -p "Press Enter to acknowledge error and exit..."
+    if [ -t 0 ]; then
+        read -r -p "Press Enter to acknowledge error and exit..."
+    fi
     exit 1
 }
 
 echo "FluxLinux: Starting XFCE4 Customization..."
 
+# Setup scripts must run as root inside proot/chroot (apt/dpkg).
+if [ "$(id -u)" -ne 0 ]; then
+    echo "FluxLinux: ERROR: must run as root inside the guest (got uid=$(id -u))."
+    echo "FluxLinux: Component sessions should use --user root; re-run from Distro Settings."
+    handle_error "Not Root"
+fi
+
+# Best-effort ownership (proot often cannot chown to flux:users — never spam/fail)
+_flux_chown() { chown "$@" 2>/dev/null || true; }
+_flux_chown_r() { chown -R "$@" 2>/dev/null || true; }
+
 # 1. Install Dependencies
-echo "FluxLinux: Installing customization tools..."
+echo "FluxLinux: Installing customization tools (as root)..."
 export DEBIAN_FRONTEND=noninteractive
-apt update -y
-apt install -y xfce4-goodies curl fastfetch wget unzip fontconfig locales || handle_error "Dependency Installation"
+apt-get update -y || handle_error "Dependency Installation (apt update)"
+# git: guest fallback when host did not pre-stage Oh My Zsh; zsh: terminal shell
+apt-get install -y -o Dpkg::Use-Pty=0 \
+    xfce4-goodies curl fastfetch wget unzip fontconfig locales git zsh \
+    || handle_error "Dependency Installation"
 
 # Setup Locales for proper font rendering in ZSH/Terminal
 echo "FluxLinux: Setting up locales..."
@@ -40,27 +56,74 @@ ASSET_REPO="abhay-byte/fluxlinux"
 ASSET_TAG="debian-v1"
 BASE_URL="https://github.com/$ASSET_REPO/releases/download/$ASSET_TAG"
 
-echo "FluxLinux: Downloading assets from $BASE_URL..."
+# Local asset dirs (host stages into shared /tmp for proot; optional offline paths)
+FLUX_ASSET_DIR="${FLUX_ASSET_DIR:-/tmp/flux_xfce_assets}"
 
-# Helper to extract all contents
-extract_all_assets() {
-    local URL="$1"
-    local TARGET_DIR="$2"
-    local TEMP_ZIP="/tmp/$(basename "$URL")"
-    
-    echo " - Downloading $(basename "$URL")..."
-    wget -q --show-progress "$URL" -O "$TEMP_ZIP"
-    
-    echo " - Extracting to $TARGET_DIR..."
-    unzip -q -o "$TEMP_ZIP" -d "$TARGET_DIR"
-    rm "$TEMP_ZIP"
+theme_is_installed() {
+    local name="$1"
+    local d="$THEME_DIR/$name"
+    [ -d "$d" ] && { [ -f "$d/index.theme" ] || [ -d "$d/gtk-3.0" ] || [ -d "$d/xfwm4" ]; }
+}
 
-    # Extract any nested tarballs found in the target dir
-    find "$TARGET_DIR" -maxdepth 1 -name "*.tar.xz" -exec tar -xf {} -C "$TARGET_DIR" \;
-    find "$TARGET_DIR" -maxdepth 1 -name "*.tar.gz" -exec tar -xzf {} -C "$TARGET_DIR" \;
-    
-    # Cleanup tars
-    rm -f "$TARGET_DIR"/*.tar.xz "$TARGET_DIR"/*.tar.gz
+icon_is_installed() {
+    local name="$1"
+    local d="$ICON_DIR/$name"
+    [ -d "$d" ] && { [ -f "$d/index.theme" ] || [ -n "$(ls -A "$d" 2>/dev/null)" ]; }
+}
+
+cursor_is_installed() {
+    local name="$1"
+    local d="$ICON_DIR/$name"
+    [ -d "$d" ] && { [ -f "$d/index.theme" ] || [ -d "$d/cursors" ]; }
+}
+
+# Fast path: extract a single archive into TARGET (optional path filter as $3+)
+extract_local_tar() {
+    local archive="$1"
+    local target="$2"
+    shift 2
+    [ -f "$archive" ] || return 1
+    mkdir -p "$target"
+    echo " - Extracting $(basename "$archive") → $target $*"
+    case "$archive" in
+        *.tar.xz|*.txz) tar -xJf "$archive" -C "$target" "$@" ;;
+        *.tar.gz|*.tgz) tar -xzf "$archive" -C "$target" "$@" ;;
+        *.tar)          tar -xf  "$archive" -C "$target" "$@" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Resolve archive from FLUX_ASSET_DIR / common names; download zip only as last resort.
+find_asset() {
+    # find_asset <basename-or-glob-pattern>
+    local name="$1"
+    local f
+    for f in \
+        "$FLUX_ASSET_DIR/$name" \
+        "/tmp/flux_xfce_assets/$name" \
+        "$ASSETS_DIR/xfce4/theme/$name" \
+        "$ASSETS_DIR/xfce4/icons/$name" \
+        "$ASSETS_DIR/xfce4/cursor/$name" \
+        "$ASSETS_DIR/xfce4/wallpaper/$name"
+    do
+        if [ -f "$f" ]; then
+            echo "$f"
+            return 0
+        fi
+    done
+    return 1
+}
+
+download_if_needed() {
+    local url="$1"
+    local out="$2"
+    if [ -f "$out" ] && [ -s "$out" ]; then
+        return 0
+    fi
+    mkdir -p "$(dirname "$out")"
+    echo " - Downloading $(basename "$out")..."
+    wget -q --show-progress "$url" -O "$out" || curl -fL --progress-bar "$url" -o "$out" || return 1
+    [ -s "$out" ]
 }
 
 # 3. Theme Selection Prompt
@@ -72,57 +135,120 @@ if [ -n "$FLUX_THEME" ]; then
         THEME_CHOICE="1"
     fi
 else
-    echo "------------------------------------------------"
-    echo "Select Theme Preference:"
-    echo "1) Dark (Default)"
-    echo "2) Light"
-    read -p "Enter choice [1-2]: " THEME_CHOICE
-    echo "------------------------------------------------"
+    if [ -t 0 ]; then
+        echo "------------------------------------------------"
+        echo "Select Theme Preference:"
+        echo "1) Dark (Default)"
+        echo "2) Light"
+        read -r -p "Enter choice [1-2]: " THEME_CHOICE
+        echo "------------------------------------------------"
+    else
+        echo "FluxLinux: No TTY / FLUX_THEME — defaulting to dark"
+        THEME_CHOICE="1"
+    fi
 fi
+
+# Icons: Papirus-Dark only (no full Papirus / Light / ePapirus packs)
+SEL_ICON="Papirus-Dark"
+ICON_TAR="papirus-dark-only.tar.gz"
 
 if [ "$THEME_CHOICE" == "2" ]; then
-    echo "FluxLinux: Light Mode Selected."
+    echo "FluxLinux: Light Mode Selected (icons: Papirus-Dark only)."
     SEL_THEME="Space-light"
-    SEL_ICON="Papirus" # Light icons
     SEL_CURSOR="Vimix-cursors" # Dark cursor for light theme (better contrast)
     SEL_WALLPAPER="fluxlinux-light.png"
+    THEME_TAR="Space-light.tar.xz"
+    CURSOR_TAR="01-Vimix-cursors.tar.xz"
 else
-    echo "FluxLinux: Dark Mode Selected."
+    echo "FluxLinux: Dark Mode Selected (icons: Papirus-Dark only)."
     SEL_THEME="Space-transparency"
-    SEL_ICON="Papirus-Dark" # Dark icons
     SEL_CURSOR="Vimix-white-cursors" # White cursor for dark theme (better contrast)
     SEL_WALLPAPER="fluxlinux-dark.png"
+    THEME_TAR="Space-transparency.tar.xz"
+    CURSOR_TAR="02-Vimix-white-cursors.tar.xz"
 fi
 
-# Install Themes (Both)
-echo "FluxLinux: Installing Themes..."
-mkdir -p "$THEME_DIR"
-extract_all_assets "$BASE_URL/theme.zip" "$THEME_DIR"
+mkdir -p "$THEME_DIR" "$ICON_DIR"
 
-# Install Icons
-echo "FluxLinux: Installing Icons..."
-mkdir -p "$ICON_DIR"
-extract_all_assets "$BASE_URL/icons.zip" "$ICON_DIR"
-# Icons are assumed to have known names or we use the selected one directly.
-# SEL_ICON is already set based on theme choice.
+# Host may have already extracted into the proot rootfs (native tar — fast).
+# FLUX_SKIP_THEME_ICONS=1 → only apply configs / wallpaper ownership.
+if [ "${FLUX_SKIP_THEME_ICONS:-0}" = "1" ]; then
+    echo "FluxLinux: Themes/icons pre-installed on host — skip guest extract"
+elif theme_is_installed "$SEL_THEME" && icon_is_installed "$SEL_ICON" && cursor_is_installed "$SEL_CURSOR"; then
+    echo "FluxLinux: Theme+icons+cursor already installed ($SEL_THEME / $SEL_ICON / $SEL_CURSOR) — skip extract"
+else
+    # ── Theme (selected only) ───────────────────────────────────────────────
+    if theme_is_installed "$SEL_THEME"; then
+        echo "FluxLinux: Theme $SEL_THEME already installed — skip"
+    else
+        echo "FluxLinux: Installing theme $SEL_THEME only..."
+        TFILE="$(find_asset "$THEME_TAR" || true)"
+        if [ -z "$TFILE" ]; then
+            download_if_needed "$BASE_URL/theme.zip" "/tmp/theme.zip" || handle_error "Theme Download"
+            unzip -q -o /tmp/theme.zip -d /tmp/flux_theme_zip
+            TFILE="$(find /tmp/flux_theme_zip -name "$THEME_TAR" | head -1)"
+            [ -n "$TFILE" ] || TFILE="$(find /tmp/flux_theme_zip -name "${SEL_THEME}*.tar.xz" | head -1)"
+        fi
+        extract_local_tar "$TFILE" "$THEME_DIR" || handle_error "Theme Extract"
+        theme_is_installed "$SEL_THEME" || handle_error "Theme Missing After Extract"
+    fi
 
-# Install Cursors (Both variants)
-echo "FluxLinux: Installing Cursors..."
-extract_all_assets "$BASE_URL/cursor.zip" "$ICON_DIR"
+    # ── Icons: Papirus-Dark only ────────────────────────────────────────────
+    if icon_is_installed "$SEL_ICON"; then
+        echo "FluxLinux: Icons $SEL_ICON already installed — skip"
+    else
+        echo "FluxLinux: Installing icons $SEL_ICON only..."
+        IFILE="$(find_asset "$ICON_TAR" || find_asset "papirus-dark-only.tar.gz" || true)"
+        if [ -z "$IFILE" ]; then
+            # Legacy fallback: full pack but still extract only Papirus-Dark/
+            IFILE="$(find_asset "papirus-icon-theme-20250501.tar.gz" || true)"
+        fi
+        if [ -z "$IFILE" ]; then
+            echo "FluxLinux: ERROR: Papirus-Dark archive missing (expected $ICON_TAR in assets)"
+            handle_error "Icons Archive Missing"
+        fi
+        extract_local_tar "$IFILE" "$ICON_DIR" "Papirus-Dark" || \
+            extract_local_tar "$IFILE" "$ICON_DIR" || handle_error "Icons Extract"
+        icon_is_installed "$SEL_ICON" || handle_error "Icons Missing After Extract"
+    fi
 
-# Wallpaper Setup
+    # ── Cursor (selected only) ──────────────────────────────────────────────
+    if cursor_is_installed "$SEL_CURSOR"; then
+        echo "FluxLinux: Cursor $SEL_CURSOR already installed — skip"
+    else
+        echo "FluxLinux: Installing cursor $SEL_CURSOR only..."
+        CFILE="$(find_asset "$CURSOR_TAR" || true)"
+        if [ -z "$CFILE" ]; then
+            download_if_needed "$BASE_URL/cursor.zip" "/tmp/cursor.zip" || handle_error "Cursor Download"
+            unzip -q -o /tmp/cursor.zip -d /tmp/flux_cursor_zip
+            CFILE="$(find /tmp/flux_cursor_zip -name "$CURSOR_TAR" -o -name "*${SEL_CURSOR}*.tar.xz" | head -1)"
+        fi
+        extract_local_tar "$CFILE" "$ICON_DIR" || handle_error "Cursor Extract"
+        cursor_is_installed "$SEL_CURSOR" || handle_error "Cursor Missing After Extract"
+    fi
+fi
+
+# Wallpaper Setup (skip download if selected file already present)
 WALLPAPER_DIR="$USER_HOME/Pictures/Wallpapers"
 mkdir -p "$WALLPAPER_DIR"
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/Pictures" 2>/dev/null
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/Pictures"
 
-echo "FluxLinux: Downloading Wallpaper..."
-TEMP_WP_ZIP="/tmp/wallpaper.zip"
-wget -q --show-progress "$BASE_URL/wallpaper.zip" -O "$TEMP_WP_ZIP"
-unzip -o -j "$TEMP_WP_ZIP" -d "$WALLPAPER_DIR"
-rm "$TEMP_WP_ZIP"
-[ -f "$WALLPAPER_DIR/dark.png" ] && mv "$WALLPAPER_DIR/dark.png" "$WALLPAPER_DIR/fluxlinux-dark.png"
-[ -f "$WALLPAPER_DIR/light.png" ] && mv "$WALLPAPER_DIR/light.png" "$WALLPAPER_DIR/fluxlinux-light.png"
-chown "$CUSTOM_USER:$CUSTOM_GROUP" "$WALLPAPER_DIR"/*
+if [ -f "$WALLPAPER_DIR/$SEL_WALLPAPER" ]; then
+    echo "FluxLinux: Wallpaper $SEL_WALLPAPER already present — skip"
+else
+    echo "FluxLinux: Installing wallpaper..."
+    WFILE="$(find_asset "$SEL_WALLPAPER" || true)"
+    if [ -n "$WFILE" ]; then
+        cp -f "$WFILE" "$WALLPAPER_DIR/$SEL_WALLPAPER"
+    else
+        TEMP_WP_ZIP="/tmp/wallpaper.zip"
+        download_if_needed "$BASE_URL/wallpaper.zip" "$TEMP_WP_ZIP" || handle_error "Wallpaper Download"
+        unzip -o -j "$TEMP_WP_ZIP" -d "$WALLPAPER_DIR"
+        [ -f "$WALLPAPER_DIR/dark.png" ] && mv -f "$WALLPAPER_DIR/dark.png" "$WALLPAPER_DIR/fluxlinux-dark.png"
+        [ -f "$WALLPAPER_DIR/light.png" ] && mv -f "$WALLPAPER_DIR/light.png" "$WALLPAPER_DIR/fluxlinux-light.png"
+    fi
+fi
+_flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$WALLPAPER_DIR"/*
 
 
 # Install JetBrains Mono Nerd Font
@@ -281,7 +407,7 @@ cat <<EOF > "$XFCONF_DIR/xfce4-desktop.xml"
 EOF
 
 # Fix ownership
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$XFCONF_DIR"
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$XFCONF_DIR"
 echo "FluxLinux: XFCE4 settings applied successfully!"
 
 # Generate xfce4-keyboard-shortcuts.xml (Custom Keyboard Shortcuts)
@@ -597,7 +723,7 @@ cat <<'EOF' > "$PANEL_CONFIG_DIR/xfce4-panel.xml"
 </channel>
 EOF
 
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$PANEL_CONFIG_DIR"
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$PANEL_CONFIG_DIR"
 
 # Create plugin configuration files
 PLUGIN_CONFIG_DIR="$USER_HOME/.config/xfce4/panel"
@@ -679,8 +805,8 @@ UpdatePeriod=1000
 Font=JetBrainsMono Nerd Font 10
 EOF
 
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$PLUGIN_CONFIG_DIR"
-chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config/info.sh"
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$PLUGIN_CONFIG_DIR"
+_flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config/info.sh"
 
 
 # 6. Configure Terminal (Direct Config File)
@@ -712,64 +838,186 @@ ScrollingLines=1000
 BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT
 BackgroundDarkness=0.7
 EOF
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config"
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config"
 
 
 # 7. Configure Zsh and Terminal Enhancements
 echo "FluxLinux: Configuring Zsh and Terminal..."
 
-# Install zsh if not already installed
-echo "FluxLinux: Installing zsh..."
-apt-get install -y zsh 2>/dev/null
+# Bounded network helpers (proot hangs forever on bare curl/git)
+_flux_have_timeout() { command -v timeout >/dev/null 2>&1; }
+_flux_run() {
+    # _flux_run <seconds> <cmd...>
+    local sec="$1"; shift
+    if _flux_have_timeout; then
+        timeout "$sec" "$@"
+    else
+        "$@"
+    fi
+}
+_flux_git_clone() {
+    # _flux_git_clone <url> <dest> [timeout_sec]
+    local url="$1" dest="$2" sec="${3:-90}"
+    if ! command -v git >/dev/null 2>&1; then
+        echo "FluxLinux: git not in guest PATH — skip clone $url"
+        return 1
+    fi
+    export GIT_TERMINAL_PROMPT=0
+    export GIT_HTTP_LOW_SPEED_LIMIT=1000
+    export GIT_HTTP_LOW_SPEED_TIME=30
+    if [ -d "$dest/.git" ] || [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
+        return 0
+    fi
+    rm -rf "$dest"
+    mkdir -p "$(dirname "$dest")"
+    _flux_run "$sec" git clone --depth 1 --single-branch --quiet "$url" "$dest"
+}
 
-# Install Oh My Zsh for flux user
-# Install Oh My Zsh for flux user
+# Safe remove: rename first (instant), delete in background — never block forever on proot unlink
+_flux_safe_rm_tree() {
+    local d="$1"
+    [ -e "$d" ] || return 0
+    local trash="${d}.trash.$$"
+    if mv "$d" "$trash" 2>/dev/null; then
+        if _flux_have_timeout; then
+            timeout 45 rm -rf "$trash" 2>/dev/null || (rm -rf "$trash" >/dev/null 2>&1 &)
+        else
+            (rm -rf "$trash" >/dev/null 2>&1 &)
+        fi
+    else
+        if _flux_have_timeout; then
+            timeout 45 rm -rf "$d" 2>/dev/null || true
+        else
+            rm -rf "$d" 2>/dev/null || true
+        fi
+    fi
+}
+
+# zsh/git should already be present from apt above; re-check for older rootfs
+if ! command -v zsh >/dev/null 2>&1; then
+    echo "FluxLinux: Installing zsh..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Use-Pty=0 zsh 2>/dev/null || true
+else
+    echo "FluxLinux: zsh already installed — skip apt"
+fi
+if ! command -v git >/dev/null 2>&1; then
+    echo "FluxLinux: Installing git (needed for Oh My Zsh fallback)..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Use-Pty=0 git 2>/dev/null || true
+fi
+
+# ── Oh My Zsh ────────────────────────────────────────────────────────────────
+# Prefer host pre-install (FLUX_SKIP_OMZ=1 + oh-my-zsh.sh present).
+# Never use curl|sh under proot — hangs. Never mkdir empty OMZ after a failed clone
+# (that re-triggers plugin clones into a broken tree).
 echo "FluxLinux: Installing Oh My Zsh..."
 
-# 1. Check for corrupt installation (folder exists but missing core script)
-if [ -d "$USER_HOME/.oh-my-zsh" ] && [ ! -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
-    echo "FluxLinux: Detected corrupt Oh My Zsh installation. Removing..."
-    rm -rf "$USER_HOME/.oh-my-zsh"
+OMZ_OK=0
+if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    if [ "${FLUX_SKIP_OMZ:-0}" = "1" ]; then
+        echo "FluxLinux: Oh My Zsh pre-installed on host — skip guest install"
+    else
+        echo "FluxLinux: Oh My Zsh already valid — skip install"
+    fi
+    OMZ_OK=1
+else
+    # Partial / corrupt tree — remove with bounded rename+rm (not bare rm -rf hang)
+    if [ -e "$USER_HOME/.oh-my-zsh" ]; then
+        echo "FluxLinux: Incomplete Oh My Zsh detected — removing (bounded)…"
+        _flux_safe_rm_tree "$USER_HOME/.oh-my-zsh"
+    fi
+    if [ "${FLUX_SKIP_OMZ:-0}" = "1" ]; then
+        echo "FluxLinux: FLUX_SKIP_OMZ set but oh-my-zsh.sh missing — guest fallback"
+    fi
+    if command -v git >/dev/null 2>&1; then
+        echo "FluxLinux: Shallow git clone Oh My Zsh (timeout 120s)…"
+        if _flux_git_clone "https://github.com/ohmyzsh/ohmyzsh.git" "$USER_HOME/.oh-my-zsh" 120 \
+            && [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+            echo "FluxLinux: Oh My Zsh installed"
+            OMZ_OK=1
+        else
+            echo "FluxLinux: WARNING: Oh My Zsh install failed/timed out — continuing without it"
+            _flux_safe_rm_tree "$USER_HOME/.oh-my-zsh"
+        fi
+    else
+        echo "FluxLinux: WARNING: git unavailable — Oh My Zsh skipped (host stage or install git)"
+        _flux_safe_rm_tree "$USER_HOME/.oh-my-zsh"
+    fi
 fi
 
-# 2. Install if missing
-if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
-    su -s /bin/bash - "$CUSTOM_USER" -c 'RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"' 2>/dev/null
+# Plugins/themes only when OMZ is actually valid — do not recreate empty tree
+if [ "$OMZ_OK" = "1" ]; then
+    ZSH_CUSTOM="$USER_HOME/.oh-my-zsh/custom"
+    mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes" 2>/dev/null || true
+
+    echo "FluxLinux: Installing Zsh plugins (if missing)…"
+    if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions/.git" ] \
+        && [ ! -f "$ZSH_CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; then
+        if command -v git >/dev/null 2>&1; then
+            _flux_git_clone "https://github.com/zsh-users/zsh-autosuggestions.git" \
+                "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 60 || true
+        else
+            echo "FluxLinux: git missing — skip zsh-autosuggestions"
+        fi
+    else
+        echo "FluxLinux: zsh-autosuggestions already present — skip"
+    fi
+    if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/.git" ] \
+        && [ ! -f "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
+        if command -v git >/dev/null 2>&1; then
+            _flux_git_clone "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
+                "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 60 || true
+        else
+            echo "FluxLinux: git missing — skip zsh-syntax-highlighting"
+        fi
+    else
+        echo "FluxLinux: zsh-syntax-highlighting already present — skip"
+    fi
+    # Do NOT install zsh-autocomplete
+
+    if [ ! -s "$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" ]; then
+        echo "FluxLinux: Installing agnosterzak theme…"
+        _flux_run 30 curl -fsSL --connect-timeout 10 --max-time 25 \
+            "https://raw.githubusercontent.com/zakaziko99/agnosterzak-ohmyzsh-theme/master/agnosterzak.zsh-theme" \
+            -o "$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" 2>/dev/null || true
+    else
+        echo "FluxLinux: agnosterzak theme already present — skip"
+    fi
+    _flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.oh-my-zsh"
+else
+    echo "FluxLinux: Skipping Zsh plugins (Oh My Zsh not installed)"
 fi
 
-# Set ZSH_CUSTOM path
-ZSH_CUSTOM="$USER_HOME/.oh-my-zsh/custom"
-
-# Install zsh plugins
-echo "FluxLinux: Installing Zsh plugins..."
-su -s /bin/bash - "$CUSTOM_USER" -c "git clone https://github.com/zsh-users/zsh-autosuggestions '$ZSH_CUSTOM/plugins/zsh-autosuggestions'" 2>/dev/null
-su -s /bin/bash - "$CUSTOM_USER" -c "git clone https://github.com/zsh-users/zsh-syntax-highlighting '$ZSH_CUSTOM/plugins/zsh-syntax-highlighting'" 2>/dev/null
-su -s /bin/bash - "$CUSTOM_USER" -c "git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete.git '$ZSH_CUSTOM/plugins/zsh-autocomplete'" 2>/dev/null
-
-# Install agnosterzak theme
-echo "FluxLinux: Installing agnosterzak theme..."
-su -s /bin/bash - "$CUSTOM_USER" -c "mkdir -p '$ZSH_CUSTOM/themes'"
-su -s /bin/bash - "$CUSTOM_USER" -c "curl -fsSL https://raw.githubusercontent.com/zakaziko99/agnosterzak-ohmyzsh-theme/master/agnosterzak.zsh-theme -o '$ZSH_CUSTOM/themes/agnosterzak.zsh-theme'" 2>/dev/null
-
-# Install pokemon-colorscripts
-echo "FluxLinux: Installing pokemon-colorscripts..."
-POKEMON_TEMP="/tmp/pokemon-colorscripts"
-rm -rf "$POKEMON_TEMP"
-git clone https://gitlab.com/phoneybadger/pokemon-colorscripts.git "$POKEMON_TEMP" 2>/dev/null
-cd "$POKEMON_TEMP" && ./install.sh 2>/dev/null
-cd - > /dev/null
-rm -rf "$POKEMON_TEMP"
+# pokemon-colorscripts: optional; default skip under proot (gitlab stalls; needs git)
+if [ "${FLUX_SKIP_POKEMON:-1}" = "1" ]; then
+    echo "FluxLinux: pokemon-colorscripts skip (disabled by default)"
+elif command -v pokemon-colorscripts >/dev/null 2>&1; then
+    echo "FluxLinux: pokemon-colorscripts already present — skip"
+elif ! command -v git >/dev/null 2>&1; then
+    echo "FluxLinux: pokemon-colorscripts skip (git missing)"
+else
+    echo "FluxLinux: Installing pokemon-colorscripts (optional, 60s budget)…"
+    POKEMON_TEMP="/tmp/pokemon-colorscripts.$$"
+    _flux_safe_rm_tree "$POKEMON_TEMP"
+    if _flux_git_clone "https://gitlab.com/phoneybadger/pokemon-colorscripts.git" "$POKEMON_TEMP" 60 \
+        && [ -f "$POKEMON_TEMP/install.sh" ]; then
+        (cd "$POKEMON_TEMP" && _flux_run 30 sh ./install.sh) 2>/dev/null \
+            || echo "FluxLinux: pokemon-colorscripts install skipped"
+    else
+        echo "FluxLinux: pokemon-colorscripts skipped (clone timeout/fail)"
+    fi
+    _flux_safe_rm_tree "$POKEMON_TEMP"
+fi
 
 # Configure .zshrc
 echo "FluxLinux: Configuring .zshrc..."
 ZSHRC="$USER_HOME/.zshrc"
 
-# Check if .zshrc is valid (loading oh-my-zsh)
-# Write complete optimized .zshrc (performance fixes from screenshot)
+# Write complete optimized .zshrc (performance fixes)
 # - Removed zsh-autocomplete (extremely slow on PRoot, 35s+ startup)
 # - Backgrounded visuals with &! (async, don't block shell startup)
 # - DISABLE_AUTO_UPDATE / DISABLE_UPDATE_PROMPT (no prompts on launch)
 # - ZSH_DISABLE_COMPFIX (no compaudit, faster init)
+# Defensive: never hard-fail on missing oh-my-zsh / pokemon
 echo "FluxLinux: Writing optimized .zshrc..."
 cat > "$ZSHRC" << 'ZSHEOF'
 # PATH setup - local bin, npm global modules
@@ -782,54 +1030,66 @@ export LC_ALL=en_US.UTF-8
 # Fix XDG_RUNTIME_DIR (not set in PRoot/chroot — no systemd-logind)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 
-# Background visuals - don't block shell startup
-{ fastfetch --config termux; pokemon-colorscripts --no-title -r 1,2,3 } &!
+# Background visuals - don't block shell startup; skip missing tools (no error spam)
+{
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+  fi
+  if command -v pokemon-colorscripts >/dev/null 2>&1; then
+    pokemon-colorscripts --no-title -r 1,2,3 2>/dev/null || true
+  fi
+} &!
 
-# oh-my-zsh optimizations
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="agnosterzak"
-DISABLE_UPDATE_PROMPT=true
-DISABLE_AUTO_UPDATE=true
-ZSH_DISABLE_COMPFIX=true
-
-# Removed zsh-autocomplete (very slow), kept essential plugins
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
-
-source $ZSH/oh-my-zsh.sh
+# oh-my-zsh (optional — install may fail offline; shell still usable without it)
+export ZSH="${ZSH:-$HOME/.oh-my-zsh}"
+if [ -f "$ZSH/oh-my-zsh.sh" ]; then
+  ZSH_THEME="agnosterzak"
+  DISABLE_UPDATE_PROMPT=true
+  DISABLE_AUTO_UPDATE=true
+  ZSH_DISABLE_COMPFIX=true
+  # Removed zsh-autocomplete (very slow), kept essential plugins
+  plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+  source "$ZSH/oh-my-zsh.sh"
+fi
 ZSHEOF
-chown "$CUSTOM_USER:$CUSTOM_GROUP" "$ZSHRC"
+_flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$ZSHRC"
 
-# Download fastfetch config
+# Download fastfetch config (bounded)
 mkdir -p "$USER_HOME/.local/share/fastfetch/presets"
-curl -fsSL https://raw.githubusercontent.com/abhay-byte/Linux_Setup/dev/config/termux.jsonc \
-    -o "$USER_HOME/.local/share/fastfetch/presets/termux.jsonc" 2>/dev/null
-
-# Fastfetch and pokemon are already included in the optimized .zshrc above (backgrounded)
+_flux_run 20 curl -fsSL --connect-timeout 8 --max-time 15 \
+    https://raw.githubusercontent.com/abhay-byte/Linux_Setup/dev/config/termux.jsonc \
+    -o "$USER_HOME/.local/share/fastfetch/presets/termux.jsonc" 2>/dev/null || true
 
 # Set zsh as default shell for flux user
-chsh -s /bin/zsh "$CUSTOM_USER" 2>/dev/null
+chsh -s /bin/zsh "$CUSTOM_USER" 2>/dev/null || true
 
-# Fix ownership
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.oh-my-zsh" "$USER_HOME/.zshrc" "$USER_HOME/.local" 2>/dev/null
+# Ownership (best-effort; proot cannot always chown)
+if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
+    _flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.oh-my-zsh"
+fi
+_flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.zshrc"
+_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.local"
 
 echo "FluxLinux: Terminal configuration complete!"
 
-
-# 8. Reload XFCE Daemons (Force restart like chroot script does)
-echo "FluxLinux: Reloading Desktop..."
-
-# Kill existing XFCE processes to force reload (matches chroot pattern)
-su -s /bin/bash - "$CUSTOM_USER" -c "killall -9 xfdesktop xfwm4 xfsettingsd" 2>/dev/null
-sleep 2
-
-# Restart daemons with updated settings (run in background but wait a bit for each)
-su -s /bin/bash - "$CUSTOM_USER" -c "DISPLAY=:0 nohup xfdesktop > /dev/null 2>&1 &" 2>/dev/null
-sleep 0.5
-su -s /bin/bash - "$CUSTOM_USER" -c "DISPLAY=:0 nohup xfwm4 --replace > /dev/null 2>&1 &" 2>/dev/null
-sleep 0.5
+# 8. Reload XFCE Daemons — only if a session is actually running (don't hang install)
+echo "FluxLinux: Reloading Desktop (if running)..."
+if pgrep -x xfdesktop >/dev/null 2>&1 || pgrep -x xfwm4 >/dev/null 2>&1; then
+    su -s /bin/bash - "$CUSTOM_USER" -c "killall -9 xfdesktop xfwm4 xfsettingsd" 2>/dev/null || true
+    sleep 1
+    su -s /bin/bash - "$CUSTOM_USER" -c "DISPLAY=:0 nohup xfdesktop >/dev/null 2>&1 &" 2>/dev/null || true
+    su -s /bin/bash - "$CUSTOM_USER" -c "DISPLAY=:0 nohup xfwm4 --replace >/dev/null 2>&1 &" 2>/dev/null || true
+else
+    echo "FluxLinux: No XFCE session running — skip daemon reload"
+fi
 su -s /bin/bash - "$CUSTOM_USER" -c "DISPLAY=:0 nohup xfsettingsd > /dev/null 2>&1 &" 2>/dev/null
 sleep 1
 
 echo "FluxLinux: Customization Complete!"
 echo "------------------------------------------------"
-read -p "Press Enter to close..."
+# Interactive pause only in a real terminal — hangs forever under onboarding
+# (ProcessBuilder / proot-distro with no stdin TTY).
+if [ -t 0 ]; then
+    read -r -p "Press Enter to close..."
+fi
+exit 0

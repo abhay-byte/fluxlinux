@@ -286,6 +286,8 @@ This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
 
 See [LICENSE](LICENSE) for details.
 
+**Embedded components:** The in-app terminal stack bundles [termux-app](https://github.com/termux/termux-app) v0.118.0 (GPLv3) for `TerminalSession`/`TerminalView`; host userland packages are rebuilt from the Termux package repo (`native/`). FluxLinux remains open source under GPLv3, consistent with these dependencies.
+
 ---
 
 <div align="center">

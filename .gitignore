@@ -6,15 +6,35 @@ app/build/
 *.iml
 local.properties
 .DS_Store
+.serena/
 
 # FluxLinux Specific
-# (Add any generated script temp files here)
 tmp/
 scripts/generated/
+
+# Native Termux package builds:
+# - Track *.deb under native/output/<appId>/ so bootstrap can be assembled anywhere
+# - Ignore logs, assemble workdirs, and oversized bootstrap.tar (rebuild via scripts/)
+native/output/logs/
+native/bootstrap/**/root/
+native/bootstrap/**/bootstrap.tar
+native/bootstrap/**/bootstrap-*.tar
+native/loader/*.apk
+# keep package-lists and README; termux-packages is a local symlink
+native/termux-packages
+
+# Staged host assets (large; regenerate via scripts/package_host_assets.sh)
+app/src/*/assets/bootstrap.tar
+app/src/*/assets/rootfs/*.tar.xz
+app/src/*/jniLibs/
 
 # Large NDK packages
 packages/android-ndk-r29-aarch64-linux-musl.tar.xz
 packages/android-ndk-r27d-aarch64-linux-musl.tar.xz
+
+# Module build outputs
+termux-x11/build/
+stub/build/
 
 app/release
 .kotlin

@@ -28,10 +28,31 @@ android {
         }
     }
 
+    // Dual app-id flavors: ivarna (F-Droid/GitHub) + zenithblue (Play).
+    // Host bootstrap + jniLibs ship per flavor from native/bootstrap/<applicationId>/
+    // staged by :app:packageHostAssets* (runs scripts/package_host_assets.sh).
+    flavorDimensions += "store"
+    productFlavors {
+        create("ivarna") {
+            dimension = "store"
+            applicationId = "com.ivarna.fluxlinux"
+            // Host binaries (libbash/loader/proot) build only for arm64-v8a;
+            // x86_64 devices run them via NDK translation (native bridge).
+            ndk { abiFilters += listOf("arm64-v8a") }
+        }
+        create("zenithblue") {
+            dimension = "store"
+            applicationId = "com.zenithblue.fluxlinux"
+        }
+    }
+
     androidResources {
         // Disable PNG crunching for reproducible builds
         @Suppress("UnstableApiUsage")
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~"
+        // Critical — do not recompress archives; they must stay STORED in the APK
+        @Suppress("UnstableApiUsage")
+        noCompress += listOf("xz", "tar")
     }
 
     // Disable dependency metadata block for F-Droid
@@ -87,12 +108,25 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    testOptions {
+        unitTests {
+            // android.util.Log etc. are stubs in JVM tests — return defaults instead of throwing
+            isReturnDefaultValues = true
+        }
+    }
+
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            // W^X host binaries (libbash/libproot/libloader) must be extracted to
+            // nativeLibraryDir so the app-data ET_DYN loader can exec them.
+            useLegacyPackaging = true
         }
     }
 }
@@ -101,6 +135,81 @@ android {
 tasks.withType<AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Package host assets per flavor (Pass 2 fail-closed gate, plan P0-T6/T7)
+//   :app:stageHostRootfs             — shared rootfs asset (once)
+//   :app:packageHostAssetsIvarna     — stages native/bootstrap/com.ivarna.fluxlinux
+//   :app:packageHostAssetsZenithblue — stages native/bootstrap/com.zenithblue.fluxlinux
+// Fails assemble with a clear error when bootstrap.tar / jniLibs are missing.
+// The shared rootfs lives in its own task so two flavor tasks never write the
+// same output concurrently.
+// ─────────────────────────────────────────────────────────────────────────────
+val flavorAppIds = mapOf(
+    "ivarna" to "com.ivarna.fluxlinux",
+    "zenithblue" to "com.zenithblue.fluxlinux"
+)
+
+val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
+    group = "build"
+    description = "Copy the pinned Debian rootfs into app/src/main/assets/rootfs"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "-c",
+        "mkdir -p app/src/main/assets/rootfs && " +
+            "cp -f assets/rootfs/debian_13_rootfs.tar.xz app/src/main/assets/rootfs/debian_13_rootfs.tar.xz")
+    inputs.file(rootProject.file("assets/rootfs/debian_13_rootfs.tar.xz"))
+    outputs.file(file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"))
+    onlyIf { !file("src/main/assets/rootfs/debian_13_rootfs.tar.xz").isFile }
+}
+
+for ((flavorName, appId) in flavorAppIds) {
+    val taskName = "packageHostAssets" + flavorName.replaceFirstChar { it.uppercase() }
+    tasks.register<Exec>(taskName) {
+        group = "build"
+        description = "Stage host bootstrap + jniLibs for flavor '$flavorName' from native/bootstrap/$appId"
+        workingDir = rootProject.projectDir
+        commandLine("bash", "scripts/package_host_assets.sh", appId)
+        dependsOn(stageHostRootfs)
+
+        val bootstrapTree = fileTree(rootProject.file("native/bootstrap/$appId"))
+        inputs.files(bootstrapTree)
+        outputs.file(file("src/$flavorName/assets/bootstrap.tar"))
+        outputs.dir(file("src/$flavorName/jniLibs"))
+
+        doFirst {
+            val missing = listOf(
+                rootProject.file("native/bootstrap/$appId/bootstrap.tar"),
+                rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libbash.so"),
+                rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libproot.so"),
+                rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libloader.so"),
+                rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libloader32.so")
+            ).filter { !it.isFile }
+            if (missing.isNotEmpty()) {
+                throw GradleException(
+                    "Host bootstrap assets missing for applicationId '$appId':\n" +
+                        missing.joinToString("\n") { "  - $it" } +
+                        "\n\nRun the package build first:\n" +
+                        "  ./scripts/build_packages_for_appid.sh $appId\n" +
+                        "  ./scripts/assemble_bootstrap.py --package-name $appId --mode full\n" +
+                        "  ./scripts/verify_bootstrap.sh $appId"
+                )
+            }
+        }
+    }
+}
+
+// Every assemble / bundle / pre-build for a flavor depends on its package task so
+// mergeAssets / mergeJniLibFolders never see an empty host (P0-T7).
+for (flavorName in flavorAppIds.keys) {
+    val cap = flavorName.replaceFirstChar { it.uppercase() }
+    tasks.matching {
+        it.name.startsWith("assemble$cap") ||
+            it.name.startsWith("bundle$cap") ||
+            it.name.startsWith("pre${cap}")
+    }.configureEach {
+        dependsOn("packageHostAssets$cap")
+    }
 }
 
 dependencies {
@@ -123,6 +232,13 @@ dependencies {
     
     // Networking
     implementation(libs.okhttp)
+
+    // Embedded terminal (termux-app GPLv3 — app stays open source; see LICENSE/README)
+    implementation(libs.termux.app)
+    implementation(libs.listenablefuture)
+
+    // Embedded Termux:X11 (cloned + integrated directly, same-package rendering)
+    implementation(project(":termux-x11"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

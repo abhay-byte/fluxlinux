@@ -40,8 +40,10 @@ import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.core.utils.RootUtils
 import com.ivarna.fluxlinux.core.utils.SystemInfoUtils
 import com.ivarna.fluxlinux.core.utils.ApkDownloader
+import com.ivarna.fluxlinux.core.utils.LogcatStreamer
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.data.ScriptManager
+import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -82,6 +84,15 @@ fun PrerequisitesScreen(
     // Step tracking
     var currentStep by remember { mutableStateOf(1) }
     val totalSteps = 9 // Adjusted down for keyboard removal
+
+    // With the embedded host there is no external Termux: skip the legacy
+    // Termux-config (2) and RUN_COMMAND permission (3) steps automatically.
+    LaunchedEffect(currentStep) {
+        if (TerminalLauncher.isHostSetupDone(context) && (currentStep == 2 || currentStep == 3)) {
+            if (currentStep == 2) StateManager.setConnectionFixed(context, true)
+            currentStep += 1
+        }
+    }
     
     // Package states
     val termuxInstalled = remember { mutableStateOf(StateManager.isTermuxInstalled(context)) }
@@ -91,6 +102,9 @@ fun PrerequisitesScreen(
     
     // Configuration state
     var configDone by remember { mutableStateOf(false) }
+
+    // Setup log viewer (shown on every onboarding step)
+    var showLogs by remember { mutableStateOf(false) }
     
     // Permission state
     val permissionState = rememberPermissionState(
@@ -139,7 +153,9 @@ fun PrerequisitesScreen(
                 onRefresh = checkStatus,
                 onStepChange = { currentStep = it },
                 onConfigDone = { configDone = it },
-                onComplete = onComplete
+                onComplete = onComplete,
+                showLogs = showLogs,
+                onToggleLogs = { showLogs = !showLogs }
             )
         } else {
             Column(
@@ -184,6 +200,111 @@ fun PrerequisitesScreen(
                     onConfigDone = { configDone = it },
                     onComplete = onComplete
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SetupLogPanel(
+                    expanded = showLogs,
+                    onToggle = { showLogs = !showLogs }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Collapsible live logcat viewer for onboarding/setup steps. Tails logcat for
+ * the app's own UID and shows host-setup tags (TerminalLauncher, BootstrapInstaller…).
+ */
+@Composable
+fun SetupLogPanel(
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    var lines by remember { mutableStateOf(LogcatStreamer.snapshot()) }
+    var autoScroll by remember { mutableStateOf(true) }
+
+    LaunchedEffect(expanded) {
+        if (!expanded) return@LaunchedEffect
+        LogcatStreamer.start(scope)
+        val unsubscribe = LogcatStreamer.subscribe { _ ->
+            lines = LogcatStreamer.snapshot()
+        }
+        try {
+            while (true) {
+                delay(400)
+                lines = LogcatStreamer.snapshot()
+                if (autoScroll) {
+                    runCatching { scrollState.scrollTo(scrollState.maxValue) }
+                }
+            }
+        } finally {
+            unsubscribe()
+            LogcatStreamer.stop()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onToggle() }
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (expanded) "▾ Setup Logs (live)" else "▸ Setup Logs",
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = { LogcatStreamer.clear(); lines = emptyList() },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Clear logs",
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            if (expanded) {
+                Text(
+                    text = if (autoScroll) "autoscroll on" else "autoscroll off",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp,
+                    modifier = Modifier.clickable { autoScroll = !autoScroll }
+                )
+            }
+        }
+
+        if (expanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0D0D0D))
+                    .border(
+                        1.dp,
+                        androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .verticalScroll(scrollState)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = lines.takeLast(500).joinToString("\n").ifEmpty { "Waiting for host setup logs…" },
+                    color = Color(0xFF9ECE6A),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 14.sp
+                )
             }
         }
     }
@@ -202,7 +323,9 @@ private fun PrerequisitesLandscapeLayout(
     onRefresh: () -> Unit,
     onStepChange: (Int) -> Unit,
     onConfigDone: (Boolean) -> Unit,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    showLogs: Boolean,
+    onToggleLogs: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -266,6 +389,13 @@ private fun PrerequisitesLandscapeLayout(
                 onConfigDone = onConfigDone,
                 onComplete = onComplete
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SetupLogPanel(
+                expanded = showLogs,
+                onToggle = onToggleLogs
+            )
         }
     }
 }
@@ -285,14 +415,10 @@ private fun PrerequisitesStepContent(
 ) {
     val context = LocalContext.current
     when (currentStep) {
-        1 -> PackageInstallationStep(
-            termuxInstalled = termuxInstalled,
-            x11Installed = x11Installed,
+        1 -> HostBootstrapStep(
             onRefresh = onRefresh,
             onContinue = {
-                if (termuxInstalled.value && x11Installed.value) {
-                    onStepChange(2)
-                }
+                onStepChange(2)
             }
         )
 
@@ -343,111 +469,33 @@ private fun PrerequisitesStepContent(
 }
 
 @Composable
-fun PackageInstallationStep(
-    termuxInstalled: MutableState<Boolean>,
-    x11Installed: MutableState<Boolean>,
+fun HostBootstrapStep(
     onRefresh: () -> Unit,
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    var bootstrapDone by remember { mutableStateOf(TerminalLauncher.isHostSetupDone(context)) }
+    var initializing by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf(0f) }
+    var statusText by remember { mutableStateOf("") }
 
-    var termuxApkStatus by remember { mutableStateOf(ApkStatus.NOT_INSTALLED) }
-    var termuxProgress by remember { mutableStateOf(0f) }
-    var x11ApkStatus by remember { mutableStateOf(ApkStatus.NOT_INSTALLED) }
-    var x11Progress by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(termuxInstalled.value) {
-        if (termuxInstalled.value) {
-            termuxApkStatus = ApkStatus.INSTALLED
-            ApkDownloader.deleteApk(context, "termux.apk")
-        }
-    }
-    LaunchedEffect(x11Installed.value) {
-        if (x11Installed.value) {
-            x11ApkStatus = ApkStatus.INSTALLED
-            ApkDownloader.deleteApk(context, "termux_x11.apk")
-        }
-    }
-
-    val TERMUX_SHA = "7600078440c3c34ef050bc009b00fc3215cb87ec4a449e01a696f74cf4249db2"
-    LaunchedEffect(Unit) {
-        if (!termuxInstalled.value && ApkDownloader.apkExists(context, "termux.apk")) {
-            if (ApkDownloader.verifySha256(context, "termux.apk", TERMUX_SHA)) {
-                termuxApkStatus = ApkStatus.DOWNLOADED
-            } else {
-                termuxApkStatus = ApkStatus.CORRUPTED
+    fun startInit() {
+        initializing = true
+        statusText = "Extracting host bootstrap…"
+        TerminalLauncher.prepareHost(
+            context,
+            progress = { done, total, phase ->
+                statusText = phase
+                if (total > 0) progress = (done.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+            },
+            onDone = { ok ->
+                initializing = false
+                bootstrapDone = TerminalLauncher.isHostSetupDone(context)
+                statusText = if (bootstrapDone) "Host environment ready."
+                else "Setup failed — see device logs (Settings → Host status)."
             }
-        }
-        if (!x11Installed.value && ApkDownloader.apkExists(context, "termux_x11.apk")) {
-            x11ApkStatus = ApkStatus.DOWNLOADED
-        }
+        )
     }
-
-    fun downloadTermux() {
-        termuxApkStatus = ApkStatus.DOWNLOADING
-        termuxProgress = 0f
-        coroutineScope.launch {
-            ApkDownloader.download(
-                context,
-                "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk",
-                "termux.apk"
-            ).collect { state ->
-                if (state.error != null) {
-                    termuxApkStatus = ApkStatus.NOT_INSTALLED
-                } else if (state.isDone) {
-                    if (ApkDownloader.verifySha256(context, "termux.apk", TERMUX_SHA)) {
-                        termuxApkStatus = ApkStatus.DOWNLOADED
-                    } else {
-                        termuxApkStatus = ApkStatus.CORRUPTED
-                    }
-                    termuxProgress = 1f
-                } else {
-                    termuxProgress = state.progress
-                }
-            }
-        }
-    }
-
-    fun downloadX11() {
-        x11ApkStatus = ApkStatus.DOWNLOADING
-        x11Progress = 0f
-        coroutineScope.launch {
-            ApkDownloader.download(
-                context,
-                "https://github.com/termux/termux-x11/releases/download/nightly/app-universal-debug.apk",
-                "termux_x11.apk"
-            ).collect { state ->
-                if (state.error != null) {
-                    x11ApkStatus = ApkStatus.NOT_INSTALLED
-                } else if (state.isDone) {
-                    x11ApkStatus = ApkStatus.DOWNLOADED
-                    x11Progress = 1f
-                } else {
-                    x11Progress = state.progress
-                }
-            }
-        }
-    }
-
-    fun installApk(fileName: String) {
-        if (!ApkDownloader.canInstallPackages(context)) {
-            ApkDownloader.openInstallPermissionSettings(context)
-            return
-        }
-        val intent = ApkDownloader.getInstallIntent(context, fileName)
-        if (intent != null) {
-            try {
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to open installer", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    val isTermuxOutdated = termuxInstalled.value && isVersionOlderThan(
-        StateManager.getTermuxVersion(context), "0.118.3"
-    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -459,12 +507,11 @@ fun PackageInstallationStep(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Step 1: Install Required Apps",
+                text = "Step 1: Initialize Environment",
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
-
             IconButton(onClick = onRefresh) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -476,49 +523,40 @@ fun PackageInstallationStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // T4: Top-of-screen critical alert when Termux is too old.
-        // The inline warning inside PrerequisiteItem is easy to miss in a
-        // long list of cards — a prominent banner at the top of the screen
-        // makes the "uninstall Play Store, install v0.118.3 from GitHub"
-        // requirement unmissable.
-        if (isTermuxOutdated) {
-            TermuxVersionAlertBanner()
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // Termux
+        // Embedded host card (bootstrap.tar inside this APK — no Termux install needed)
         PrerequisiteItem(
-            name = "Termux",
-            isInstalled = termuxInstalled.value,
-            isOutdated = isTermuxOutdated,
-            version = if (termuxInstalled.value) StateManager.getTermuxVersion(context) else null,
-            apkStatus = termuxApkStatus,
-            progress = termuxProgress,
-            minVersionHint = "v0.118.3",
-            onDownload = { downloadTermux() },
-            onInstallApk = { installApk("termux.apk") }
+            name = "FluxLinux Host (embedded)",
+            isInstalled = bootstrapDone,
+            isOutdated = false,
+            version = if (bootstrapDone) "v1 (extracted)" else null,
+            apkStatus = ApkStatus.INSTALLED,
+            progress = progress,
+            minVersionHint = null,
+            onDownload = { startInit() },
+            onInstallApk = { startInit() }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Termux:X11
-        PrerequisiteItem(
-            name = "Termux:X11",
-            isInstalled = x11Installed.value,
-            version = if (x11Installed.value) StateManager.getTermuxX11Version(context) else null,
-            apkStatus = x11ApkStatus,
-            progress = x11Progress,
-            onDownload = { downloadX11() },
-            onInstallApk = { installApk("termux_x11.apk") }
+        Text(
+            text = "The Linux host environment (Termux-class prefix + proot-distro) is bundled inside this app — no separate Termux APK is required for Debian installs.",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        val allAppsReady = termuxInstalled.value && x11Installed.value && !isTermuxOutdated
-        // Continue Button
+        val ready = bootstrapDone && !initializing
         Button(
-            onClick = onContinue,
-            enabled = allAppsReady,
+            onClick = {
+                when {
+                    initializing -> {}
+                    bootstrapDone -> onContinue()
+                    else -> startInit()
+                }
+            },
+            enabled = !initializing,
             colors = ButtonDefaults.buttonColors(
                 containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                 disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
@@ -529,10 +567,23 @@ fun PackageInstallationStep(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                if (allAppsReady) "Continue" else "Install Required Apps",
-                color = if (allAppsReady) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                when {
+                    initializing -> "Initializing…"
+                    bootstrapDone -> "Continue"
+                    else -> "Initialize Environment"
+                },
+                color = if (ready) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
+            )
+        }
+
+        if (statusText.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = statusText,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
             )
         }
     }
@@ -1486,8 +1537,8 @@ fun EnvironmentSetupStep(
     val scriptManager = remember { ScriptManager(context) }
     
     // State to track if scripts have been run
-    // Initialize from StateManager to handle screen rotation/re-entry
-    var setupInitiated by remember { mutableStateOf(StateManager.getScriptStatus(context, "setup_termux")) }
+    // Embedded host gate (Pass 2): setup_termux marker, not external Termux.
+    var setupInitiated by remember { mutableStateOf(com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context)) }
     var isSetupLoading by remember { mutableStateOf(false) }
     var tweaksInitiated by remember { mutableStateOf(false) }
     var tweaksCompleted by remember { mutableStateOf(StateManager.getScriptStatus(context, "termux_tweaks")) }
@@ -1497,7 +1548,7 @@ fun EnvironmentSetupStep(
         if (isSetupLoading) {
             while (isSetupLoading) {
                 delay(2000) // Check every 2 seconds
-                if (StateManager.getScriptStatus(context, "setup_termux")) {
+                if (com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context)) {
                     isSetupLoading = false
                     setupInitiated = true
                     Toast.makeText(context, "Environment Initialized Successfully!", Toast.LENGTH_SHORT).show()
@@ -1540,7 +1591,7 @@ fun EnvironmentSetupStep(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "1. Initialize Environment: Sets up the core Linux system.\n2. Apply Termux Tweaks: Configures the shell and visuals (Optional).",
+            text = "1. Initialize Environment: Extracts the embedded host + validates dependencies (no Termux APK needed).\n2. Apply Termux Tweaks: Configures the shell and visuals (Optional, legacy external-Termux).",
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
@@ -1549,21 +1600,20 @@ fun EnvironmentSetupStep(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // Setup Button (Background)
+        // Setup Button (embedded host — no external Termux)
         Button(
             onClick = {
-                val script = scriptManager.getScriptContent("termux/setup_termux.sh")
-                // Reset status first
-                StateManager.setScriptStatus(context, "setup_termux", false)
-                
-                val intent = TermuxIntentFactory.buildRunCommandIntent(script, runInBackground = false)
-                try {
-                    context.startService(intent)
-                    isSetupLoading = true
-                    Toast.makeText(context, "Opening Termux...", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Failed to start service", Toast.LENGTH_SHORT).show()
-                }
+                isSetupLoading = true
+                com.ivarna.fluxlinux.core.terminal.TerminalLauncher.prepareHost(
+                    context,
+                    onDone = { ok ->
+                        isSetupLoading = false
+                        setupInitiated = com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isHostSetupDone(context)
+                        if (!ok) {
+                            Toast.makeText(context, "Host setup failed — see Troubleshooting", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (setupInitiated) androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer else androidx.compose.material3.MaterialTheme.colorScheme.primary,
@@ -1587,7 +1637,7 @@ fun EnvironmentSetupStep(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        "Initializing... (Wait for Termux)",
+                        "Initializing embedded host…",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )

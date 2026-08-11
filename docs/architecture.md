@@ -1,54 +1,56 @@
 # Core Architecture & Design Decisions
 
 ## 1. Executive Summary
-The project aims to build an Android application that creates and manages full Linux containers with GUI support. This document outlines the technical feasibility, architectural components, and implementation strategy based on existing open-source ecosystems (Termux, Proot, X11).
+The project builds an Android application that creates and manages full Linux containers with terminal + GUI support. This document outlines the architectural components and implementation strategy.
 
-**Feasibility Verdict:** **Highly Feasible**
-Existing tools (Termux, PRoot, Termux:X11) provide a robust foundation. The primary challenge is not the core technology, but the **orchestration** and **User Experience (UX)** wrapping to make it accessible to non-technical users.
+**Current model (2026-08):** FluxLinux ships its **own embedded host runtime** (Termux-class userland rebuilt for `com.ivarna.fluxlinux` / `com.zenithblue.fluxlinux`) inside the APK. Debian install/run happens **in-app** through two terminal components — no external Termux app required for the core product.
 
-## 2. Core Architecture
 ## 2. Core Architecture
 The solution relies primarily on a "Rootless" architecture for maximum compatibility, but fully supports a **High-Performance Rooted Architecture** using Chroot.
 
 ### 2.1 The Tech Stack hierarchy (Standard / Rootless)
 *   **Layer 1 (Host)**: Android OS (Linux Kernel).
-*   **Layer 2 (Environment)**: **Termux** context.
-*   **Layer 3 (Container Engine)**: **PRoot** (User-space emulation).
+*   **Layer 2 (Environment)**: **Embedded host prefix** (`/data/data/<appId>/files/usr`, `termux-flux-terminal`).
+*   **Layer 3 (Container Engine)**: **PRoot** (User-space emulation) via bundled `proot-distro` + `libproot.so` (W^X-safe jniLibs).
 
 ### 2.2 The Tech Stack hierarchy (Rooted / Chroot)
 *   **Layer 1 (Host)**: Android OS (Linux Kernel).
-*   **Layer 2 (Environment)**: **Root Shell** (via Magisk/KernelSU).
-*   **Layer 3 (Container Engine)**: **Chroot** (Native Kernel isolation).
+*   **Layer 2 (Environment)**: **Root Shell** (via Magisk/KernelSU su discovery, `chroot-root-shell`).
+*   **Layer 3 (Container Engine)**: **Chroot** (Native Kernel isolation) managed by the SSOT helper `fluxlinux_chroot.sh`.
     *   *Tooling:* Uses **Busybox** to manage mounting points (`/proc`, `/sys`, `/dev`) and standard Linux file hierarchies.
 *   **Performance:** Native speed (no syscall overhead).
-*   **Layer 4 (Display Server)**: **Termux:X11** (Works identically for both).
-*   **Layer 5 (Desktop Environment)**: XFCE/MATE/GNOME.
+*   **Layer 4 (Display Server)**: **Termux:X11** (optional companion app, GUI launch only).
+*   **Layer 5 (Desktop Environment)**: XFCE/KDE.
 
-## 3. Architecture Decision: Monolithic (Embedded) vs. Orchestrator
-The question arises: *Should we embed Termux and Termux:X11 code directly into our app (making it a single APK) or act as an orchestrator for them?*
+## 3. Architecture Decision: Embedded Host (current) vs Orchestrator (legacy)
 
-### Option A: The Monolithic/Embedded Approach (One APK)
-**Concept:** You fork Termux-app and Termux:X11, merge their codebases, and package everything into `com.yourcompany.linuxapp`.
+FluxLinux historically acted as an **orchestrator** (external `com.termux` + `com.termux.x11`). That model was replaced:
 
-*   **Pros:**
-    *   **Superior UX:** The user installs ONE app. No "Please install Termux API" prompts.
-    *   **Control:** You control the exact version of the terminal and X server.
-*   **Cons (CRITICAL):**
-    *   **Google Play Policy (The "Killer" Issue):** Apps targeting Android 10+ (API 29+) cannot execute binaries downloaded to the app's data directory (W^X violation). Termux sidesteps this by keeping `targetSdkVersion 28`. **You cannot publish a new app with SDK 28 on the Play Store today.** You must target SDK 34+, which breaks standard Linux package execution.
-    *   **Path Hardcoding:** Thousands of Linux packages in the Termux repos are compiled with hardcoded paths to `/data/data/com.termux/...`. If your package name is different, **binaries will fail** unless you rebuild the *entire* repository or rely 100% on `proot` (which has performance overhead).
-    *   **Maintenance Nightmare:** You must manually merge upstream changes from Termux and Termux:X11 constantly.
-    *   **Licensing:** Termux is GPLv3. Your entire app MUST be open-sourced under GPLv3.
+| Aspect | Orchestrator (legacy, removed) | Embedded host (current) |
+|--------|-------------------------------|--------------------------|
+| Host runtime | External `com.termux` APK | `bootstrap.tar` + W^X jniLibs inside the APK (per flavor) |
+| Paths | Hardcoded `/data/data/com.termux/...` | `TermuxHostPaths` SSOT from `BuildConfig.APPLICATION_ID` |
+| Install UX | Copy & Open Termux → paste | **Install in Flux Terminal** / **Install in Root Shell** (in-app) |
+| Debian rootfs | Network download in Termux | Same pinned rootfs asset (`SHA 13e29f60…`) for proot + chroot |
+| Terminal UI | Termux app | In-app `TerminalSession`/`TerminalView` (termux-app v0.118.0, GPLv3) |
+| `termux` Native card | Shipped as a "distro" | **Removed** — no product path |
 
-### Option B: The Orchestrator Approach (Recommended)
-**Concept:** Your app acts as a "Launcher" or "Installer" that automates the setup of the official Termux and Termux:X11 apps.
+### Why embedding works here (vs. the old concern)
+*   **W^X / targetSdk 36:** Host ELFs ship as `libbash.so`/`libproot.so`/`libloader{,32}.so` under jniLibs with `useLegacyPackaging = true` — extracted to `nativeLibraryDir` by the package manager (executable app data, no W^X violation), and run via the system linker (`ShellCommandRunner.adjustHostCmd`).
+*   **Path hardcoding:** Packages are **rebuilt** for each application id (`native/` tree, `assemble_bootstrap.py`) instead of reusing stock `com.termux` binaries; residual stock paths are rewritten post-extract (`applyPackageToExtractedPrefix`).
+*   **Play/F-Droid size:** Each flavor ships one ~122 MB bootstrap + ~82 MB rootfs; documented in the release notes.
 
-*   **Pros:**
-    *   **Store Compliance:** Your app is just a UI/Script manager. It is safe for the Play Store.
-    *   **Ecosystem Compatibility:** Uses official Termux repositories (no path issues).
-    *   **Stability:** Lets the Termux team handle the low-level Android terminal complexity.
-*   **Cons:**
-    *   **UX Friction:** User must install 2-3 apps (Termux, Termux:X11, your app).
+## 4. Components (product)
 
-### Verdict
-**INTEGRATION IS RISKY.** Unless you plan to distribute *outside* the Play Store (e.g., F-Droid or Website APK) and keep `targetSDK` low, you **cannot** fully embed Termux's functionality natively.
-**Recommendation:** Start as an **Orchestrator**. If you prove the market, consider a fork *only* for off-store distribution.
+| Component | Isolation | Requires | Used by |
+|-----------|-----------|----------|---------|
+| `termux-flux-terminal` | Host prefix + proot-distro Debian | None (rootless) | Debian card install/run, host shell |
+| `chroot-root-shell` | `busybox chroot` via SSOT helper | Root + BusyBox NDK | Debian (Rooted) card install/run |
+
+Routing is centralized: `terminalComponentFor(distroId)` (`core/data/TerminalComponent.kt`) — Debian → `TERMUX_FLUX_TERMINAL`, Debian Rooted → `CHROOT_ROOT_SHELL`. The removed `termux` card has no component.
+
+## 5. Package identity SSOT
+`TermuxHostPaths.PACKAGE = BuildConfig.APPLICATION_ID` — the only place defining `/data/data/<pkg>/files/{usr,home}`; scripts source the generated `usr/etc/fluxlinux-host.env`. Flavors: `ivarna` (F-Droid, `com.ivarna.fluxlinux`), `zenithblue` (Play, `com.zenithblue.fluxlinux`).
+
+## 6. Licensing
+The embedded terminal stack (termux-app v0.118.0) is GPLv3. FluxLinux stays open source (GPL-compatible, see LICENSE) and attributes termux-app; packaged assets are generated by `scripts/` from `native/` (reproducible, not stored in git).

@@ -38,21 +38,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * survives the activity being backgrounded or trimmed.
  *
  * Lifecycle:
- *  - Started by MainActivity when an install begins (both onInstallStart and
- *    onInstallComponent paths).
- *  - For component installs: the FGS is driven by
- *    [InstallationQueueManager.installState]. When the queue drains or the
- *    user cancels, `isInstalling` flips false and the service stops itself.
- *  - For the BASE_INSTALL / reinstall path, no queue task is enqueued (the
- *    user runs the script manually via curl in Termux). In that case the
- *    service arms a [SCRIPT_BEARING_IDLE_MS] idle timer that auto-stops the
- *    FGS if the user never returns.
- *  - If the activity is destroyed mid-install, the service keeps the HTTP
- *    bridge alive so Termux's `curl localhost:PORT` still succeeds.
+ *  - Historically started by MainActivity to serve install scripts over HTTP to
+ *    external Termux (`curl localhost:PORT/install`).
+ *  - Pass 2 (embedded terminal plan): NO LONGER started for debian* product
+ *    installs — installs run in-app via FluxTerminalSessionManager. Kept only
+ *    as legacy scaffolding for old flows; do not start for new install paths.
  *
  * Port discovery: [activePort] is a process-wide StateFlow. The activity
  * awaits on it after [start] returns to build the curl command for Termux.
  */
+@Deprecated("Legacy clipboard→Termux install bridge; embedded terminal installs run in-app (see docs/plans/embedded-terminal-bootstrap-proot-chroot.md §2.4)")
 class InstallServerService : Service() {
 
     companion object {

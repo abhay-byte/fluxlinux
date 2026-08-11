@@ -39,6 +39,8 @@ fun DistroCard(
     distro: Distro,
     isInstalled: Boolean = false,
     isGuiRunning: Boolean = false,
+    /** True while start_gui is streaming (termux-lib Starting phase). */
+    isGuiStarting: Boolean = false,
     isGlobalInstalling: Boolean = false,
     isCurrentlyInstalling: Boolean = false,
     onInstall: () -> Unit,
@@ -47,6 +49,8 @@ fun DistroCard(
     onNavigateToStart: () -> Unit,
     onStop: () -> Unit = {},
     onOpenDisplay: () -> Unit = {},
+    onViewLogs: () -> Unit = {},
+    logsAvailable: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -104,19 +108,19 @@ fun DistroCard(
                             fontWeight = FontWeight.Bold
                         )
                         
-                        // RUNNING badge (for installed distros with GUI running)
-                        if (isInstalled && isGuiRunning) {
+                        // RUNNING / STARTING badge (desktop session)
+                        if (isInstalled && (isGuiRunning || isGuiStarting)) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        Color(0xFF4CAF50),
+                                        if (isGuiStarting) Color(0xFFFFA000) else Color(0xFF4CAF50),
                                         RoundedCornerShape(4.dp)
                                     )
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "RUNNING",
+                                    text = if (isGuiStarting) "STARTING" else "RUNNING",
                                     color = Color.White,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -238,65 +242,104 @@ fun DistroCard(
                     )
                 }
             } else {
-                // RUNNING State Handling
-                if (isGuiRunning) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Open Display Button (Cyan - Primary Action)
-                        Button(
-                            onClick = onOpenDisplay,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF00E5FF), // Cyan
-                                contentColor = Color.Black
-                            ),
-                            modifier = Modifier.weight(1f)
+                // RUNNING / STARTING — Open X11 + View Logs + Stop (termux-lib parity)
+                if (isGuiRunning || isGuiStarting) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                text = "Open X11",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+                            // Open X11 display (nativecode displayBtn)
+                            Button(
+                                onClick = onOpenDisplay,
+                                enabled = isGuiRunning || isGuiStarting,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF00E5FF),
+                                    contentColor = Color.Black,
+                                    disabledContainerColor = Color(0xFF00E5FF).copy(alpha = 0.4f),
+                                    disabledContentColor = Color.Black.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "Open X11",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
 
-                        // Stop Button (Red - Destructive Action)
-                        Button(
-                            onClick = onStop,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFF5252), // Red
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier.weight(0.5f) // Smaller
-                        ) {
-                            Text(
-                                text = "Stop",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            Button(
+                                onClick = onStop,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF5252),
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.weight(0.55f)
+                            ) {
+                                Text(
+                                    text = "Stop",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                        // VIEW LOGS — always available once start streamed any output
+                        if (logsAvailable || isGuiStarting || isGuiRunning) {
+                            Button(
+                                onClick = onViewLogs,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "View Logs",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
                     }
                 } else {
-                    // STOPPED State - Standard Start Button
-                    Button(
-                        onClick = onNavigateToStart, // This should trigger the Popup, passed from parent
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                            contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        androidx.compose.material3.Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Start",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
+                    // STOPPED State - Start + optional prior logs
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onNavigateToStart,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                                contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Start",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                        if (logsAvailable) {
+                            Button(
+                                onClick = onViewLogs,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "View Logs",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

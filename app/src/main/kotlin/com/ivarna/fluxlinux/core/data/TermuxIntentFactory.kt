@@ -5,6 +5,16 @@ import android.content.Context
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
 
+/**
+ * Legacy external-Termux intent builder.
+ *
+ * Pass 2 (embedded terminal plan §2.4/§4.5): install / run shell / uninstall /
+ * component paths for `debian` / `debian13_chroot` / `debian_chroot` MUST NOT
+ * use this factory — use `terminalComponentFor(distroId)` + the session
+ * factories. Remaining legitimate call sites: GUI Start/Stop (deferred GUI
+ * pass) and legacy optional tweaks. The install/buildRun* builders below are
+ * DEAD (no product caller) — do not re-wire them.
+ */
 object TermuxIntentFactory {
 
     private const val ACTION_RUN_COMMAND = "com.termux.RUN_COMMAND"
@@ -899,8 +909,8 @@ object TermuxIntentFactory {
                 'killall -9 plasmashell kwin_x11 kded6 plasma_session startplasma-x11 dbus-launch 2>/dev/null; sleep 1' \
                 2>/dev/null
 
-            # Step 2: Stop Termux:X11
-            am broadcast -a com.termux.x11.ACTION_STOP -p com.termux.x11 >/dev/null 2>&1
+            # Step 2: Stop Termux:X11 (embedded — broadcast to host app package)
+            am broadcast -a com.termux.x11.ACTION_STOP -p com.ivarna.fluxlinux >/dev/null 2>&1
             killall -9 Xwayland termux-x11 2>/dev/null
             kill -9 $(pgrep -f "termux.x11") 2>/dev/null
 

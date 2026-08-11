@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- NativeCode design tokens (ui_design.md / NC.*) -->
+    <color name="nc_bg">#131313</color>
+    <color name="nc_surface">#131313</color>
+    <color name="nc_surface_container">#1E1E1E</color>
+    <color name="nc_surface_bright">#393939</color>
+    <color name="nc_primary">#3DDC84</color>
+    <color name="nc_on_primary">#0A0A0A</color>
+    <color name="nc_on_surface">#FAFAFA</color>
+    <color name="nc_outline_variant">#3C4A3F</color>
+    <color name="nc_ek_bar_bg">#0A0A0A</color>
+    <color name="nc_ek_active_bg">#3DDC84</color>
+    <color name="nc_ek_active_text">#0A0A0A</color>
+</resources>

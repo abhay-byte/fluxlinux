@@ -16,15 +16,18 @@ mkdir -p "$FLUX_RUNTIME_DIR"
 chmod 700 "$FLUX_RUNTIME_DIR"
 export XDG_RUNTIME_DIR="$FLUX_RUNTIME_DIR"
 
-# Prepare termux-x11 session
-termux-x11 :0 >/dev/null &
+# Prepare embedded termux-x11 session (X11 server runs in-process with the host app).
+# The host app launches the X11 activity; here we spawn the X server entry point
+# from the app's own APK (TERMUX_X11_APK_PATH is set by the app's host env).
+if [ -n "$TERMUX_X11_APK_PATH" ] && [ -f "$TERMUX_X11_APK_PATH" ]; then
+    CLASSPATH="$TERMUX_X11_APK_PATH" app_process / com.termux.x11.CmdEntryPoint :0 -legacy-drawing >/dev/null 2>&1 &
+    echo "FluxLinux: Embedded X11 server started from app APK"
+else
+    termux-x11 :0 >/dev/null &
+fi
 
-# Wait until termux-x11 gets started
+# Wait until the X11 session gets started
 sleep 3
-
-# Launch Termux X11 main activity
-am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1
-sleep 1
 
 # Login to PRoot and start KDE Plasma
 proot-distro login $DISTRO --shared-tmp -- /bin/bash -c '

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:installLocation="internalOnly">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <application
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        tools:ignore="DataExtractionRules,GoogleAppIndexingWarning">
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTask"
+            android:theme="@style/AppTheme"
+            android:supportsPictureInPicture="true"
+            android:configChanges="fontScale|orientation|screenSize|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|screenLayout|touchscreen|uiMode|smallestScreenSize|density"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="stateHidden"
+            android:exported="false">
+            <!-- B14: NativeCode same-package explicit Intent only -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+            <intent-filter>
+                <category android:name="android.intent.category.SECONDARY_HOME" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity>
+        <activity
+            android:theme="@style/Theme.NativeCode.X11.Preferences"
+            android:excludeFromRecents="true"
+            android:name=".LoriePreferences"
+            android:supportsPictureInPicture="false"
+            android:resizeableActivity="true"
+            android:exported="false">
+            <!-- B14: NativeCode same-package explicit Intent only -->
+            <intent-filter>
+                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+	    <meta-data android:name="com.samsung.android.multidisplay.keep_process_alive" android:value="false"/>
+	    <meta-data android:name="android.allow_multiple_resumed_activities" android:value="true" />
+
+        <!-- B14: not exported — CHANGE_PREFERENCE only from same app -->
+        <receiver android:name=".LoriePreferences$Receiver" android:exported="false" android:enabled="true">
+            <intent-filter>
+                <action android:name="com.termux.x11.CHANGE_PREFERENCE" />
+            </intent-filter>
+        </receiver>
+    </application>
+    <queries>
+        <package android:name="com.termux" />
+    </queries>
+</manifest>
