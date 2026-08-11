@@ -307,15 +307,25 @@ class OnboardingInstallRunner(private val ctx: Context) {
             processHolder = activeProcess
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
-        val installed = TerminalLauncher.isDebianChrootInstalled()
         if (rootResult.exitCode != 0) {
             postFail(onProgress, phases, "Chroot install failed (exit ${rootResult.exitCode})")
             return
         }
+        // App SELinux cannot see /data/local/tmp — always re-probe as root after install.
+        TerminalLauncher.invalidateChrootInstalledCache()
+        val installed = TerminalLauncher.isDebianChrootInstalled()
         if (!installed) {
-            postFail(onProgress, phases, "Chroot rootfs missing after install")
+            log(
+                phases, 2, onProgress,
+                "Root probe: chroot missing at ${com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH}"
+            )
+            postFail(
+                onProgress, phases,
+                "Chroot rootfs missing after install (check root grant + ${com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH})"
+            )
             return
         }
+        log(phases, 2, onProgress, "Chroot rootfs verified (root probe)")
         completePhase(phases, 2, onProgress, "Chroot rootfs ready")
 
         enter(phases, 3, onProgress, "Installing XFCE packages…")
@@ -327,7 +337,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             postFail(onProgress, phases, "XFCE setup failed (exit $familyExit)")
             return
         }
-        if (!isChrootXfceInstalled()) {
+        if (!TerminalLauncher.isDebianChrootXfceInstalled()) {
             postFail(
                 onProgress, phases,
                 "XFCE not found after family setup (startxfce4 missing). Retry."
@@ -623,9 +633,6 @@ class OnboardingInstallRunner(private val ctx: Context) {
             ctx.filesDir,
             "usr/var/lib/proot-distro/containers/debian/rootfs/usr/bin/startxfce4"
         ).exists()
-
-    private fun isChrootXfceInstalled(): Boolean =
-        File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
 
     companion object {
         private const val TAG = "OnboardingInstall"

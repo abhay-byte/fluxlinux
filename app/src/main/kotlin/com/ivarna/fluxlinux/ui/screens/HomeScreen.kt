@@ -12,9 +12,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -221,100 +236,45 @@ fun HomeScreen(
 
     
     Spacer(modifier = Modifier.height(100.dp))
-    
-    // Launch Popup
+
+    // Launch mode dialog (shell / root / desktop)
     if (distroToLaunch.value != null) {
         val distro = distroToLaunch.value!!
-        AlertDialog(
-            onDismissRequest = { distroToLaunch.value = null },
-            title = { 
-                Text(
-                    "Start ${distro.name}", 
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                ) 
-            },
-            text = { Text("Choose how you want to launch the distribution.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            containerColor = MaterialTheme.colorScheme.surface,
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { distroToLaunch.value = null }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface) 
-                }
-            },
-            icon = {
-                 Icon(
-                     imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
-                     contentDescription = null,
-                     tint = FluxAccentCyan
-                 )
-            },
-            // Custom Layout for Buttons
-            // Using a Row with two big buttons? LIMITATION: AlertDialog has specific slots.
-            // We can put the buttons in the "text" part or just use confirm/dismiss as actions?
-            // Better to use the text part to house the buttons for vertical stacking or a Row.
-        )
-        // AlertDialog is a bit restrictive for 2 "positive" actions.
-        // Let's use a custom Dialog or just use the Buttons in the text area?
-        // Actually, we can just put a Column in the 'text' slot.
-    }
-    
-    // Custom Launch Dialog
-    if (distroToLaunch.value != null) {
-        val distro = distroToLaunch.value!!
+        val accent = MaterialTheme.colorScheme.secondary
+        val titleColor = MaterialTheme.colorScheme.onBackground
+        val muted = MaterialTheme.colorScheme.onSurfaceVariant
+        val llmInstalled = StateManager.isComponentInstalled(context, distro.id, "vulkan_llamacpp")
+        val modelInstalled = StateManager.isComponentInstalled(context, distro.id, "qwen25_model")
+        val kdeInstalled = StateManager.isComponentInstalled(context, distro.id, "kde_plasma")
+        val isGuiRunning = StateManager.isGuiRunning(context, distro.id)
+        val runningType = StateManager.getGuiRunningType(context, distro.id)
+
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { distroToLaunch.value = null },
             properties = androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false // Allow full width customization
-            ) 
+                usePlatformDefaultWidth = false
+            )
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFF1E1E1E).copy(alpha = 0.95f),
-                                Color(0xFF121212).copy(alpha = 0.98f)
-                            )
-                        )
-                    )
-                    .border(
-                        BorderStroke(1.dp, Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.15f),
-                                Color.Transparent
-                            )
-                        )),
-                        RoundedCornerShape(28.dp)
-                    )
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.92f),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
-                // Glow effect behind the top
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Header Icon
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(accent.copy(alpha = 0.12f))
+                            .border(
+                                BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
+                                RoundedCornerShape(20.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         if (distro.iconRes != null) {
@@ -325,84 +285,74 @@ fun HomeScreen(
                             )
                         } else {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+                                imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
+                                tint = accent,
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(Modifier.height(16.dp))
 
                     Text(
                         text = "Start ${distro.name}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = titleColor
                     )
-                    
                     Text(
                         text = "Choose launch mode",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        color = muted,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
-                    // CLI Button — opens in-app terminal session (termux-flux-terminal /
-                    // chroot-root-shell), no external Termux required.
-                    Button(
+
+                    Spacer(Modifier.height(22.dp))
+
+                    // Shell — in-app terminal (no external Termux)
+                    LaunchModeAction(
+                        icon = Icons.Filled.Terminal,
+                        label = "Open Shell",
+                        subtitle = "User session",
+                        containerColor = Color(0xFFF8BBD9),
+                        contentColor = Color(0xFF4A1028),
                         onClick = {
                             onOpenTerminal(distro.id, false)
                             distroToLaunch.value = null
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Open Shell", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Root Terminal Button (chroot → chroot-root-shell; proot → shell-root card)
-                    Button(
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    LaunchModeAction(
+                        icon = Icons.Filled.AdminPanelSettings,
+                        label = "Open Root Shell",
+                        subtitle = "Privileged session",
+                        containerColor = Color(0xFFB71C1C),
+                        contentColor = Color.White,
                         onClick = {
                             onOpenTerminal(distro.id, true)
                             distroToLaunch.value = null
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🔓 Open Root Shell", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // LLM Model Button (Qwen3.5 interactive chat)
-                    val llmInstalled = StateManager.isComponentInstalled(context, distro.id, "vulkan_llamacpp")
-                    val modelInstalled = StateManager.isComponentInstalled(context, distro.id, "qwen25_model")
-                    
+                    )
+
                     if (llmInstalled && modelInstalled) {
-                        Button(
+                        Spacer(Modifier.height(10.dp))
+                        LaunchModeAction(
+                            icon = Icons.Filled.Psychology,
+                            label = "Run Qwen2.5-1.5B",
+                            subtitle = "In-app model session",
+                            containerColor = Color(0xFF5E35B1),
+                            contentColor = Color.White,
                             onClick = {
-                                // Run Qwen inside the in-app proot terminal (no Termux intent)
                                 val scriptManager = ScriptManager(context)
-                                val scriptContent = scriptManager.getScriptContent("debian/common/addon/launch_qwen25.sh")
+                                val scriptContent = scriptManager.getScriptContent(
+                                    "debian/common/addon/launch_qwen25.sh"
+                                )
                                 val scriptB64 = android.util.Base64.encodeToString(
-                                    scriptContent.toByteArray(), android.util.Base64.NO_WRAP
+                                    scriptContent.toByteArray(),
+                                    android.util.Base64.NO_WRAP
                                 )
                                 val payload = "echo '$scriptB64' | base64 -d | bash"
                                 com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openSessionAfterHost(
@@ -418,27 +368,18 @@ fun HomeScreen(
                                     }
                                 )
                                 distroToLaunch.value = null
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF7C4DFF).copy(alpha = 0.85f),
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🤖 Run Qwen2.5-1.5B", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                             }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
+                        )
                     }
-                    
-                    // GUI Buttons — separate for XFCE4 and KDE
-                    val kdeInstalled = StateManager.isComponentInstalled(context, distro.id, "kde_plasma")
 
-                    // XFCE4 — streamed start_gui + live logs + X11 (termux-lib parity)
-                    Button(
+                    Spacer(Modifier.height(10.dp))
+
+                    LaunchModeAction(
+                        icon = Icons.Filled.DesktopWindows,
+                        label = "Launch XFCE4",
+                        subtitle = "Graphical desktop",
+                        containerColor = Color(0xFF6A1B9A),
+                        contentColor = Color.White,
                         onClick = {
                             try {
                                 DesktopLauncher.start(context, distro.id) { ok ->
@@ -448,93 +389,86 @@ fun HomeScreen(
                                 showDesktopLogs = true
                                 distroToLaunch.value = null
                             } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Launch failed: ${e.message}",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
                             }
+                        }
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    LaunchModeAction(
+                        icon = Icons.Filled.Widgets,
+                        label = if (kdeInstalled) "Launch KDE Plasma" else "Launch KDE",
+                        subtitle = if (kdeInstalled) "GPU mode picker" else "Not installed",
+                        containerColor = if (kdeInstalled) {
+                            Color(0xFF283593)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4A148C).copy(alpha = 0.85f),
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Text("🖥 Launch XFCE4", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // KDE Plasma — opens GPU picker if installed
-                    Button(
+                        contentColor = if (kdeInstalled) {
+                            Color.White
+                        } else {
+                            muted
+                        },
+                        enabled = true,
                         onClick = {
-                            if (kdeInstalled && com.ivarna.fluxlinux.core.utils.StateManager.canRunCommands(context)) {
-                                // Show GPU mode picker sub-dialog
+                            if (kdeInstalled && StateManager.canRunCommands(context)) {
                                 showKdeGpuPicker.value = distro
                             } else if (!kdeInstalled) {
-                                android.widget.Toast.makeText(context, "Install KDE Plasma Desktop first from Settings.", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Install KDE Plasma Desktop first from Settings.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
                             } else {
                                 permissionState.launchPermissionRequest()
                             }
-                        },
-                        enabled = true, // Always tappable — shows toast if not installed
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (kdeInstalled) Color(0xFF1A237E).copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            contentColor = if (kdeInstalled) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Text(
-                            if (kdeInstalled) "🌊 Launch KDE Plasma" else "🌊 Launch KDE (Not Installed)",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                    }
+                        }
+                    )
 
-
-                    val isGuiRunning = StateManager.isGuiRunning(context, distro.id)
-                    val runningType = StateManager.getGuiRunningType(context, distro.id)
                     if (isGuiRunning) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
+                        Spacer(Modifier.height(10.dp))
+                        LaunchModeAction(
+                            icon = Icons.Filled.Stop,
+                            label = if (runningType == "kde") "Stop KDE Plasma" else "Stop XFCE4",
+                            subtitle = "End desktop session",
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = Color.White,
                             onClick = {
                                 if (runningType == "kde") {
-                                    // KDE still uses legacy intent until fully ported
-                                    val intent = TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
+                                    val intent = TermuxIntentFactory.buildStopKdeGuiIntent(
+                                        context,
+                                        distro.id
+                                    )
                                     onStartService(intent)
                                     StateManager.setGuiRunning(context, distro.id, false)
                                     StateManager.setGuiRunningType(context, distro.id, "")
                                 } else {
-                                    // Flags cleared inside DesktopLauncher.stop
-                                    com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(context, distro.id)
+                                    DesktopLauncher.stop(context, distro.id)
                                 }
                                 distroToLaunch.value = null
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
-                        ) {
-                            Text(
-                                if (runningType == "kde") "⏹ Stop KDE Plasma" else "⏹ Stop XFCE4",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    androidx.compose.material3.TextButton(
-                        onClick = { distroToLaunch.value = null },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            "Cancel", 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
+                            }
                         )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = { distroToLaunch.value = null },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = titleColor)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cancel", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -632,6 +566,29 @@ private fun DesktopLogsDialog(
     LaunchedEffect(logText) {
         scroll.animateScrollTo(scroll.maxValue)
     }
+
+    // Dark primary is near-black — prefer cream secondary + light surfaces for contrast.
+    val titleColor = MaterialTheme.colorScheme.onBackground
+    val accent = MaterialTheme.colorScheme.secondary
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val logFg = Color(0xFFE8EAED)
+    val logBg = Color(0xFF101214)
+    val phaseLabel = when (phase) {
+        DesktopLauncher.Phase.Starting -> "Starting…"
+        DesktopLauncher.Phase.Running -> "Running"
+        DesktopLauncher.Phase.Idle -> "Idle"
+    }
+    val phaseIcon = when (phase) {
+        DesktopLauncher.Phase.Starting -> Icons.Filled.Sync
+        DesktopLauncher.Phase.Running -> Icons.Filled.PlayArrow
+        DesktopLauncher.Phase.Idle -> Icons.Filled.Schedule
+    }
+    val phaseTint = when (phase) {
+        DesktopLauncher.Phase.Starting -> accent
+        DesktopLauncher.Phase.Running -> Color(0xFF69F0AE)
+        DesktopLauncher.Phase.Idle -> muted
+    }
+
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -650,25 +607,47 @@ private fun DesktopLogsDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
-                        Text(
-                            "Graphical Desktop Log",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.DesktopWindows,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(28.dp)
                         )
-                        Text(
-                            when (phase) {
-                                DesktopLauncher.Phase.Starting -> "Starting…"
-                                DesktopLauncher.Phase.Running -> "Running"
-                                DesktopLauncher.Phase.Idle -> "Idle"
-                            },
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "Graphical Desktop Log",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = titleColor
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = phaseIcon,
+                                    contentDescription = null,
+                                    tint = phaseTint,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    phaseLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = phaseTint
+                                )
+                            }
+                        }
                     }
-                    TextButton(onClick = onDismiss) {
-                        Text("Close")
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Close",
+                            tint = titleColor
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -677,14 +656,19 @@ private fun DesktopLogsDialog(
                         .weight(1f)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF0D0D0D))
+                        .background(logBg)
+                        .border(
+                            BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                            RoundedCornerShape(12.dp)
+                        )
                         .padding(12.dp)
                 ) {
                     Text(
                         text = logText.ifBlank { "Waiting for desktop output…" },
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        color = Color(0xFFB0BEC5),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = logFg,
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(scroll)
@@ -697,22 +681,100 @@ private fun DesktopLogsDialog(
                 ) {
                     OutlinedButton(
                         onClick = onCopy,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = accent
+                        ),
+                        border = BorderStroke(1.5.dp, accent.copy(alpha = 0.75f))
                     ) {
-                        Text("Copy")
+                        Icon(
+                            imageVector = Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Copy", fontWeight = FontWeight.SemiBold)
                     }
                     Button(
                         onClick = onOpenX11,
                         enabled = phase != DesktopLauncher.Phase.Idle,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF00E5FF),
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color(0xFF00E5FF).copy(alpha = 0.28f),
+                            disabledContentColor = Color.Black.copy(alpha = 0.45f)
                         )
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text("Open X11", fontWeight = FontWeight.Bold)
                     }
                 }
+            }
+        }
+    }
+}
+
+// ─── Launch mode action row ────────────────────────────────────────────────────
+@Composable
+private fun LaunchModeAction(
+    icon: ImageVector,
+    label: String,
+    subtitle: String,
+    containerColor: Color,
+    contentColor: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+            disabledContainerColor = containerColor.copy(alpha = 0.45f),
+            disabledContentColor = contentColor.copy(alpha = 0.55f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().height(64.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(contentColor.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Text(
+                    label,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = contentColor
+                )
+                Text(
+                    subtitle,
+                    fontSize = 11.sp,
+                    color = contentColor.copy(alpha = 0.78f)
+                )
             }
         }
     }
@@ -772,18 +834,26 @@ private fun KdeGpuPickerDialog(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
-                Text(
-                    text = "🌊 KDE Plasma",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Widgets,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = "KDE Plasma",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Choose GPU Renderer",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.55f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -798,7 +868,7 @@ private fun KdeGpuPickerDialog(
                     // ── Turnip Card ─────────────────────────
                     GpuOptionCard(
                         modifier = Modifier.fillMaxWidth(),
-                        emoji = "🔥",
+                        icon = Icons.Filled.Bolt,
                         title = "Turnip",
                         subtitle = "Vulkan",
                         description = "Hardware Vulkan via Adreno GPU. Best performance.",
@@ -810,7 +880,7 @@ private fun KdeGpuPickerDialog(
                     // ── Software Card ───────────────────────
                     GpuOptionCard(
                         modifier = Modifier.fillMaxWidth(),
-                        emoji = "🖥️",
+                        icon = Icons.Filled.Memory,
                         title = "Software",
                         subtitle = "LLVMpipe",
                         description = "CPU-only. No GPU required. Works on all devices.",
@@ -831,28 +901,41 @@ private fun KdeGpuPickerDialog(
                         .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text = "ℹ️  Turnip: Requires Adreno GPU with Vulkan • Software: Works on any device (slower)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.45f),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Turnip needs Adreno + Vulkan. Software works on any device (slower).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                androidx.compose.material3.TextButton(
+                TextButton(
                     onClick = onDismiss,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Cancel",
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontWeight = FontWeight.Medium
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onBackground
                     )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Cancel", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -863,7 +946,7 @@ private fun KdeGpuPickerDialog(
 @Composable
 private fun GpuOptionCard(
     modifier: Modifier = Modifier,
-    emoji: String,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     description: String,
@@ -873,23 +956,18 @@ private fun GpuOptionCard(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        accentColor.copy(alpha = 0.15f),
-                        accentColor.copy(alpha = 0.05f)
+                        accentColor.copy(alpha = 0.18f),
+                        accentColor.copy(alpha = 0.06f)
                     )
                 )
             )
             .border(
-                BorderStroke(1.dp, Brush.verticalGradient(
-                    listOf(
-                        accentColor.copy(alpha = 0.3f),
-                        Color.Transparent
-                    )
-                )),
-                RoundedCornerShape(24.dp)
+                BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+                RoundedCornerShape(20.dp)
             )
             .clickable(onClick = onClick)
     ) {
@@ -897,30 +975,31 @@ private fun GpuOptionCard(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Emoji icon in glowing circle
             Box(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(accentColor.copy(alpha = 0.2f)),
+                    .background(accentColor.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = emoji, fontSize = 26.sp)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(26.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Text content
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = title,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onBackground
                     )
-                    
-                    // Experimental/Fallback badge
                     if (badgeText != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
@@ -938,12 +1017,12 @@ private fun GpuOptionCard(
                         }
                     }
                 }
-                
+
                 Text(
                     text = subtitle,
                     fontSize = 11.sp,
-                    color = accentColor.copy(alpha = 0.85f),
-                    fontWeight = FontWeight.Medium
+                    color = accentColor,
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -951,7 +1030,7 @@ private fun GpuOptionCard(
                 Text(
                     text = description,
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Start,
                     lineHeight = 15.sp
                 )
@@ -959,6 +1038,4 @@ private fun GpuOptionCard(
         }
     }
 }
-
-
 

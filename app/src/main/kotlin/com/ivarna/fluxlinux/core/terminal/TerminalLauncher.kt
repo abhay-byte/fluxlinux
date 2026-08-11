@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.ivarna.fluxlinux.core.chroot.ChrootDetection
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -35,9 +36,17 @@ object TerminalLauncher {
     fun isDebianProotInstalled(ctx: Context): Boolean =
         File(ctx.filesDir, "usr/var/lib/proot-distro/containers/debian/rootfs/bin/sh").exists()
 
-    /** Filesystem truth for "Debian (chroot) installed". */
-    fun isDebianChrootInstalled(): Boolean =
-        File("/data/local/tmp/chrootDebian13/bin/sh").exists()
+    /**
+     * Debian chroot installed — delegates to [ChrootDetection] (auto-detect +
+     * root probe; SELinux-safe).
+     */
+    fun isDebianChrootInstalled(): Boolean = ChrootDetection.isInstalled()
+
+    fun invalidateChrootInstalledCache() {
+        ChrootDetection.invalidate()
+    }
+
+    fun isDebianChrootXfceInstalled(): Boolean = ChrootDetection.isXfceInstalled()
 
     /** @return true when the distro rootfs exists on disk for [distroId]. */
     fun isDistroInstalledOnFs(ctx: Context, distroId: String): Boolean = when (distroId) {

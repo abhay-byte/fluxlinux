@@ -31,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,8 +56,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager
 import com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult
+import com.ivarna.fluxlinux.core.utils.TerminalPreferences
 import com.ivarna.fluxlinux.ui.terminal.TerminalExtraKeys
 import com.ivarna.fluxlinux.ui.terminal.TerminalModifierState
 import com.ivarna.fluxlinux.ui.terminal.TerminalToolSelector
@@ -83,13 +90,32 @@ fun TerminalScreen(
 
     // Modifier state shared between TerminalViewClient (read side) and ExtraKeys (UI).
     val modState = remember { TerminalModifierState() }
-    var fontSize by remember { mutableStateOf(24) }
+    var fontSize by remember {
+        mutableIntStateOf(TerminalPreferences.getFontSize(context))
+    }
+    var showExtraKeys by remember {
+        mutableStateOf(TerminalPreferences.isExtraKeysEnabled(context))
+    }
     var terminalViewRef by remember { mutableStateOf<TerminalView?>(null) }
     var showNewSessionSheet by remember { mutableStateOf(false) }
     // Avoid SIGWINCH spam on every Compose recomposition — only when the emulator's
     // cols/rows or the attached pid actually change (R2: pinch zoom changes cols/rows
     // without a view-size change, so pixel width/height is NOT a valid guard key).
     val lastWinchKey = remember { intArrayOf(-1, -1, -1) } // cols, rows, pid
+
+    // Reload prefs when returning from Settings (Terminal / X11 detail pages).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                fontSize = TerminalPreferences.getFontSize(context)
+                showExtraKeys = TerminalPreferences.isExtraKeysEnabled(context)
+                terminalViewRef?.setTextSize(fontSize)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -192,6 +218,22 @@ fun TerminalScreen(
                 modifier = Modifier.padding(start = if (onBack == null) 12.dp else 0.dp)
             )
             Spacer(Modifier.weight(1f))
+            // Extra keys toolbar toggle (nativecode parity)
+            IconButton(
+                onClick = {
+                    val next = !showExtraKeys
+                    showExtraKeys = next
+                    TerminalPreferences.setExtraKeysEnabled(context, next)
+                    terminalViewRef?.let { forceTerminalResize(it) }
+                }
+            ) {
+                Icon(
+                    imageVector = if (showExtraKeys) Icons.Default.Keyboard else Icons.Default.KeyboardHide,
+                    contentDescription = if (showExtraKeys) "Hide extra keys" else "Show extra keys",
+                    tint = if (showExtraKeys) FluxAccentMagenta
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             IconButton(onClick = { showNewSessionSheet = true }) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -260,8 +302,12 @@ fun TerminalScreen(
                             setTerminalViewClient(object : TerminalViewClient {
                                 override fun onScale(scale: Float): Float {
                                     if (scale < 0.9f || scale > 1.1f) {
-                                        val next = (fontSize * scale).toInt().coerceIn(10, 48)
+                                        val next = (fontSize * scale).toInt().coerceIn(
+                                            TerminalPreferences.FONT_MIN,
+                                            TerminalPreferences.FONT_MAX
+                                        )
                                         fontSize = next
+                                        TerminalPreferences.setFontSize(ctx, next)
                                         setTextSize(next)
                                         return 1.0f
                                     }
@@ -306,6 +352,8 @@ fun TerminalScreen(
                     },
                     update = { view ->
                         terminalViewRef = view
+                        // Keep text size in sync with global prefs (settings page / pinch).
+                        view.setTextSize(fontSize)
                         // T3: focus parity — re-attach + focus on every recompose/switch so a
                         // freshly opened or switched session never shows a blank/dead view.
                         view.isFocusable = true
@@ -326,11 +374,13 @@ fun TerminalScreen(
             }
 
             // ExtraKeys toolbar: nativecode inject path (TerminalView.onKeyDown / inputCodePoint).
-            TerminalExtraKeys(
-                modState = modState,
-                terminalView = { terminalViewRef },
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (showExtraKeys) {
+                TerminalExtraKeys(
+                    modState = modState,
+                    terminalView = { terminalViewRef },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         } else {
             // Empty state: nativecode-style 2-column card grid with original distro icons.
             TerminalToolSelector(onOpen = ::openCard)

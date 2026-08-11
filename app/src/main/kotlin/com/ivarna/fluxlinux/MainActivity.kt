@@ -46,6 +46,9 @@ enum class Screen {
     PREREQUISITES,
     HOME,
     SETTINGS,
+    SETTINGS_TERMINAL,
+    SETTINGS_X11,
+    SETTINGS_CHROOT,
     TROUBLESHOOTING,
     ROOT_ACCESS,
     INSTALL_WIZARD,
@@ -682,7 +685,42 @@ class MainActivity : ComponentActivity() {
                                 currentScreen = Screen.ONBOARDING
                             },
                             onNavigateToTroubleshooting = { currentScreen = Screen.TROUBLESHOOTING },
-                            onNavigateToRootCheck = { currentScreen = Screen.ROOT_ACCESS }
+                            onNavigateToRootCheck = { currentScreen = Screen.ROOT_ACCESS },
+                            onNavigateToTerminalSettings = {
+                                currentScreen = Screen.SETTINGS_TERMINAL
+                            },
+                            onNavigateToX11Settings = {
+                                currentScreen = Screen.SETTINGS_X11
+                            },
+                            onNavigateToChrootSettings = {
+                                currentScreen = Screen.SETTINGS_CHROOT
+                            }
+                        )
+                    }
+                    Screen.SETTINGS_TERMINAL -> {
+                        com.ivarna.fluxlinux.ui.screens.TerminalSettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS }
+                        )
+                    }
+                    Screen.SETTINGS_X11 -> {
+                        com.ivarna.fluxlinux.ui.screens.X11SettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS }
+                        )
+                    }
+                    Screen.SETTINGS_CHROOT -> {
+                        com.ivarna.fluxlinux.ui.screens.ChrootSettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS },
+                            onNavigateToInstall = {
+                                // Route to distro install for rooted Debian
+                                selectedDistro = com.ivarna.fluxlinux.core.data.DistroRepository
+                                    .supportedDistros
+                                    .firstOrNull { it.id == "debian13_chroot" }
+                                currentScreen = if (selectedDistro != null) {
+                                    Screen.INSTALL_WIZARD
+                                } else {
+                                    Screen.HOME
+                                }
+                            }
                         )
                     }
                     Screen.TROUBLESHOOTING -> {

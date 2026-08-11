@@ -488,9 +488,14 @@ main() {
 
     DEBIANPATH="/data/local/tmp/chrootDebian13"
 
-    if [ -f "$DEBIANPATH/.flux_configured" ]; then
+    # Already installed: marker and/or a real shell binary (app cannot always see this path).
+    if [ -f "$DEBIANPATH/.flux_configured" ] || [ -e "$DEBIANPATH/bin/sh" ] || [ -e "$DEBIANPATH/usr/bin/bash" ]; then
         success "Debian 13 Chroot already installed."
-        progress "Skipping installation..."
+        progress "Skipping installation (rootfs at $DEBIANPATH)..."
+        # Ensure marker exists for future probes
+        touch "$DEBIANPATH/.flux_configured" 2>/dev/null || true
+        # Print probe lines the app can match in logs
+        progress "VERIFY: chroot present (bin/sh or bash + marker)"
         am start -a android.intent.action.VIEW -d "fluxlinux://callback?result=success&name=distro_install_debian13_chroot" >/dev/null 2>&1 || true
         exit 0
     fi
