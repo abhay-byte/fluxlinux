@@ -27,9 +27,9 @@ import kotlinx.coroutines.flow.update
  * (termux-lib / nativecode-ai parity — no external Termux / Termux:X11).
  *
  * Long-lived start uses [ShellCommandRunner.runStreamedCancelable] so other
- * install/script runners are never blocked. X11 opens on the first healthy
- * script line (not a blind preflight sleep). Desktop stdout is captured to
- * [GuiDesktopLog] for VIEW LOGS.
+ * install/script runners are never blocked. X11 opens only after a readiness
+ * marker (e.g. `X server PID=`), not decorative banners. Desktop stdout is
+ * captured to [GuiDesktopLog] for VIEW LOGS.
  */
 object DesktopLauncher {
 
@@ -58,10 +58,12 @@ object DesktopLauncher {
     @Volatile private var guiUserStopping: Boolean = false
     @Volatile private var guiX11Launched: Boolean = false
     private val healthyLineSeen = AtomicBoolean(false)
+    /** Ensures [onResult] is invoked at most once per start. */
+    private val startResultDelivered = AtomicBoolean(false)
 
     /**
-     * @param onResult main-thread; true when desktop accepted (first healthy line
-     *   or still running — not early fail).
+     * @param onResult main-thread; true when desktop readiness marker seen
+     *   (once); false only on early fail before readiness.
      */
     fun start(ctx: Context, distroId: String, onResult: ((Boolean) -> Unit)? = null) {
         val app = ctx.applicationContext
@@ -109,6 +111,7 @@ object DesktopLauncher {
             guiUserStopping = false
             guiX11Launched = false
             healthyLineSeen.set(false)
+            startResultDelivered.set(false)
 
             GuiDesktopLog.clear(app)
             GuiDesktopLog.header(app, "START", scriptName, method)
@@ -145,7 +148,7 @@ object DesktopLauncher {
                 onLine = { line ->
                     GuiDesktopLog.append(app, line)
                     appendLive(line)
-                    if (line.isNotBlank()) {
+                    if (isDesktopReadyLine(line)) {
                         onHealthyLine(app, distroId, onResult)
                     }
                 },
@@ -160,7 +163,8 @@ object DesktopLauncher {
                             Log.w(TAG, "Desktop start failed exit=$code")
                             toast(app, "Desktop start failed (exit $code) — see logs")
                             revertToIdle(app, distroId, "exit $code", showLogs = true)
-                            onResult?.invoke(false)
+                            // Only report failure if readiness never delivered success
+                            deliverStartResult(onResult, false)
                         }
                         else -> {
                             // Clean desktop exit (session ended)
@@ -257,10 +261,28 @@ object DesktopLauncher {
 
     // ── private ────────────────────────────────────────────────────────────
 
+    /**
+     * True only for host/script readiness markers — not banner / early progress lines.
+     * Matches `start_gui.sh` / `start_gui_chroot.sh` / chroot guest stage.
+     */
+    internal fun isDesktopReadyLine(line: String): Boolean {
+        val t = line.trim()
+        if (t.isEmpty()) return false
+        return t.contains("X server PID=") ||
+            t.contains("host X0 socket ready") ||
+            t.contains("FLUX_DESKTOP_READY") ||
+            t.contains("FLUXLINUX_DESKTOP_READY")
+    }
+
+    private fun deliverStartResult(onResult: ((Boolean) -> Unit)?, ok: Boolean) {
+        if (startResultDelivered.compareAndSet(false, true)) {
+            onResult?.invoke(ok)
+        }
+    }
+
     private fun onHealthyLine(app: Context, distroId: String, onResult: ((Boolean) -> Unit)?) {
         if (guiUserStopping) return
-        // Only first healthy line flips RUNNING / prefs / X11 (match nativecode once-per-start).
-        // Subsequent lines only append logs — avoid StateManager + TermuxX11 prefs thrash.
+        // Only first readiness marker flips RUNNING / prefs / X11.
         val first = healthyLineSeen.compareAndSet(false, true)
         if (!first) return
 
@@ -277,10 +299,10 @@ object DesktopLauncher {
             )
         }
 
-        onResult?.invoke(true)
+        deliverStartResult(onResult, true)
         if (!guiX11Launched) {
             guiX11Launched = true
-            // Match nativecode: short delay so X server process can bind
+            // Short delay so X server process can bind socket before surface open
             main.postDelayed({
                 if (guiUserStopping) return@postDelayed
                 if (_ui.value.phase == Phase.Idle) return@postDelayed
@@ -323,7 +345,7 @@ object DesktopLauncher {
                 )
             }
         }
-        onResult?.invoke(ok)
+        deliverStartResult(onResult, ok)
     }
 
     private fun revertToIdle(
@@ -337,6 +359,7 @@ object DesktopLauncher {
         StateManager.setGuiRunningType(app, distroId, "")
         guiX11Launched = false
         healthyLineSeen.set(false)
+        // Keep startResultDelivered as-is so a late exit cannot re-fire onResult
         _ui.update {
             it.copy(
                 phase = Phase.Idle,

@@ -434,9 +434,13 @@ object RootShell {
     private fun buildChrootHelperCmd(user: String, b64: String, chrootPath: String): String {
         val helper = ChrootPaths.CHROOT_HELPER
         val pkg = com.ivarna.fluxlinux.BuildConfig.APPLICATION_ID
+        val prefix = "/data/data/$pkg/files/usr"
+        val hostTmp = "$prefix/tmp"
+        // Always pin package paths so zenithblue (and future flavors) do not fall
+        // back to the script's ivarna defaults when FLUX_* is unset.
         val envPrefix =
-            if (chrootPath == ChrootPaths.CHROOT_PATH) ""
-            else "FLUX_CHROOT='$chrootPath' "
+            "FLUX_PACKAGE='$pkg' FLUX_PREFIX='$prefix' FLUX_HOST_TMP='$hostTmp' " +
+                "FLUX_CHROOT='$chrootPath' "
         return envPrefix +
             "if [ ! -f $helper ]; then " +
             "for _s in " +

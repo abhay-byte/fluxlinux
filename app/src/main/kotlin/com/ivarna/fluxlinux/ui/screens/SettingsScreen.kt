@@ -226,9 +226,9 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        "v1.8.0 • embedded terminal & X11",
+                        "v${com.ivarna.fluxlinux.BuildConfig.VERSION_NAME} • embedded terminal & X11",
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

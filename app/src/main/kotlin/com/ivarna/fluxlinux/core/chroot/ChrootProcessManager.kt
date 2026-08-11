@@ -16,6 +16,8 @@ object ChrootProcessManager {
 
     private const val TAG = "ChrootProcessManager"
     private const val ASSET = "scripts/chroot/chroot_processes.sh"
+    private const val LIST_TIMEOUT_MS = 25_000L
+    private const val REAP_TIMEOUT_MS = 55_000L
 
     data class Proc(val pid: Int, val comm: String, val cmdline: String)
 
@@ -60,7 +62,18 @@ object ChrootProcessManager {
                 error = "stage_failed"
             )
         }
-        val raw = RootShell.capture("sh \"$staged\" list '$path'")
+        val raw = try {
+            RootShell.capture("sh \"$staged\" list '$path'", timeoutMs = LIST_TIMEOUT_MS)
+        } catch (e: Exception) {
+            Log.w(TAG, "list failed: ${e.message}")
+            return ListResult(
+                path = path,
+                processes = emptyList(),
+                raw = "",
+                rootOk = true,
+                error = "timeout"
+            )
+        }
         Log.d(TAG, "list raw:\n${raw.take(800)}")
         val parsed = parseList(raw, path)
         return parsed.copy(rootOk = true, error = parsed.error)
@@ -93,7 +106,20 @@ object ChrootProcessManager {
                 error = "stage_failed"
             )
         }
-        val raw = RootShell.capture("sh \"$staged\" reap '$path'")
+        val raw = try {
+            RootShell.capture("sh \"$staged\" reap '$path'", timeoutMs = REAP_TIMEOUT_MS)
+        } catch (e: Exception) {
+            Log.w(TAG, "reap failed: ${e.message}")
+            return KillResult(
+                killed = 0,
+                failed = 0,
+                remaining = emptyList(),
+                verifiedClean = false,
+                raw = "",
+                rootOk = true,
+                error = "timeout"
+            )
+        }
         Log.d(TAG, "reap raw:\n${raw.take(1200)}")
         return parseKill(raw, path, rootOk = true)
     }

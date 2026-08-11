@@ -18,7 +18,14 @@
 set -u
 
 VERSION_STR="fluxlinux-chroot v2.2"
-FLUX_PACKAGE="${FLUX_PACKAGE:-com.ivarna.fluxlinux}"
+# Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
+if [ -z "${FLUX_PACKAGE:-}" ]; then
+  if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
+    FLUX_PACKAGE=com.zenithblue.fluxlinux
+  else
+    FLUX_PACKAGE=com.ivarna.fluxlinux
+  fi
+fi
 FLUX_CHROOT="${FLUX_CHROOT:-/data/local/tmp/chrootDebian13}"
 FLUX_HOST_TMP="${FLUX_HOST_TMP:-/data/data/${FLUX_PACKAGE}/files/usr/tmp}"
 FLUX_PREFIX="${FLUX_PREFIX:-/data/data/${FLUX_PACKAGE}/files/usr}"
@@ -59,7 +66,7 @@ resolve_bb() {
   if command -v busybox >/dev/null 2>&1; then
     _det=$(command -v busybox)
     case "$_det" in
-      *com.termux*|*com.ivarna.fluxlinux*) ;;
+      *com.termux*|*fluxlinux*|*nativecode*) ;;
       *) BB="$_det" ;;
     esac
   fi

@@ -71,12 +71,10 @@ fun ChrootSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var sizeUi by remember {
-        mutableStateOf(ChrootSettingsModel.loadCached(context).size)
-    }
-    var procUi by remember {
-        mutableStateOf(ChrootSettingsModel.loadCached(context).proc)
-    }
+    // Single cache load — loadCached must stay non-blocking (no su).
+    val initialPage = remember { ChrootSettingsModel.loadCached(context) }
+    var sizeUi by remember { mutableStateOf(initialPage.size) }
+    var procUi by remember { mutableStateOf(initialPage.proc) }
     var busy by remember { mutableStateOf(false) }
     var showKillConfirm by remember { mutableStateOf(false) }
 

@@ -205,6 +205,15 @@ object ChrootSettingsModel {
                 error = result.error
             )
         }
+        if (result.error == "timeout") {
+            return ProcUi(
+                rootOk = true,
+                count = -1,
+                processes = emptyList(),
+                hint = "Scan timed out — retry",
+                error = result.error
+            )
+        }
         val n = result.processes.size
         ChrootInfoStore.saveProcCount(ctx, n)
         return ProcUi(
@@ -237,6 +246,16 @@ object ChrootSettingsModel {
                 processes = emptyList(),
                 hint = "Failed to stage helper script",
                 error = result.error
+            )
+        }
+        if (result.error == "timeout") {
+            return ProcUi(
+                rootOk = true,
+                count = -1,
+                processes = emptyList(),
+                hint = "Kill timed out — retry",
+                error = result.error,
+                statusLine = "last: timeout"
             )
         }
         val rem = result.remaining.size

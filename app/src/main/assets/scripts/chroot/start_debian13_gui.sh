@@ -1,10 +1,20 @@
 #!/system/bin/sh
 # start_debian13_gui.sh — root: mount Debian chroot + launch XFCE4
 # Called by start_gui_chroot.sh after host Pulse/VirGL/X11 are up.
-# Paths: com.ivarna.fluxlinux (not com.termux). Sticky guest /tmp preserved.
+# Paths: app package via FLUX_PACKAGE / TARGET_PREFIX (ivarna or zenithblue). Sticky guest /tmp preserved.
 
 DEBIANPATH="${DEBIANPATH:-/data/local/tmp/chrootDebian13}"
-TARGET_PREFIX="${TARGET_PREFIX:-/data/data/com.ivarna.fluxlinux/files/usr}"
+if [ -z "${TARGET_PREFIX:-}" ]; then
+  if [ -n "${FLUX_PREFIX:-}" ]; then
+    TARGET_PREFIX="$FLUX_PREFIX"
+  elif [ -n "${FLUX_PACKAGE:-}" ]; then
+    TARGET_PREFIX="/data/data/${FLUX_PACKAGE}/files/usr"
+  elif [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
+    TARGET_PREFIX="/data/data/com.zenithblue.fluxlinux/files/usr"
+  else
+    TARGET_PREFIX="/data/data/com.ivarna.fluxlinux/files/usr"
+  fi
+fi
 USERNAME="${USERNAME:-flux}"
 
 echo "========================================"

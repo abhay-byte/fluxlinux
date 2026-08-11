@@ -164,7 +164,7 @@ extract_file() {
 # NEVER bind app files/usr/tmp onto /tmp (app_data perms/SELinux break mkstemp).
 # Host app tmp is bridged at /mnt/host-tmp only.
 ensure_chroot_tmp() {
-    HOST_TMP="/data/data/com.ivarna.fluxlinux/files/usr/tmp"
+    HOST_TMP="${APP_PREFIX}/tmp"
     mkdir -p "$DEBIANPATH/tmp" "$HOST_TMP" "$DEBIANPATH/mnt/host-tmp" "$DEBIANPATH/var/tmp"
 
     # Drop previous bad bind/tmpfs on /tmp if present
@@ -296,34 +296,36 @@ configure_debian_chroot() {
     LAUNCH_SCRIPT="/data/local/tmp/start_debian13.sh"
     progress "Creating thin GUI launch script at $LAUNCH_SCRIPT..."
 
-    cat <<'EOF' > "$LAUNCH_SCRIPT"
+    # Expand APP_PREFIX / PKG at write time (unquoted EOF); keep runtime vars escaped.
+    cat <<EOF > "$LAUNCH_SCRIPT"
 #!/system/bin/sh
 # Compat one-shot GUI → prefer start_debian13_gui.sh (app SSOT) else helper mount --x11 + xfce
 GUI=/data/local/tmp/start_debian13_gui.sh
 HELPER=/data/local/tmp/fluxlinux_chroot.sh
-DEBIANPATH="${DEBIANPATH:-/data/local/tmp/chrootDebian13}"
-TARGET_PREFIX="${TARGET_PREFIX:-/data/data/com.ivarna.fluxlinux/files/usr}"
-USERNAME="${USERNAME:-flux}"
+DEBIANPATH="\${DEBIANPATH:-/data/local/tmp/chrootDebian13}"
+TARGET_PREFIX="\${TARGET_PREFIX:-$APP_PREFIX}"
+USERNAME="\${USERNAME:-flux}"
+export FLUX_PACKAGE="$PKG"
 
-if [ -f "$GUI" ]; then
-  exec sh "$GUI"
+if [ -f "\$GUI" ]; then
+  exec sh "\$GUI"
 fi
 
-if [ ! -f "$HELPER" ]; then
+if [ ! -f "\$HELPER" ]; then
   echo "fluxlinux_chroot.sh missing — open app chroot session or re-run setup" >&2
   exit 127
 fi
 
-export FLUX_CHROOT="$DEBIANPATH"
-export FLUX_PREFIX="$TARGET_PREFIX"
-export FLUX_HOST_TMP="${TARGET_PREFIX}/tmp"
-sh "$HELPER" mount --x11 || true
-sh "$HELPER" sh --user root -- \
-  "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon 2>/dev/null; true" \
+export FLUX_CHROOT="\$DEBIANPATH"
+export FLUX_PREFIX="\$TARGET_PREFIX"
+export FLUX_HOST_TMP="\${TARGET_PREFIX}/tmp"
+sh "\$HELPER" mount --x11 || true
+sh "\$HELPER" sh --user root -- \\
+  "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon 2>/dev/null; true" \\
   >/dev/null 2>&1 || true
-echo "Starting Debian 13 Chroot GUI ($USERNAME) via SSOT helper..."
+echo "Starting Debian 13 Chroot GUI (\$USERNAME) via SSOT helper..."
 echo "NOTE: Prefer app Settings START (start_gui_chroot.sh) for Pulse/X11 host stack."
-exec sh "$HELPER" sh --user "$USERNAME" -- \
+exec sh "\$HELPER" sh --user "\$USERNAME" -- \\
   'export DISPLAY=:0 PULSE_SERVER=tcp:127.0.0.1 XDG_RUNTIME_DIR=/tmp VTEST_SOCKET_NAME=/mnt/host-tmp/.virgl_test; xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null; exec dbus-launch --exit-with-session startxfce4'
 EOF
     chmod 755 "$LAUNCH_SCRIPT"
@@ -332,7 +334,7 @@ EOF
     # Prefer asset SSOT stop when present under app home (redeployed by app)
     STOP_LAUNCHER="/data/local/tmp/stop_debian13_gui.sh"
     progress "Creating GUI Stop Script at $STOP_LAUNCHER..."
-    APP_STOP="/data/data/com.ivarna.fluxlinux/files/home/stop_debian13_gui.sh"
+    APP_STOP="$APP_HOME/stop_debian13_gui.sh"
     if [ -f "$APP_STOP" ]; then
         cp -f "$APP_STOP" "$STOP_LAUNCHER"
         chmod +x "$STOP_LAUNCHER"
@@ -343,7 +345,7 @@ EOF
 DEBIANPATH="/data/local/tmp/chrootDebian13"
 BB="$BB"
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-TARGET_TERMUX_PREFIX="/data/data/com.ivarna.fluxlinux/files/usr"
+TARGET_TERMUX_PREFIX="$APP_PREFIX"
 
 echo "Terminating Debian 13 Chroot GUI processes..."
 \$BB chroot \$DEBIANPATH /bin/su - root -c "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon" >/dev/null 2>&1
@@ -358,7 +360,7 @@ EOF
     fi
 
     # Also stage full root GUI launcher from app home if present (Settings SSOT)
-    APP_START_GUI="/data/data/com.ivarna.fluxlinux/files/home/start_debian13_gui.sh"
+    APP_START_GUI="$APP_HOME/start_debian13_gui.sh"
     if [ -f "$APP_START_GUI" ]; then
         cp -f "$APP_START_GUI" /data/local/tmp/start_debian13_gui.sh
         chmod +x /data/local/tmp/start_debian13_gui.sh
@@ -370,8 +372,8 @@ EOF
     progress "Installing chroot SSOT helper at $HELPER..."
     HELPER_SRC=""
     for cand in \
-        "/data/data/com.ivarna.fluxlinux/files/home/fluxlinux_chroot.sh" \
-        "/data/data/com.ivarna.fluxlinux/files/staged_scripts/fluxlinux_chroot.sh" \
+        "$APP_HOME/fluxlinux_chroot.sh" \
+        "$(dirname "$APP_HOME")/staged_scripts/fluxlinux_chroot.sh" \
         "$(dirname "$0")/fluxlinux_chroot.sh"
     do
         if [ -f "$cand" ]; then
@@ -441,7 +443,7 @@ EOF
 }
 
 main() {
-    export LD_LIBRARY_PATH=/data/data/com.ivarna.fluxlinux/files/usr/lib
+    export LD_LIBRARY_PATH="${APP_PREFIX}/lib"
 
     if [ "$(id -u)" != "0" ]; then
         error "This script must be run as root. Exiting."
@@ -454,7 +456,7 @@ main() {
     if command -v busybox >/dev/null 2>&1; then
         DETECTED_BB=$(command -v busybox)
         case "$DETECTED_BB" in
-            *"com.ivarna.fluxlinux"*) ;;
+            *com.termux*|*fluxlinux*|*nativecode*) ;;
             *)
                 if [ -x "$DETECTED_BB" ]; then
                     BB="$DETECTED_BB"

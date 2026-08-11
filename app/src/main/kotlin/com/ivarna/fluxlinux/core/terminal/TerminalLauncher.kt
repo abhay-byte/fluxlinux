@@ -15,9 +15,10 @@ import java.util.concurrent.Executors
  * validation (host gate). All heavy work runs on a background executor;
  * [onDone] is dispatched on the main thread.
  *
- * Pass 2: **fail-closed** — false unless extract AND rootfs deploy AND
- * setup_termux all succeed. Recovery: a failed setup_termux clears the extract
- * marker and force re-extracts once before giving up.
+ * Fail-closed: false unless extract AND rootfs deploy AND setup_termux succeed.
+ * Recovery (B2): a failed setup_termux clears only the setup marker (never wipes
+ * the prefix); re-extract happens on a later call only if the extract tree/marker
+ * is invalid. Installed proot containers are preserved by [BootstrapInstaller].
  */
 object TerminalLauncher {
 

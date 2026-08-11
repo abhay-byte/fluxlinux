@@ -1,5 +1,6 @@
 package com.ivarna.fluxlinux.core.chroot
 
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.ivarna.fluxlinux.core.root.ChrootPaths
@@ -56,7 +57,10 @@ object ChrootDetection {
 
     /**
      * True when chroot looks installed. Uses cache; call [invalidate] after
-     * install/uninstall. Safe on any thread; root probe blocks briefly.
+     * install/uninstall.
+     *
+     * Main thread: app-visible + TTL cache only (never blocks on su).
+     * Background: may root-probe when cache is cold.
      */
     fun isInstalled(): Boolean {
         if (isVisibleToApp() && (isMarkerVisibleToApp() || shellPresentToApp())) {
@@ -67,6 +71,11 @@ object ChrootDetection {
         val now = SystemClock.elapsedRealtime()
         val cached = installedCache
         if (cached != null && now - cacheAtMs < CACHE_TTL_MS) return cached
+
+        // Never block the UI thread on su discovery / probes.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return cached ?: false
+        }
 
         val snap = probe(forceRoot = true)
         installedCache = snap.installed
@@ -80,16 +89,21 @@ object ChrootDetection {
     }
 
     /**
-     * Full probe for settings UI. Background thread preferred when forceRoot.
+     * Full probe for settings UI.
+     *
+     * When [forceRoot] is false: app-visible files only — never calls su
+     * (safe on the main thread / Compose remember).
+     * When [forceRoot] is true: may block on root; call from a background thread.
      */
     fun probe(forceRoot: Boolean = true): Snapshot {
         val markerApp = isMarkerVisibleToApp()
         val dirApp = isDirVisibleToApp()
         val shellApp = shellPresentToApp()
 
-        if (!forceRoot && (markerApp || shellApp)) {
+        // App-only snapshot: no su, no ANR risk.
+        if (!forceRoot) {
             return Snapshot(
-                installed = true,
+                installed = markerApp || shellApp || dirApp,
                 markerOk = markerApp,
                 dirExists = dirApp || shellApp,
                 viaRoot = false,

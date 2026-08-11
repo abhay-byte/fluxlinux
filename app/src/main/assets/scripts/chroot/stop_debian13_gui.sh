@@ -3,7 +3,17 @@
 # Does NOT pkill proot (proot stop is stop_gui.sh only).
 
 DEBIANPATH="${DEBIANPATH:-/data/local/tmp/chrootDebian13}"
-TARGET_PREFIX="${TARGET_PREFIX:-/data/data/com.ivarna.fluxlinux/files/usr}"
+if [ -z "${TARGET_PREFIX:-}" ]; then
+  if [ -n "${FLUX_PREFIX:-}" ]; then
+    TARGET_PREFIX="$FLUX_PREFIX"
+  elif [ -n "${FLUX_PACKAGE:-}" ]; then
+    TARGET_PREFIX="/data/data/${FLUX_PACKAGE}/files/usr"
+  elif [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
+    TARGET_PREFIX="/data/data/com.zenithblue.fluxlinux/files/usr"
+  else
+    TARGET_PREFIX="/data/data/com.ivarna.fluxlinux/files/usr"
+  fi
+fi
 
 echo "========================================"
 echo "FluxLinux: Stopping Chroot XFCE"

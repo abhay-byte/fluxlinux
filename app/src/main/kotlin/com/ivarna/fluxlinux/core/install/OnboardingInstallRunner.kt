@@ -50,6 +50,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
     /** Throttle FGS notification updates (percent/label change only). */
     @Volatile private var lastNotifPercent: Int = -1
     @Volatile private var lastNotifLabel: String = ""
+    /** Last overall percent from real phase updates (log lines must not thrash). */
+    @Volatile private var lastOverallPercent: Int = 0
 
     fun cancel() {
         cancelled.set(true)
@@ -77,6 +79,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
         cancelled.set(true)
         activeProcess.getAndSet(null)?.destroyForcibly()
         cancelled.set(false)
+        lastOverallPercent = 0
+        lastNotifPercent = -1
+        lastNotifLabel = ""
 
         val method = BaseDesktopInstallPlan.methodFor(distroId)
         val phases = BaseDesktopInstallPlan.phasesFor(method)
@@ -450,6 +455,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
         detail: String
     ) {
         val p = phases[index]
+        val pct = weightedPercent(phases, index, 0f)
+        lastOverallPercent = pct
         post(
             onProgress,
             Progress(
@@ -457,7 +464,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseLabel = p.label,
                 phaseIndex = index,
                 phaseCount = phases.size,
-                overallPercent = weightedPercent(phases, index, 0f),
+                overallPercent = pct,
                 detail = detail,
                 logLine = "── ${p.label}: $detail"
             )
@@ -471,6 +478,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
         detail: String
     ) {
         val p = phases[index]
+        val pct = weightedPercent(phases, index, 1f)
+        lastOverallPercent = pct
         post(
             onProgress,
             Progress(
@@ -478,7 +487,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseLabel = p.label,
                 phaseIndex = index,
                 phaseCount = phases.size,
-                overallPercent = weightedPercent(phases, index, 1f),
+                overallPercent = pct,
                 detail = detail,
                 logLine = "✓ $detail"
             )
@@ -493,6 +502,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
         detail: String
     ) {
         val p = phases[index]
+        val pct = weightedPercent(phases, index, frac.coerceIn(0f, 1f))
+        lastOverallPercent = pct
         post(
             onProgress,
             Progress(
@@ -500,7 +511,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseLabel = p.label,
                 phaseIndex = index,
                 phaseCount = phases.size,
-                overallPercent = weightedPercent(phases, index, frac.coerceIn(0f, 1f)),
+                overallPercent = pct,
                 detail = detail
             )
         )
@@ -513,6 +524,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         line: String
     ) {
         val p = phases.getOrNull(index) ?: return
+        // Keep prior overall percent — pure log lines must not snap the bar mid-phase.
         post(
             onProgress,
             Progress(
@@ -520,7 +532,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
                 phaseLabel = p.label,
                 phaseIndex = index,
                 phaseCount = phases.size,
-                overallPercent = weightedPercent(phases, index, 0.5f),
+                overallPercent = lastOverallPercent.coerceIn(0, 100),
                 detail = p.label,
                 logLine = line
             )
@@ -532,6 +544,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         phases: List<BaseDesktopInstallPlan.Phase>
     ) {
         val last = phases.last()
+        lastOverallPercent = 100
         post(
             onProgress,
             Progress(
