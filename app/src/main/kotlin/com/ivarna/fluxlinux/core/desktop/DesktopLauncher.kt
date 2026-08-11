@@ -8,183 +8,176 @@ import android.util.Log
 import android.widget.Toast
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
 import com.ivarna.fluxlinux.core.service.DesktopSessionService
-import com.ivarna.fluxlinux.core.terminal.HostCommandBuilder
+import com.ivarna.fluxlinux.core.terminal.HostScriptDeployer
 import com.ivarna.fluxlinux.core.terminal.ShellCommandRunner
+import com.ivarna.fluxlinux.core.terminal.ShellJob
 import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
 import com.ivarna.fluxlinux.core.terminal.TermuxHostPaths
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.core.utils.TermuxX11Preferences
 import java.io.File
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Start/stop XFCE via embedded host scripts + in-process Termux:X11
- * (nativecode-ai parity — no external Termux / Termux:X11).
+ * (termux-lib / nativecode-ai parity — no external Termux / Termux:X11).
  *
- * Fail-closed: missing script or early exit (any code) does not open X11 or
- * mark GUI running. A real XFCE session keeps the start script alive after
- * preflight; short-lived exit is always treated as failure.
- *
- * GUI running flags are owned here so call sites do not reimplement them.
+ * Long-lived start uses [ShellCommandRunner.runStreamedCancelable] so other
+ * install/script runners are never blocked. X11 opens on the first healthy
+ * script line (not a blind preflight sleep). Desktop stdout is captured to
+ * [GuiDesktopLog] for VIEW LOGS.
  */
 object DesktopLauncher {
 
     private const val TAG = "DesktopLauncher"
-    /**
-     * Preflight wait: host X11 + guest start usually finish in ~4s;
-     * missing startxfce4 exits earlier. Only "still alive" counts as success.
-     */
-    private const val PREFLIGHT_SECONDS = 6L
-
-    private val executor = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
-    private val runningStartProcess = AtomicReference<Process?>(null)
+
+    enum class Phase { Idle, Starting, Running }
+
+    data class UiState(
+        val phase: Phase = Phase.Idle,
+        val distroId: String? = null,
+        /** Rolling in-memory transcript for live UI (mirrors file). */
+        val logText: String = "",
+        val logsAvailable: Boolean = false,
+        /** True after first healthy start line — Open X11 is meaningful. */
+        val displayReady: Boolean = false,
+        /** One-shot signal for UI to auto-open log sheet when start begins / fails. */
+        val autoShowLogsTick: Int = 0,
+        val lastError: String? = null
+    )
+
+    private val _ui = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _ui.asStateFlow()
+
+    @Volatile private var guiShellJob: ShellJob? = null
+    @Volatile private var guiUserStopping: Boolean = false
+    @Volatile private var guiX11Launched: Boolean = false
+    private val healthyLineSeen = AtomicBoolean(false)
 
     /**
-     * @param onResult invoked on main thread after flags are updated.
-     *   true = desktop accepted (script still running after preflight).
+     * @param onResult main-thread; true when desktop accepted (first healthy line
+     *   or still running — not early fail).
      */
     fun start(ctx: Context, distroId: String, onResult: ((Boolean) -> Unit)? = null) {
         val app = ctx.applicationContext
         TerminalLauncher.prepareHost(app) { ok ->
             if (!ok) {
-                Toast.makeText(app, "Host not ready — open Settings to initialize", Toast.LENGTH_LONG).show()
-                finishStart(app, distroId, false, onResult)
+                toast(app, "Host not ready — open Settings to initialize")
+                finishStart(app, distroId, false, "Host not ready", onResult)
                 return@prepareHost
             }
-            val method = try {
-                terminalComponentFor(distroId).method
-            } catch (_: Exception) {
-                "proot"
-            }
+            // Redeploy host scripts so start_gui.sh matches this APK (termux-lib deployScripts).
+            HostScriptDeployer.deployScripts(app)
+
+            val method = methodFor(distroId)
             if (method == "chroot" && !TerminalLauncher.isDebianChrootInstalled()) {
-                Toast.makeText(app, "Chroot not installed. Install Debian (Rooted) first.", Toast.LENGTH_LONG).show()
-                finishStart(app, distroId, false, onResult)
+                toast(app, "Chroot not installed. Install Debian (Rooted) first.")
+                finishStart(app, distroId, false, "Chroot not installed", onResult)
                 return@prepareHost
             }
             if (method != "chroot" && !TerminalLauncher.isDebianProotInstalled(app)) {
-                Toast.makeText(app, "Debian not installed. Complete onboarding first.", Toast.LENGTH_LONG).show()
-                finishStart(app, distroId, false, onResult)
+                toast(app, "Debian not installed. Complete onboarding first.")
+                finishStart(app, distroId, false, "Debian not installed", onResult)
                 return@prepareHost
             }
 
             val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
             val script = File(TermuxHostPaths.HOME, scriptName)
             if (!script.isFile) {
-                Log.e(TAG, "Missing $scriptName at ${script.absolutePath}")
-                Toast.makeText(
-                    app,
-                    "Desktop scripts missing — re-run host initialize in Settings",
-                    Toast.LENGTH_LONG
-                ).show()
-                finishStart(app, distroId, false, onResult)
+                GuiDesktopLog.header(app, "START", scriptName, method)
+                GuiDesktopLog.append(app, "ERROR: missing host script ${script.absolutePath}")
+                pushLog(app, forceShow = true)
+                toast(app, "Desktop scripts missing — re-run host initialize")
+                finishStart(app, distroId, false, "Missing $scriptName", onResult)
                 return@prepareHost
             }
             if (method == "chroot") {
                 val guest = File(TermuxHostPaths.HOME, "start_debian13_gui.sh")
                 if (!guest.isFile) {
-                    Log.e(TAG, "Missing start_debian13_gui.sh")
-                    Toast.makeText(
-                        app,
-                        "Chroot desktop launcher missing — re-run host initialize",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    finishStart(app, distroId, false, onResult)
+                    toast(app, "Chroot desktop launcher missing — re-run host initialize")
+                    finishStart(app, distroId, false, "Missing start_debian13_gui.sh", onResult)
                     return@prepareHost
                 }
             }
 
-            Toast.makeText(app, "Starting desktop…", Toast.LENGTH_SHORT).show()
+            guiShellJob?.cancel()
+            guiUserStopping = false
+            guiX11Launched = false
+            healthyLineSeen.set(false)
 
-            executor.execute {
-                val bash = TermuxHostPaths.libBash(app).absolutePath
-                Log.i(TAG, "startGui method=$method script=${script.absolutePath}")
-                val pb = ProcessBuilder(bash, script.absolutePath, "debian")
-                pb.redirectErrorStream(true)
-                runCatching { pb.directory(File(TermuxHostPaths.BIN)) }
-                HostCommandBuilder.applyTo(app, pb, forceHostSetup = false)
-
-                val proc = try {
-                    pb.start()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start desktop script", e)
-                    main.post {
-                        Toast.makeText(app, "Desktop start failed: ${e.message}", Toast.LENGTH_LONG).show()
-                        finishStart(app, distroId, false, onResult)
-                    }
-                    return@execute
-                }
-                runningStartProcess.getAndSet(proc)?.destroyForcibly()
-
-                executor.execute {
-                    try {
-                        proc.inputStream.bufferedReader().use { reader ->
-                            reader.lineSequence().forEach { line ->
-                                if (line.isNotBlank()) Log.d(TAG, "gui: $line")
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-
-                val exitedEarly = try {
-                    proc.waitFor(PREFLIGHT_SECONDS, TimeUnit.SECONDS)
-                } catch (_: Exception) {
-                    true
-                }
-
-                if (exitedEarly) {
-                    val code = try {
-                        proc.exitValue()
-                    } catch (_: Exception) {
-                        -1
-                    }
-                    runningStartProcess.compareAndSet(proc, null)
-                    Log.w(TAG, "Desktop script exited during preflight exit=$code (fail-closed)")
-                    main.post {
-                        stopFgs(app)
-                        Toast.makeText(
-                            app,
-                            if (code != 0) {
-                                "Desktop failed to start (exit $code). Check logs."
-                            } else {
-                                "Desktop exited immediately — XFCE did not stay running."
-                            },
-                            Toast.LENGTH_LONG
-                        ).show()
-                        finishStart(app, distroId, false, onResult)
-                    }
-                    return@execute
-                }
-
-                // Still alive after preflight → DE session running
-                Log.i(TAG, "Desktop script still running after ${PREFLIGHT_SECONDS}s — opening display")
-                main.post {
-                    val fgsOk = startFgs(app)
-                    if (!fgsOk) {
-                        Toast.makeText(
-                            app,
-                            "Desktop keep-alive service failed — display may sleep",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                    // Script also am-starts X11; reopen for reliability (singleTop)
-                    openX11(app)
-                    finishStart(app, distroId, true, onResult)
-                }
+            GuiDesktopLog.clear(app)
+            GuiDesktopLog.header(app, "START", scriptName, method)
+            val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
+            if (!supportLib.isFile) {
+                GuiDesktopLog.append(
+                    app,
+                    "WARN: missing ${supportLib.absolutePath} — libbash may fail to link"
+                )
             }
+
+            _ui.update {
+                it.copy(
+                    phase = Phase.Starting,
+                    distroId = distroId,
+                    logText = GuiDesktopLog.read(app),
+                    logsAvailable = true,
+                    displayReady = false,
+                    lastError = null,
+                    autoShowLogsTick = it.autoShowLogsTick + 1
+                )
+            }
+
+            startFgs(app)
+            toast(app, "Starting desktop…")
+            Log.i(TAG, "startGui method=$method script=${script.absolutePath}")
+
+            val bash = TermuxHostPaths.libBash(app).absolutePath
+            val args = arrayOf(bash, script.absolutePath, "debian")
+
+            guiShellJob = ShellCommandRunner.runStreamedCancelable(
+                app,
+                args,
+                onLine = { line ->
+                    GuiDesktopLog.append(app, line)
+                    appendLive(line)
+                    if (line.isNotBlank()) {
+                        onHealthyLine(app, distroId, onResult)
+                    }
+                },
+                onDone = { code ->
+                    GuiDesktopLog.append(app, "[exit $code]")
+                    appendLive("[exit $code]")
+                    when {
+                        code == -1 || guiUserStopping -> {
+                            // User stop owns flip to idle
+                        }
+                        code != 0 -> {
+                            Log.w(TAG, "Desktop start failed exit=$code")
+                            toast(app, "Desktop start failed (exit $code) — see logs")
+                            revertToIdle(app, distroId, "exit $code", showLogs = true)
+                            onResult?.invoke(false)
+                        }
+                        else -> {
+                            // Clean desktop exit (session ended)
+                            Log.i(TAG, "Desktop session ended cleanly")
+                            revertToIdle(app, distroId, null, showLogs = false)
+                        }
+                    }
+                }
+            )
         }
     }
 
     fun stop(ctx: Context, distroId: String, onDone: (() -> Unit)? = null) {
         val app = ctx.applicationContext
-        val method = try {
-            terminalComponentFor(distroId).method
-        } catch (_: Exception) {
-            "proot"
-        }
+        val method = methodFor(distroId)
+        guiUserStopping = true
+
         try {
             val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
             stopBroadcast.setPackage(app.packageName)
@@ -193,48 +186,174 @@ object DesktopLauncher {
             Log.w(TAG, "ACTION_STOP failed", e)
         }
         stopFgs(app)
-        runningStartProcess.getAndSet(null)?.destroyForcibly()
+        guiShellJob?.cancel()
 
-        // Clear flags immediately so UI does not offer Stop while dying
         StateManager.setGuiRunning(app, distroId, false)
         StateManager.setGuiRunningType(app, distroId, "")
 
-        executor.execute {
-            val bash = TermuxHostPaths.libBash(app).absolutePath
-            val scriptName = if (method == "chroot") "stop_gui_chroot.sh" else "stop_gui.sh"
-            val script = File(TermuxHostPaths.HOME, scriptName)
-            Log.i(TAG, "stopGui method=$method script=${script.absolutePath}")
-            try {
-                if (script.isFile) {
-                    ShellCommandRunner.run(app, arrayOf(bash, script.absolutePath, "debian"))
-                } else {
-                    Log.w(TAG, "Stop script missing: ${script.absolutePath}")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "stop_gui failed", e)
+        val scriptName = if (method == "chroot") "stop_gui_chroot.sh" else "stop_gui.sh"
+        HostScriptDeployer.deployScripts(app)
+        val script = File(TermuxHostPaths.HOME, scriptName)
+        Log.i(TAG, "stopGui method=$method script=${script.absolutePath}")
+        GuiDesktopLog.header(app, "STOP", scriptName, method)
+        appendLive("=== STOP method=$method script=$scriptName ===")
+
+        if (!script.isFile) {
+            GuiDesktopLog.append(app, "WARN: stop script missing ${script.absolutePath}")
+            appendLive("WARN: stop script missing")
+            _ui.update {
+                it.copy(
+                    phase = Phase.Idle,
+                    displayReady = false,
+                    logsAvailable = GuiDesktopLog.hasContent(app),
+                    logText = GuiDesktopLog.read(app)
+                )
             }
+            toast(app, "Stopping desktop…")
             main.post { onDone?.invoke() }
+            return
         }
-        Toast.makeText(app, "Stopping desktop…", Toast.LENGTH_SHORT).show()
+
+        val bash = TermuxHostPaths.libBash(app).absolutePath
+        toast(app, "Stopping desktop…")
+        guiShellJob = ShellCommandRunner.runStreamedCancelable(
+            app,
+            arrayOf(bash, script.absolutePath, "debian"),
+            onLine = { line ->
+                GuiDesktopLog.append(app, line)
+                appendLive(line)
+            },
+            onDone = { code ->
+                GuiDesktopLog.append(app, "[exit $code]")
+                appendLive("[exit $code]")
+                _ui.update {
+                    it.copy(
+                        phase = Phase.Idle,
+                        displayReady = false,
+                        logsAvailable = GuiDesktopLog.hasContent(app),
+                        logText = GuiDesktopLog.read(app)
+                    )
+                }
+                onDone?.invoke()
+            }
+        )
+        // Immediate idle for Open X11 button (stop stream may still print)
+        _ui.update {
+            it.copy(
+                phase = Phase.Idle,
+                displayReady = false,
+                logsAvailable = true
+            )
+        }
     }
 
     /** Re-open the X11 surface without restarting the DE. */
     fun reopenDisplay(ctx: Context) {
-        openX11(ctx.applicationContext)
+        // Prefer Activity context so NEW_TASK is not required (BACK returns to Home).
+        openX11(ctx)
+    }
+
+    fun readLog(ctx: Context): String = GuiDesktopLog.read(ctx.applicationContext)
+
+    // ── private ────────────────────────────────────────────────────────────
+
+    private fun onHealthyLine(app: Context, distroId: String, onResult: ((Boolean) -> Unit)?) {
+        if (guiUserStopping) return
+        // Only first healthy line flips RUNNING / prefs / X11 (match nativecode once-per-start).
+        // Subsequent lines only append logs — avoid StateManager + TermuxX11 prefs thrash.
+        val first = healthyLineSeen.compareAndSet(false, true)
+        if (!first) return
+
+        StateManager.setGuiRunning(app, distroId, true)
+        StateManager.setGuiRunningType(app, distroId, "xfce4")
+        runCatching { TermuxX11Preferences.applyToTermux(app) }
+
+        _ui.update {
+            it.copy(
+                phase = Phase.Running,
+                distroId = distroId,
+                displayReady = true,
+                logsAvailable = true
+            )
+        }
+
+        onResult?.invoke(true)
+        if (!guiX11Launched) {
+            guiX11Launched = true
+            // Match nativecode: short delay so X server process can bind
+            main.postDelayed({
+                if (guiUserStopping) return@postDelayed
+                if (_ui.value.phase == Phase.Idle) return@postDelayed
+                openX11(app)
+            }, 400)
+        }
+    }
+
+    private fun appendLive(line: String) {
+        _ui.update { st ->
+            val next = (st.logText + line + "\n").takeLast(24_000)
+            st.copy(logText = next, logsAvailable = true)
+        }
+    }
+
+    private fun pushLog(app: Context, forceShow: Boolean) {
+        _ui.update {
+            it.copy(
+                logText = GuiDesktopLog.read(app),
+                logsAvailable = GuiDesktopLog.hasContent(app),
+                autoShowLogsTick = if (forceShow) it.autoShowLogsTick + 1 else it.autoShowLogsTick
+            )
+        }
     }
 
     private fun finishStart(
         app: Context,
         distroId: String,
         ok: Boolean,
+        error: String?,
         onResult: ((Boolean) -> Unit)?
     ) {
-        if (ok) {
-            StateManager.setGuiRunning(app, distroId, true)
-            StateManager.setGuiRunningType(app, distroId, "xfce4")
-            runCatching { TermuxX11Preferences.applyToTermux(app) }
+        if (!ok) {
+            _ui.update {
+                it.copy(
+                    phase = Phase.Idle,
+                    distroId = distroId,
+                    lastError = error,
+                    displayReady = false
+                )
+            }
         }
         onResult?.invoke(ok)
+    }
+
+    private fun revertToIdle(
+        app: Context,
+        distroId: String,
+        error: String?,
+        showLogs: Boolean
+    ) {
+        stopFgs(app)
+        StateManager.setGuiRunning(app, distroId, false)
+        StateManager.setGuiRunningType(app, distroId, "")
+        guiX11Launched = false
+        healthyLineSeen.set(false)
+        _ui.update {
+            it.copy(
+                phase = Phase.Idle,
+                distroId = distroId,
+                lastError = error,
+                displayReady = false,
+                logsAvailable = GuiDesktopLog.hasContent(app),
+                logText = GuiDesktopLog.read(app),
+                autoShowLogsTick = if (showLogs) it.autoShowLogsTick + 1 else it.autoShowLogsTick
+            )
+        }
+    }
+
+    private fun methodFor(distroId: String): String = try {
+        terminalComponentFor(distroId).method
+    } catch (_: Exception) {
+        "proot"
     }
 
     private fun startFgs(app: Context): Boolean {
@@ -248,22 +367,8 @@ object DesktopLauncher {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Desktop FGS start failed", e)
+            toast(app, "Desktop keep-alive service failed — display may sleep")
             false
-        }
-    }
-
-    private fun openX11(app: Context) {
-        try {
-            val x11 = Intent(app, com.termux.x11.MainActivity::class.java)
-            x11.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-            )
-            app.startActivity(x11)
-        } catch (e: Exception) {
-            Log.e(TAG, "Open X11 activity failed", e)
-            Toast.makeText(app, "Failed to open display: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -271,6 +376,36 @@ object DesktopLauncher {
         try {
             app.stopService(Intent(app, DesktopSessionService::class.java))
         } catch (_: Exception) {
+        }
+    }
+
+    private fun openX11(ctx: Context) {
+        try {
+            val x11 = Intent(ctx, com.termux.x11.MainActivity::class.java)
+            // Match nativecode when started from an Activity (no NEW_TASK).
+            // Application context (auto-open after healthy line) still needs NEW_TASK.
+            if (ctx is android.app.Activity) {
+                x11.addFlags(
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+            } else {
+                x11.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+            }
+            ctx.startActivity(x11)
+        } catch (e: Exception) {
+            Log.e(TAG, "Open X11 activity failed", e)
+            toast(ctx.applicationContext, "Failed to open display: ${e.message}")
+        }
+    }
+
+    private fun toast(app: Context, msg: String) {
+        main.post {
+            Toast.makeText(app, msg, Toast.LENGTH_LONG).show()
         }
     }
 }

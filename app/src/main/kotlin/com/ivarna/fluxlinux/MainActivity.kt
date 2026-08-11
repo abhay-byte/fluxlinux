@@ -188,6 +188,47 @@ class MainActivity : ComponentActivity() {
         runComponentStep(distro, components, 0, theme, gpu)
     }
 
+    private fun isCustomizationComponent(component: com.ivarna.fluxlinux.core.data.DistroComponent): Boolean =
+        component.id == "customization" || component.id == "kde_customization" ||
+            component.scriptName.contains("setup_customization")
+
+    /**
+     * Host-stage theme/icons + Oh My Zsh into the proot rootfs before guest
+     * customization runs. Distro Settings used to skip this (only onboarding
+     * did), so guest hung on missing git / corrupt OMZ rm. Merges skip flags
+     * into [extraEnv]. Safe to call off the main thread.
+     */
+    private fun stageCustomizationHostEnv(
+        activity: android.content.Context,
+        extraEnv: Map<String, String>
+    ): Map<String, String> {
+        val theme = extraEnv["FLUX_THEME"] ?: "dark"
+        val merged = extraEnv.toMutableMap()
+        try {
+            val themeOk = com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.install(
+                activity, theme
+            ) { line ->
+                android.util.Log.i("FluxLinux", "Host theme: $line")
+            }
+            if (themeOk) merged["FLUX_SKIP_THEME_ICONS"] = "1"
+        } catch (e: Exception) {
+            android.util.Log.w("FluxLinux", "Host theme stage failed", e)
+        }
+        try {
+            val omzOk = com.ivarna.fluxlinux.core.install.ProotZshBootstrap.install(activity) { line ->
+                android.util.Log.i("FluxLinux", "Host OMZ: $line")
+            }
+            if (omzOk) merged["FLUX_SKIP_OMZ"] = "1"
+        } catch (e: Exception) {
+            android.util.Log.w("FluxLinux", "Host OMZ stage failed", e)
+        }
+        // Default: skip pokemon (gitlab often stalls under proot)
+        if (!merged.containsKey("FLUX_SKIP_POKEMON")) {
+            merged["FLUX_SKIP_POKEMON"] = "1"
+        }
+        return merged
+    }
+
     private fun runComponentStep(
         distro: com.ivarna.fluxlinux.core.data.Distro,
         components: List<com.ivarna.fluxlinux.core.data.DistroComponent>,
@@ -197,43 +238,57 @@ class MainActivity : ComponentActivity() {
     ) {
         if (index >= components.size) return
         val component = components[index]
-        val scriptContent = try {
-            val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(this)
-            scriptManager.getScriptContent(component.scriptName)
-        } catch (e: Exception) {
-            android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
-            null
-        }
-        if (scriptContent == null) {
-            runComponentStep(distro, components, index + 1, theme, gpu)
-            return
-        }
-        val extraEnv = if (component.id == "hw_accel") {
+        val baseEnv = if (component.id == "hw_accel") {
             mapOf("FLUX_GPU" to gpu)
         } else {
             mapOf("FLUX_THEME" to theme)
         }
-        val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
-            this,
-            distro = distro,
-            scriptContent = scriptContent,
-            title = component.name,
-            extraEnv = extraEnv,
-            isUninstall = false,
-            onFinished = {
-                com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
-                    this, distro.id, component.id, true
-                )
-                com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+        fun openWith(extraEnv: Map<String, String>) {
+            val scriptContent = try {
+                val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(this)
+                val envBlock = extraEnv.entries.joinToString("\n") {
+                    "export ${it.key}=\"${it.value}\""
+                }
+                val base = scriptManager.getScriptContent(component.scriptName)
+                if (extraEnv.isNotEmpty()) "$envBlock\n\n$base" else base
+            } catch (e: Exception) {
+                android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
+                null
+            }
+            if (scriptContent == null) {
+                runComponentStep(distro, components, index + 1, theme, gpu)
+                return
+            }
+            val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
+                this,
+                distro = distro,
+                scriptContent = scriptContent,
+                title = component.name,
+                extraEnv = extraEnv,
+                isUninstall = false,
+                onFinished = {
+                    com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
+                        this, distro.id, component.id, true
+                    )
+                    com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                    runComponentStep(distro, components, index + 1, theme, gpu)
+                }
+            )
+            if (!opened) {
+                android.widget.Toast.makeText(
+                    this, "Max tabs reached — ${component.name} skipped (retry in Distro Settings)",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
                 runComponentStep(distro, components, index + 1, theme, gpu)
             }
-        )
-        if (!opened) {
-            android.widget.Toast.makeText(
-                this, "Max tabs reached — ${component.name} skipped (retry in Distro Settings)",
-                android.widget.Toast.LENGTH_LONG
-            ).show()
-            runComponentStep(distro, components, index + 1, theme, gpu)
+        }
+        if (isCustomizationComponent(component)) {
+            Thread {
+                val env = stageCustomizationHostEnv(this, baseEnv)
+                runOnUiThread { openWith(env) }
+            }.start()
+        } else {
+            openWith(baseEnv)
         }
     }
 
@@ -258,33 +313,49 @@ class MainActivity : ComponentActivity() {
                 ).show()
                 return@prepareHost
             }
-            val scriptContent = try {
-                val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(activity)
-                val envBlock = extraEnv.entries.joinToString("\n") { "export ${it.key}=\"${it.value}\"" }
-                val base = scriptManager.getScriptContent(component.scriptName)
-                if (extraEnv.isNotEmpty()) "$envBlock\n\n$base" else base
-            } catch (e: Exception) {
-                android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
-                null
-            }
-            if (scriptContent == null) return@prepareHost
-            val title = (if (isUninstall) "Uninstall " else "Install ") + component.name
-            val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
-                activity,
-                distro = distro,
-                scriptContent = scriptContent,
-                title = title,
-                extraEnv = extraEnv,
-                isUninstall = isUninstall,
-                onFinished = {
-                    com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
-                        activity, distro.id, component.id, !isUninstall
-                    )
-                    com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+            fun openWith(env: Map<String, String>) {
+                val scriptContent = try {
+                    val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(activity)
+                    val envBlock = env.entries.joinToString("\n") {
+                        "export ${it.key}=\"${it.value}\""
+                    }
+                    val base = scriptManager.getScriptContent(component.scriptName)
+                    if (env.isNotEmpty()) "$envBlock\n\n$base" else base
+                } catch (e: Exception) {
+                    android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
+                    null
                 }
-            )
-            if (opened) {
-                onOpenTerminalScreen()
+                if (scriptContent == null) return
+                val title = (if (isUninstall) "Uninstall " else "Install ") + component.name
+                val opened = com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openComponentSession(
+                    activity,
+                    distro = distro,
+                    scriptContent = scriptContent,
+                    title = title,
+                    extraEnv = env,
+                    isUninstall = isUninstall,
+                    onFinished = {
+                        com.ivarna.fluxlinux.core.utils.StateManager.setComponentInstalled(
+                            activity, distro.id, component.id, !isUninstall
+                        )
+                        com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                    }
+                )
+                if (opened) {
+                    onOpenTerminalScreen()
+                }
+            }
+            if (!isUninstall && isCustomizationComponent(component)) {
+                android.widget.Toast.makeText(
+                    activity, "Preparing themes & Oh My Zsh on host…",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                Thread {
+                    val env = stageCustomizationHostEnv(activity, extraEnv)
+                    activity.runOnUiThread { openWith(env) }
+                }.start()
+            } else {
+                openWith(extraEnv)
             }
         }
     }

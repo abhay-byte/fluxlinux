@@ -92,7 +92,9 @@ object TerminalShellCatalog {
             TerminalShellCardUi(
                 def = def,
                 enabled = enabled,
+                // Fail-closed: reason only when disabled (enabled cards must be null).
                 disabledReason = when {
+                    enabled -> null
                     !avail.chrootInstalled -> "Chroot not installed"
                     else -> "Root required"
                 }

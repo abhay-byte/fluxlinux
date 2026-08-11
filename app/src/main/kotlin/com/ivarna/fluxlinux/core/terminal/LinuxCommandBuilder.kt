@@ -16,9 +16,16 @@ object LinuxCommandBuilder {
     @Deprecated("Pass method explicitly from terminalComponentFor(distroId).method for card actions")
     var currentMethod = "proot"
 
-    /** Guest user for session type. Rooted shell → root; everything else → flux. */
+    /**
+     * Guest user for session type.
+     * - shell-root / component → root (apt/dpkg & setup scripts)
+     * - interactive shell / default → flux
+     */
     fun sessionUserForType(type: String): String =
-        if (type == "shell-root") "root" else "flux"
+        when (type) {
+            "shell-root", "component" -> "root"
+            else -> "flux"
+        }
 
     fun build(
         ctx: Context,

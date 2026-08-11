@@ -54,4 +54,42 @@ class ProotCommandBuilderTest {
         val args = ProotCommandBuilder.buildArgs(shell, pd, "exec zsh", useSharedTmp = false)
         assertEquals("exec python $pd login debian  --user flux".trimEnd().replace("  ", " "), args[2].replace("  ", " "))
     }
+
+    @Test
+    fun loginBashSentinel_isInteractive() {
+        val args = ProotCommandBuilder.buildArgs(shell, pd, "/bin/bash --login", user = "flux")
+        assertEquals("exec python $pd login debian --shared-tmp --user flux", args[2])
+        // Must NOT wrap as zsh -c payload
+        assertTrue(!args[2].contains("zsh -c"))
+    }
+
+    @Test
+    fun interactiveArgs_alwaysThreeElements() {
+        val args = ProotCommandBuilder.buildArgs(shell, pd, "exec zsh")
+        assertEquals(3, args.size)
+        assertEquals(shell, args[0])
+        assertEquals("-c", args[1])
+    }
+
+    @Test
+    fun emptyPaths_stillBuildCommand_doNotSilentSwapUser() {
+        // Fail-closed for empty path strings: still produces a command, never silently
+        // changes --user (product open path validates host readiness separately).
+        val args = ProotCommandBuilder.buildArgs("", "", "exec zsh", user = "flux")
+        assertTrue(args[2].contains("--user flux"))
+        assertTrue(!args[2].contains("--user root"))
+    }
+
+    @Test
+    fun payload_neverInteractiveLoginShape() {
+        val args = ProotCommandBuilder.buildArgs(shell, pd, "whoami")
+        assertTrue(args[2].contains("-- zsh -c "))
+        assertTrue(args[2].contains("'whoami'"))
+    }
+
+    @Test
+    fun defaultUser_isFlux() {
+        val args = ProotCommandBuilder.buildArgs(shell, pd, "exec zsh")
+        assertTrue(args[2].contains("--user flux"))
+    }
 }

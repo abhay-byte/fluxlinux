@@ -95,18 +95,19 @@ else
     echo "------------------------------------------------"
 fi
 
+# Icons: Papirus-Dark only (no full Papirus light pack)
+SEL_ICON="Papirus-Dark"
+
 if [ "$THEME_CHOICE" == "2" ]; then
-    echo "FluxLinux: Light Mode Selected."
+    echo "FluxLinux: Light Mode Selected (icons: Papirus-Dark only)."
     SEL_GTK_THEME="Space-light"
-    SEL_ICON="Papirus"
     SEL_CURSOR="Vimix-cursors"
     SEL_WALLPAPER="fluxlinux-light.png"
     KDE_COLOR_SCHEME="BreezeLight"
     KWIN_THEME="Breeze"
 else
-    echo "FluxLinux: Dark Mode Selected."
+    echo "FluxLinux: Dark Mode Selected (icons: Papirus-Dark only)."
     SEL_GTK_THEME="Space-transparency"
-    SEL_ICON="Papirus-Dark"
     SEL_CURSOR="Vimix-white-cursors"
     SEL_WALLPAPER="fluxlinux-dark.png"
     KDE_COLOR_SCHEME="BreezeDark"

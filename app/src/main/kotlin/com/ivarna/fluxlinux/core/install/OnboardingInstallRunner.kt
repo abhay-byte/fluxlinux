@@ -200,10 +200,38 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, 2, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
+        // Native host extract into proot rootfs (avoids proot thrashing on Papirus).
+        // Skip guest re-extract when this succeeds or assets are already present.
+        log(phases, 2, onProgress, "Staging XFCE theme/icons on host (native tar)…")
+        val hostThemeOk = try {
+            ProotXfceAssetInstaller.install(appCtx, theme) { line ->
+                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+            }
+        } catch (e: Exception) {
+            log(phases, 2, onProgress, "Host theme stage error: ${e.message}")
+            false
+        }
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        log(phases, 2, onProgress, "Staging Oh My Zsh on host (avoids proot hang)…")
+        val hostOmzOk = try {
+            ProotZshBootstrap.install(appCtx) { line ->
+                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+            }
+        } catch (e: Exception) {
+            log(phases, 2, onProgress, "Host Oh My Zsh stage error: ${e.message}")
+            false
+        }
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        val skipAssets = if (hostThemeOk) "1" else "0"
+        val skipOmz = if (hostOmzOk) "1" else "0"
         val customOk = runProotGuestScript(
             phases, 2, onProgress, gen,
             scriptAssetPath = BaseDesktopInstallPlan.CUSTOMIZATION_SCRIPT,
-            envPrefix = "FLUX_THEME=$theme"
+            envPrefix = "FLUX_THEME=$theme " +
+                "FLUX_SKIP_THEME_ICONS=$skipAssets " +
+                "FLUX_SKIP_OMZ=$skipOmz " +
+                "FLUX_SKIP_POKEMON=1 " +
+                "FLUX_ASSET_DIR=/tmp/flux_xfce_assets"
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!customOk) {

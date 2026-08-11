@@ -33,6 +33,7 @@ import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 
+import com.ivarna.fluxlinux.core.desktop.DesktopLauncher
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -65,6 +66,25 @@ fun HomeScreen(
     val distroToLaunch = remember { mutableStateOf<com.ivarna.fluxlinux.core.data.Distro?>(null) }
     // State for KDE GPU mode picker (sub-dialog)
     val showKdeGpuPicker = remember { mutableStateOf<com.ivarna.fluxlinux.core.data.Distro?>(null) }
+    // Live desktop start/stop logs (termux-lib VIEW LOGS parity)
+    val desktopUi by DesktopLauncher.uiState.collectAsState()
+    var showDesktopLogs by remember { mutableStateOf(false) }
+    // Only auto-open on a *new* tick (start/fail). Do NOT open when Home is
+    // re-entered while tick is already > 0 from a prior start — that made the
+    // Graphical Desktop Log dialog appear every time the user went Home.
+    var lastSeenAutoShowTick by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(desktopUi.autoShowLogsTick) {
+        val tick = desktopUi.autoShowLogsTick
+        if (lastSeenAutoShowTick < 0) {
+            // First observation after this Home composition: consume current tick.
+            lastSeenAutoShowTick = tick
+            return@LaunchedEffect
+        }
+        if (tick > lastSeenAutoShowTick) {
+            lastSeenAutoShowTick = tick
+            showDesktopLogs = true
+        }
+    }
     
     // Refresh key to trigger recomposition
     val refreshKey = remember { mutableStateOf(0) }
@@ -74,6 +94,10 @@ fun HomeScreen(
         if (scriptRefreshTrigger > 0) {
             refreshKey.value++
         }
+    }
+    // Recompose cards when desktop phase changes
+    LaunchedEffect(desktopUi.phase, desktopUi.displayReady) {
+        refreshKey.value++
     }
     
     Column(
@@ -141,19 +165,31 @@ fun HomeScreen(
         } else {
             // Distro list
             installedDistros.forEach { distro ->
+                val desktopForThis =
+                    desktopUi.distroId == null || desktopUi.distroId == distro.id
+                val isStarting =
+                    desktopForThis && desktopUi.phase == DesktopLauncher.Phase.Starting
+                val isRunning =
+                    StateManager.isGuiRunning(context, distro.id) ||
+                        (desktopForThis && desktopUi.phase == DesktopLauncher.Phase.Running)
+                val logsOk =
+                    desktopForThis && (desktopUi.logsAvailable || desktopUi.logText.isNotBlank())
                 com.ivarna.fluxlinux.ui.components.DistroCard(
                     distro = distro,
                     isInstalled = true,
-                    isGuiRunning = StateManager.isGuiRunning(context, distro.id),
+                    isGuiRunning = isRunning,
+                    isGuiStarting = isStarting,
+                    logsAvailable = logsOk ||
+                        com.ivarna.fluxlinux.core.desktop.GuiDesktopLog.hasContent(context),
                     onInstall = { onNavigateToInstall(distro) },
-                    onUninstall = { /* Handled in Settings */ }, 
+                    onUninstall = { /* Handled in Settings */ },
                     onNavigateToSettings = { onNavigateToSettings(distro) },
                     onNavigateToStart = { distroToLaunch.value = distro },
                     onOpenDisplay = {
-                        if (!com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)) {
-                            android.widget.Toast.makeText(context, "Termux:X11 not available", android.widget.Toast.LENGTH_SHORT).show()
-                        }
+                        // Prefer launcher reopen (singleTop); falls back to EmbeddedX11
+                        DesktopLauncher.reopenDisplay(context)
                     },
+                    onViewLogs = { showDesktopLogs = true },
                     onStop = {
                         val runningType = StateManager.getGuiRunningType(context, distro.id)
                         try {
@@ -170,7 +206,9 @@ fun HomeScreen(
                                 }
                             } else {
                                 // Embedded XFCE stop — no Termux-era canRunCommands gate
-                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.stop(context, distro.id)
+                                DesktopLauncher.stop(context, distro.id) {
+                                    refreshKey.value++
+                                }
                             }
                         } catch (e: Exception) {
                             android.widget.Toast.makeText(context, "Stop failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -399,12 +437,15 @@ fun HomeScreen(
                     // GUI Buttons — separate for XFCE4 and KDE
                     val kdeInstalled = StateManager.isComponentInstalled(context, distro.id, "kde_plasma")
 
-                    // XFCE4 — embedded host start_gui + in-app X11 (no external Termux)
+                    // XFCE4 — streamed start_gui + live logs + X11 (termux-lib parity)
                     Button(
                         onClick = {
                             try {
-                                // Flags + X11 prefs owned by DesktopLauncher on success
-                                com.ivarna.fluxlinux.core.desktop.DesktopLauncher.start(context, distro.id)
+                                DesktopLauncher.start(context, distro.id) { ok ->
+                                    refreshKey.value++
+                                    if (!ok) showDesktopLogs = true
+                                }
+                                showDesktopLogs = true
                                 distroToLaunch.value = null
                             } catch (e: Exception) {
                                 android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -500,6 +541,32 @@ fun HomeScreen(
         }
     }
 
+    // ─── Graphical Desktop live logs (termux-lib VIEW LOGS) ─────────────────
+    if (showDesktopLogs) {
+        DesktopLogsDialog(
+            logText = if (desktopUi.logText.isNotBlank()) {
+                desktopUi.logText
+            } else {
+                DesktopLauncher.readLog(context)
+            },
+            phase = desktopUi.phase,
+            onDismiss = { showDesktopLogs = false },
+            onOpenX11 = {
+                DesktopLauncher.reopenDisplay(context)
+            },
+            onCopy = {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val text = if (desktopUi.logText.isNotBlank()) {
+                    desktopUi.logText
+                } else {
+                    DesktopLauncher.readLog(context)
+                }
+                cm.setPrimaryClip(ClipData.newPlainText("desktop_log", text))
+                android.widget.Toast.makeText(context, "Log copied", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     // ─── KDE GPU Mode Picker Sub-Dialog ───────────────────────────────────────
     if (showKdeGpuPicker.value != null) {
         val distro = showKdeGpuPicker.value!!
@@ -549,6 +616,105 @@ fun HomeScreen(
                 distroToLaunch.value = null
             }
         )
+    }
+}
+
+// ─── Desktop start/stop log dialog ─────────────────────────────────────────────
+@Composable
+private fun DesktopLogsDialog(
+    logText: String,
+    phase: DesktopLauncher.Phase,
+    onDismiss: () -> Unit,
+    onOpenX11: () -> Unit,
+    onCopy: () -> Unit
+) {
+    val scroll = rememberScrollState()
+    LaunchedEffect(logText) {
+        scroll.animateScrollTo(scroll.maxValue)
+    }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.75f),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            "Graphical Desktop Log",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            when (phase) {
+                                DesktopLauncher.Phase.Starting -> "Starting…"
+                                DesktopLauncher.Phase.Running -> "Running"
+                                DesktopLauncher.Phase.Idle -> "Idle"
+                            },
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0D0D0D))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = logText.ifBlank { "Waiting for desktop output…" },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Color(0xFFB0BEC5),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scroll)
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onCopy,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Copy")
+                    }
+                    Button(
+                        onClick = onOpenX11,
+                        enabled = phase != DesktopLauncher.Phase.Idle,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF00E5FF),
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text("Open X11", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 

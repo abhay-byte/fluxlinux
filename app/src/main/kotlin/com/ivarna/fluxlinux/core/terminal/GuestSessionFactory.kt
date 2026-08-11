@@ -76,8 +76,9 @@ object GuestSessionFactory {
 
     /**
      * Component install/uninstall session for a distro. The component script is
-     * base64-injected and runs INSIDE the guest (proot: `zsh -c '…'`; chroot: SSOT
-     * helper `b64` as flux). Same component as the parent distro — never Termux intent.
+     * base64-injected and runs INSIDE the guest as **root** (apt/dpkg require it;
+     * setup scripts then switch to user `flux` where needed). Same terminal
+     * component as the parent distro — never Termux intent.
      * [onFinished] fires when the session exits.
      */
     fun openComponentSession(
@@ -100,6 +101,7 @@ object GuestSessionFactory {
         }
         val guestPayload = buildString {
             append("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; ")
+            append("export DEBIAN_FRONTEND=noninteractive; ")
             append(envPrefix)
             append("echo '$b64' | base64 -d > /tmp/flux_feature.sh; ")
             append("chmod +x /tmp/flux_feature.sh; ")
@@ -108,7 +110,9 @@ object GuestSessionFactory {
             append("exit \$RC")
         }
         if (!SessionRegistry.hasFreeTab()) return false
-        val user = "flux"
+        // Root required: customization / feature setup scripts call apt & chown.
+        // Interactive shells stay flux via openSession(sessionUserForType).
+        val user = "root"
         val (args, envMap) = LinuxCommandBuilder.build(ctx, guestPayload, user = user, method = method)
         val isChroot = method == "chroot"
         val shell = TermuxHostPaths.libBash(ctx).absolutePath

@@ -27,7 +27,8 @@ class LinuxCommandBuilderTest {
     fun sessionUserForType_mapsShells() {
         assertEquals("flux", LinuxCommandBuilder.sessionUserForType("shell"))
         assertEquals("root", LinuxCommandBuilder.sessionUserForType("shell-root"))
-        assertEquals("flux", LinuxCommandBuilder.sessionUserForType("component"))
+        // Component installs need apt/dpkg → root (not interactive flux)
+        assertEquals("root", LinuxCommandBuilder.sessionUserForType("component"))
     }
 
     @Test
