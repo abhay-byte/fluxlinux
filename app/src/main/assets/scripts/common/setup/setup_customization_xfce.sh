@@ -39,6 +39,37 @@ export TMPDIR=/tmp
 _flux_chown() { chown "$@" 2>/dev/null || true; }
 _flux_chown_r() { chown -R "$@" 2>/dev/null || true; }
 
+# Fedora 44 + proot: sudo PAM account fails → "a password is required".
+if command -v sudo >/dev/null 2>&1; then
+    mkdir -p /etc/sudoers.d
+    echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
+    chmod 0440 /etc/sudoers.d/flux 2>/dev/null || true
+    chmod 0755 /etc/sudoers.d 2>/dev/null || true
+    if [ -f /etc/sudoers ]; then
+        grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null \
+            || echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+        grep -q '^Defaults !authenticate' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !authenticate' >> /etc/sudoers
+        grep -q '^Defaults !pam_session' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !pam_session' >> /etc/sudoers
+        chmod 0440 /etc/sudoers 2>/dev/null || true
+    fi
+    if [ -d /etc/pam.d ]; then
+        for _pam in /etc/pam.d/sudo /etc/pam.d/sudo-i; do
+            cat > "$_pam" <<'PAM'
+#%PAM-1.0
+# FluxLinux proot: pam_unix/audit cannot run → sudo asks for a password.
+auth       sufficient pam_permit.so
+account    sufficient pam_permit.so
+password   sufficient pam_permit.so
+session    sufficient pam_permit.so
+PAM
+            chmod 0644 "$_pam" 2>/dev/null || true
+        done
+    fi
+    chmod 4755 /usr/bin/sudo 2>/dev/null || chmod 4755 /usr/sbin/sudo 2>/dev/null || true
+fi
+
 if id -gn "$CUSTOM_USER" >/dev/null 2>&1; then
     CUSTOM_GROUP="$(id -gn "$CUSTOM_USER")"
 fi

@@ -20,7 +20,10 @@ if [ -z "$GUESTPATH" ]; then
 fi
 
 case "$GUESTPATH" in
-    /data/local/tmp/chrootFedora|/data/local/tmp/chrootVoid|/data/local/tmp/chrootOpenSUSE) ;;
+    /data/local/tmp/chrootDebian13|/data/local/tmp/chrootAlpine|\
+    /data/local/tmp/chrootFedora|/data/local/tmp/chrootVoid|\
+    /data/local/tmp/chrootOpenSUSE|/data/local/tmp/chrootDeepin|\
+    /data/local/tmp/chrootChimera|/data/local/tmp/chrootManjaro) ;;
     *)
         error "Refusing to remove unexpected path: $GUESTPATH"
         exit 1
@@ -82,6 +85,7 @@ fi
 
 success "Uninstallation Complete!"
 
+_cb="${FLUX_DISTRO_ID:-guest_chroot}"
 am start -a android.intent.action.VIEW \
-    -d "fluxlinux://callback?result=success&name=distro_uninstall_guest_chroot" \
+    -d "fluxlinux://callback?result=success&name=distro_uninstall_${_cb}" \
     >/dev/null 2>&1 || true

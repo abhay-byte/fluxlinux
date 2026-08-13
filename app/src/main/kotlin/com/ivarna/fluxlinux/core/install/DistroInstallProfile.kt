@@ -62,9 +62,9 @@ data class DistroInstallProfile(
             "f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259"
         const val ALPINE_ROOTFS_MIN_BYTES = 1L * 1024L * 1024L
 
-        const val FEDORA_ROOTFS_NAME = "fedora_43_rootfs.tar.xz"
+        const val FEDORA_ROOTFS_NAME = "fedora_44_rootfs.tar.xz"
         const val FEDORA_ROOTFS_SHA256 =
-            "baade82fcea89be5986ee6e0dd3cd8ff04125bf7995c0e9fc3db5020fb0722fd"
+            "2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4"
         const val FEDORA_ROOTFS_MIN_BYTES = 20L * 1024L * 1024L
 
         const val VOID_ROOTFS_NAME = "void_20250202_rootfs.tar.xz"

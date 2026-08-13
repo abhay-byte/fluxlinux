@@ -31,7 +31,9 @@ object SessionRegistry {
         val type: String,      // "shell" | "shell-root" | "host" | "install" | "component"
         val title: String,
         val method: String,    // "proot" | "chroot" | "host"
-        val onFinished: (() -> Unit)? = null
+        val onFinished: (() -> Unit)? = null,
+        /** Always fired when the process exits (any status, including signal). */
+        val onClosed: ((exitStatus: Int) -> Unit)? = null
     )
 
     private val sessionsList = ArrayList<ManagedSession>()
@@ -163,10 +165,18 @@ object SessionRegistry {
             override fun onTitleChanged(session: TerminalSession) {}
             override fun onSessionFinished(session: TerminalSession) {
                 Log.d(TAG, "Session finished: ${session.exitStatus}")
+                val managed = sessionsList.find { it.session === session }
                 // B3: success callbacks fire ONLY on clean exit — a failed
                 // flux_install.sh / component script must never mark state installed.
                 if (session.exitStatus == 0) {
-                    sessionsList.find { it.session === session }?.onFinished?.invoke()
+                    managed?.onFinished?.invoke()
+                }
+                // Uninstall must refresh cards even when toybox/su dies with
+                // SIGSEGV after the script already removed the rootfs.
+                try {
+                    managed?.onClosed?.invoke(session.exitStatus)
+                } catch (e: Exception) {
+                    Log.w(TAG, "onClosed failed: ${e.message}")
                 }
             }
             // T3: clipboard parity (nativecode) — copy puts text on the system

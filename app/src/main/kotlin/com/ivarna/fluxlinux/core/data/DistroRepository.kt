@@ -283,7 +283,7 @@ object DistroRepository {
         Distro(
             id = "fedora",
             name = "Fedora",
-            description = "Fedora 43 with dnf/dnf5 and XFCE4 (proot).",
+            description = "Fedora 44 with dnf/dnf5 and XFCE4 (proot).",
             color = Color(0xFF294172),
             iconRes = R.drawable.distro_fedora,
             comingSoon = false,
@@ -295,7 +295,7 @@ object DistroRepository {
         Distro(
             id = "fedora_chroot",
             name = "Fedora (Rooted)",
-            description = "Fedora 43 chroot environment (Requires Root).",
+            description = "Fedora 44 chroot environment (Requires Root).",
             color = Color(0xFF294172),
             iconRes = R.drawable.distro_fedora,
             comingSoon = false,

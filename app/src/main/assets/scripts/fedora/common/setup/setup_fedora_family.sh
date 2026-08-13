@@ -80,6 +80,26 @@ _flux_ensure_sudo() {
     done
     chown root:root /etc/sudoers /etc/sudoers.d /etc/sudoers.d/flux 2>/dev/null || true
     chmod 4755 /usr/bin/sudo 2>/dev/null || chmod 4755 /usr/sbin/sudo 2>/dev/null || true
+    if [ -f /etc/sudoers ]; then
+        grep -q '^Defaults !authenticate' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !authenticate' >> /etc/sudoers
+        grep -q '^Defaults !pam_session' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !pam_session' >> /etc/sudoers
+        chmod 0440 /etc/sudoers 2>/dev/null || true
+    fi
+    if [ -d /etc/pam.d ]; then
+        for _pam in /etc/pam.d/sudo /etc/pam.d/sudo-i; do
+            cat > "$_pam" <<'PAM'
+#%PAM-1.0
+# FluxLinux proot: pam_unix/audit cannot run → sudo asks for a password.
+auth       sufficient pam_permit.so
+account    sufficient pam_permit.so
+password   sufficient pam_permit.so
+session    sufficient pam_permit.so
+PAM
+            chmod 0644 "$_pam" 2>/dev/null || true
+        done
+    fi
 }
 
 _flux_ensure_home() {
@@ -149,7 +169,7 @@ _flux_require_startxfce4() {
 }
 
 # --- end common ---
-# setup_fedora_family.sh — Fedora 43 XFCE (proot + chroot). dnf/dnf5.
+# setup_fedora_family.sh — Fedora 44 XFCE (proot + chroot). dnf/dnf5.
 # Common helpers may be prepended by BaseDesktopInstallPlan.
 
 DISTRO_NAME="${1:-fedora}"
@@ -181,6 +201,15 @@ export SYSTEMD_OFFLINE=1
 export SYSTEMD_SKIP_UNMOUNTS=1
 DNF_OPTS="-y --setopt=install_weak_deps=False --setopt=tsflags=nodocs,noscripts"
 
+# fedora-minimal omits the OpenSSL default bundle symlink. Restore before
+# dnf talks to metalink HTTPS.
+if [ ! -e /etc/pki/tls/cert.pem ] && [ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
+    mkdir -p /etc/pki/tls/certs /etc/ssl
+    ln -sfn /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/cert.pem
+    ln -sfn /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/certs/ca-bundle.crt
+    ln -sfn /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem
+fi
+
 _flux_log "dnf makecache ($DNF)..."
 $DNF -y --setopt=install_weak_deps=False makecache || {
     echo "FluxLinux: dnf makecache failed (network / repos)"
@@ -190,12 +219,13 @@ $DNF -y --setopt=install_weak_deps=False makecache || {
 _flux_log "Installing base packages..."
 $DNF $DNF_OPTS install \
     bash sudo shadow-utils passwd ca-certificates curl wget unzip tar \
+    gzip xz tzdata \
     dbus dbus-daemon \
     || {
         echo "FluxLinux: base package install failed"
         exit 1
     }
-# dbus-x11 is optional on F43 (some images use dbus-daemon only)
+# dbus-x11 is optional on F44 (some images use dbus-daemon only)
 $DNF $DNF_OPTS install dbus-x11 2>/dev/null || true
 
 _flux_ensure_dbus

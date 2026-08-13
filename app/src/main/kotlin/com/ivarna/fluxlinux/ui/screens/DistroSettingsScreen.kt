@@ -370,8 +370,6 @@ fun DistroSettingsScreen(
 
     // Uninstall Dialog
     if (showUninstallDialog) {
-        val isChroot = distro.id == "debian_chroot" || distro.id == "debian13_chroot" || distro.id == "arch_chroot" || distro.id.contains("chroot")
-        
         GlassDialog(onDismiss = { showUninstallDialog = false }) {
              Column(
                 modifier = Modifier.padding(24.dp),
@@ -386,7 +384,7 @@ fun DistroSettingsScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = if(isChroot) "Manual Root Required" else "Uninstall ${distro.name}?",
+                    text = "Uninstall ${distro.name}?",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -394,29 +392,12 @@ fun DistroSettingsScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                if (isChroot) {
-                    Text(
-                        "To uninstall this Chroot environment, you must use Root (superuser) access manually.", 
-                        style = MaterialTheme.typography.bodyMedium, 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(modifier = Modifier.background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(8.dp)).padding(12.dp)) {
-                        Column {
-                             Text("1. Click 'Proceed' to Copy Command", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
-                             Text("2. Open Termux -> Type 'su'", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
-                             Text("3. Paste & Run", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
-                        }
-                    }
-                } else {
-                     Text(
-                        "This will remove all data and files for ${distro.name}. This action cannot be undone.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
+                Text(
+                    "This will remove all data and files for ${distro.name}. This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
                 

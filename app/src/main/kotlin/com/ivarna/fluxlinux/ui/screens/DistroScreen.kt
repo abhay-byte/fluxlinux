@@ -42,6 +42,7 @@ fun DistroScreen(
     val context = LocalContext.current
     
     val installState by InstallationQueueManager.installState.collectAsState()
+    val stateRefresh by StateManager.refreshTrigger.collectAsState()
     
     // Refresh mechanism to check install status
     val refreshKey = remember { mutableStateOf(0) }
@@ -77,7 +78,7 @@ fun DistroScreen(
         
         // Distro List — installed state = filesystem truth (plan P4-T13); stale
         // prefs without a rootfs on disk keep the card available for Install.
-        val installedDistroIds = remember(refreshKey.value) {
+        val installedDistroIds = remember(refreshKey.value, stateRefresh) {
             DistroRepository.supportedDistros
                 .filter { com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id) }
                 .map { it.id }

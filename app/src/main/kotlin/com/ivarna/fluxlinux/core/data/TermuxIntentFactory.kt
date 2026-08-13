@@ -168,7 +168,13 @@ object TermuxIntentFactory {
                         echo "FluxLinux: $distroId Uninstalled."
                     else
                         echo "proot-distro command failed, using manual removal..."
-                        rm -rf ${'$'}PREFIX/var/lib/proot-distro/installed-rootfs/$distroId
+                        rm -rf ${'$'}PREFIX/var/lib/proot-distro/containers/$distroId \
+                            ${'$'}PREFIX/var/lib/proot-distro/installed-rootfs/$distroId
+                        if [ -e ${'$'}PREFIX/var/lib/proot-distro/containers/$distroId ]; then
+                            if [ -x /system/bin/su ]; then
+                                /system/bin/su -c "rm -rf ${'$'}PREFIX/var/lib/proot-distro/containers/$distroId" </dev/null
+                            fi
+                        fi
                         echo "FluxLinux: $distroId manually removed."
                     fi
                 fi

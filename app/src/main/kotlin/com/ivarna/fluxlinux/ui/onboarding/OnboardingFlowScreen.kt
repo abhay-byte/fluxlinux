@@ -391,7 +391,7 @@ private fun OptionsPage(
                 distroId.startsWith("alpine") ->
                     "${distro?.name ?: distroId}: Alpine minirootfs, XFCE desktop (apk), and Flux themes. Feature modules can be added later in Distro Settings."
                 distroId.startsWith("fedora") ->
-                    "${distro?.name ?: distroId}: Fedora 43 rootfs, XFCE desktop (dnf), Mesa, and Flux themes."
+                    "${distro?.name ?: distroId}: Fedora 44 rootfs, XFCE desktop (dnf), Mesa, and Flux themes."
                 distroId.startsWith("void") ->
                     "${distro?.name ?: distroId}: Void Linux rootfs, XFCE desktop (xbps), Mesa, and Flux themes."
                 distroId.startsWith("opensuse") ->
@@ -436,7 +436,7 @@ private fun OptionsPage(
                 Text(
                     when {
                         distroId.startsWith("alpine") -> "• Alpine 3.24 minirootfs"
-                        distroId.startsWith("fedora") -> "• Fedora 43 container rootfs"
+                        distroId.startsWith("fedora") -> "• Fedora 44 container rootfs"
                         distroId.startsWith("void") -> "• Void Linux (glibc aarch64) rootfs"
                         distroId.startsWith("opensuse") -> "• openSUSE Tumbleweed rootfs"
                         else -> "• Debian 13 rootfs"

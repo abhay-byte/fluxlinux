@@ -144,7 +144,8 @@ class MainActivity : ComponentActivity() {
                          android.widget.Toast.makeText(this, "$distroId Installed! ✅", android.widget.Toast.LENGTH_LONG).show()
                      } else if (scriptName.startsWith("distro_uninstall_")) {
                          val distroId = scriptName.removePrefix("distro_uninstall_")
-                         StateManager.clearDistroState(this, distroId)
+                         com.ivarna.fluxlinux.core.terminal.TerminalLauncher
+                             .refreshInstalledAfterUninstall(this, distroId)
                          android.widget.Toast.makeText(this, "$distroId Uninstalled! 🗑️", android.widget.Toast.LENGTH_LONG).show()
                      } else {
                          // Generic Script

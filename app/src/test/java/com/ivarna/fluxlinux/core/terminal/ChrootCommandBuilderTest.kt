@@ -88,6 +88,17 @@ class ChrootCommandBuilderTest {
     }
 
     @Test
+    fun rootSessionArgv_startsWithSystemShDashC() {
+        val winch = InstallSessionFactory.rootSessionWinchCommand("su -c 'sh /tmp/x.sh'")
+        val argv = InstallSessionFactory.rootSessionArgv(winch)
+        assertEquals(3, argv.size)
+        assertEquals("/system/bin/sh", argv[0])
+        assertEquals("-c", argv[1])
+        assertEquals(winch, argv[2])
+        assertTrue(argv[2].startsWith("trap 'kill -WINCH -"))
+    }
+
+    @Test
     fun buildEnv_androidPathAndGuestHome() {
         val env = ChrootCommandBuilder.buildEnv(user = "root")
         assertEquals("/root", env["HOME"])

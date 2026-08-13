@@ -19,9 +19,9 @@ case "$DISTRO" in
         FAMILY_SCRIPT_NAME="setup_alpine_family.sh"
         ;;
     fedora)
-        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-fedora_43_rootfs.tar.xz}"
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-fedora_44_rootfs.tar.xz}"
         ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-baade82fcea89be5986ee6e0dd3cd8ff04125bf7995c0e9fc3db5020fb0722fd}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4}"
         FAMILY_SCRIPT_NAME="setup_fedora_family.sh"
         ;;
     void)
@@ -259,19 +259,71 @@ rootfs_has_shell() {
         [ -x "$_r/usr/bin/bash" ] || [ -L "$_r/bin/ash" ]
 }
 
+# Customization (fonts/icons) can leave root-owned files in a proot tree
+# (guest script ran under real root, or a rooted helper wrote the path).
+# App-uid `rm -rf` then prints Permission denied and install dies at 0%.
+wipe_proot_container() {
+    _wipe_name="$1"
+    _wipe_dir="$PREFIX/var/lib/proot-distro/containers/$_wipe_name"
+    [ -e "$_wipe_dir" ] || return 0
+    echo "FluxLinux: removing container $_wipe_dir"
+    rm -rf "$_wipe_dir" 2>/dev/null || true
+    if [ ! -e "$_wipe_dir" ]; then
+        return 0
+    fi
+    echo "FluxLinux: leftover after unprivileged rm (root-owned files) — trying su"
+    _wipe_q=$(printf "%s" "$_wipe_dir" | sed "s/'/'\\\\''/g")
+    for _su in /system/bin/su /system/xbin/su su; do
+        if [ -x "$_su" ] || command -v "$_su" >/dev/null 2>&1; then
+            "$_su" -c "rm -rf '$_wipe_q'" </dev/null 2>/dev/null || true
+            if [ ! -e "$_wipe_dir" ]; then
+                echo "FluxLinux: privileged wipe ok"
+                return 0
+            fi
+        fi
+    done
+    echo "FluxLinux: ERROR: cannot remove $_wipe_dir (root-owned leftovers)."
+    echo "FluxLinux: From a root shell run: rm -rf $_wipe_dir"
+    return 1
+}
+
+guest_version_id() {
+    _gr="$1"
+    if [ -r "$_gr/usr/lib/os-release" ]; then
+        grep -E '^VERSION_ID=' "$_gr/usr/lib/os-release" 2>/dev/null | head -1 | tr -d '"' | cut -d= -f2
+    elif [ -r "$_gr/etc/os-release" ]; then
+        grep -E '^VERSION_ID=' "$_gr/etc/os-release" 2>/dev/null | head -1 | tr -d '"' | cut -d= -f2
+    fi
+}
+
 if [ "$DISTRO" = "termux" ]; then
     echo "FluxLinux: Native Termux Mode"
     EXIT_CODE=0
 else
     DISTRO_ROOTFS="$PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
 
+    SKIP_EXTRACT=0
     if rootfs_has_shell "$DISTRO_ROOTFS"; then
+        # Fedora pin moved 43 → 44. Re-extract when the guest is the old release.
+        if [ "$DISTRO" = "fedora" ]; then
+            _have_ver=$(guest_version_id "$DISTRO_ROOTFS")
+            if [ "$_have_ver" != "44" ]; then
+                echo "FluxLinux: fedora guest is VERSION_ID=${_have_ver:-unknown} — replacing with 44"
+            else
+                SKIP_EXTRACT=1
+            fi
+        else
+            SKIP_EXTRACT=1
+        fi
+    fi
+
+    if [ "$SKIP_EXTRACT" -eq 1 ]; then
         echo "FluxLinux: $DISTRO already installed with valid rootfs. Skipping base installation."
         EXIT_CODE=0
     else
         if [ "${FLUX_PD_INSTALL_MODE:-file}" = "registry" ]; then
             echo "FluxLinux: FLUX_PD_INSTALL_MODE=registry — installing $DISTRO from registry"
-            rm -rf "$PREFIX/var/lib/proot-distro/containers/$DISTRO"
+            wipe_proot_container "$DISTRO" || exit 1
             "$PYTHON" "$PROOT_DISTRO" install "$DISTRO"
             EXIT_CODE=$?
         else
@@ -290,7 +342,7 @@ else
             fi
             echo "FluxLinux: Installing $DISTRO from local archive..."
             echo "FluxLinux: install $ROOTFS_ARCHIVE --name $DISTRO"
-            rm -rf "$PREFIX/var/lib/proot-distro/containers/$DISTRO"
+            wipe_proot_container "$DISTRO" || exit 1
             "$PYTHON" "$PROOT_DISTRO" install "$ROOTFS_ARCHIVE" --name "$DISTRO"
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 0 ] && ! rootfs_has_shell "$DISTRO_ROOTFS"; then

@@ -34,13 +34,13 @@
 
 | Distro | Source file | Packaged name | SHA-256 | Size |
 |--------|-------------|----------------|---------|------|
-| Fedora 43 container | `/home/abhaybyte/Downloads/fedora-rootfs-arm64.tar.xz` | `fedora_43_rootfs.tar.xz` | `baade82fcea89be5986ee6e0dd3cd8ff04125bf7995c0e9fc3db5020fb0722fd` | 35 MiB |
+| Fedora 44 Generic-Minimal | `/home/abhaybyte/Downloads/Fedora-Container-Base-Generic-Minimal-44-1.7.aarch64.oci.tar.xz` (OCI layer converted) | `fedora_44_rootfs.tar.xz` | `2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4` | 30 MiB |
 | Void 20250202 | `/home/abhaybyte/Downloads/void-arm64-ROOTFS-20250202.tar.xz` | `void_20250202_rootfs.tar.xz` | `01a30f17ae06d4d5b322cd579ca971bc479e02cc284ec1e5a4255bea6bac3ce6` | 44 MiB |
 | openSUSE TW 20251127 | `/home/abhaybyte/Downloads/openSUSE-Tumbleweed-rootfs-arm64.tar.xz` | `opensuse_tumbleweed_rootfs.tar.xz` | `bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a` | 22 MiB |
 
 `os-release` facts:
 
-- Fedora: `ID=fedora` `VERSION_ID=43` (Container Image Prerelease). Has `dnf` + `dnf5`, `tsflags=nodocs`.
+- Fedora: `ID=fedora` `VERSION_ID=44` (Container Image, Generic-Minimal). Has `dnf` + `dnf5`, `tsflags=nodocs`.
 - Void: `ID=void`. XBPS `architecture=aarch64`, repo `https://repo-default.voidlinux.org/current/aarch64`.
 - openSUSE: `ID=opensuse-tumbleweed` `VERSION_ID=20251127`. OSS repo `http://download.opensuse.org/ports/aarch64/tumbleweed/repo/oss/`.
 

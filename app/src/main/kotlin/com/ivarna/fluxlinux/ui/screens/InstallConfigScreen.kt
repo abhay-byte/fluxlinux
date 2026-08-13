@@ -190,7 +190,7 @@ fun InstallConfigScreen(
                     distro.id.startsWith("alpine") ->
                         "Installs Alpine 3.24 minirootfs, XFCE4 (apk), and Flux customization. "
                     distro.id.startsWith("fedora") ->
-                        "Installs Fedora 43 rootfs, XFCE4 (dnf), Mesa, and Flux customization. "
+                        "Installs Fedora 44 rootfs, XFCE4 (dnf), Mesa, and Flux customization. "
                     distro.id.startsWith("void") ->
                         "Installs Void Linux rootfs, XFCE4 (xbps), Mesa, and Flux customization. "
                     distro.id.startsWith("opensuse") ->
@@ -239,7 +239,7 @@ fun InstallConfigScreen(
                                 distro.id.startsWith("alpine") ->
                                     "• Alpine 3.24 minirootfs (~4 MB + apk packages)"
                                 distro.id.startsWith("fedora") ->
-                                    "• Fedora 43 container rootfs"
+                                    "• Fedora 44 container rootfs"
                                 distro.id.startsWith("void") ->
                                     "• Void Linux (glibc aarch64) rootfs"
                                 distro.id.startsWith("opensuse") ->

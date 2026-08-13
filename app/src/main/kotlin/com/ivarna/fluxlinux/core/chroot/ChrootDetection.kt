@@ -89,6 +89,19 @@ object ChrootDetection {
         cache.remove(path)
     }
 
+    /**
+     * Record "not installed" so the next main-thread card check does not keep
+     * returning a stale true after uninstall (TTL cache never re-probes on UI).
+     */
+    fun markUninstalled(path: String) {
+        putCache(path, false)
+    }
+
+    /** Test hook: seed the per-path TTL cache. */
+    internal fun putCacheForTest(path: String, installed: Boolean) {
+        putCache(path, installed)
+    }
+
     fun probe(
         forceRoot: Boolean = true,
         path: String = ChrootPaths.CHROOT_PATH
@@ -99,7 +112,7 @@ object ChrootDetection {
 
         if (!forceRoot) {
             return Snapshot(
-                installed = markerApp || shellApp || dirApp,
+                installed = markerApp || shellApp,
                 markerOk = markerApp,
                 dirExists = dirApp || shellApp,
                 viaRoot = false,
@@ -108,7 +121,7 @@ object ChrootDetection {
         }
 
         if (!RootShell.isRootAvailable()) {
-            val installed = markerApp || shellApp || dirApp
+            val installed = markerApp || shellApp
             return Snapshot(
                 installed = installed,
                 markerOk = markerApp,
@@ -134,7 +147,7 @@ object ChrootDetection {
         } catch (e: Exception) {
             Log.w(TAG, "probe failed: ${e.message}")
             return Snapshot(
-                installed = markerApp || shellApp || dirApp,
+                installed = markerApp || shellApp,
                 markerOk = markerApp,
                 dirExists = dirApp,
                 viaRoot = false,
@@ -160,7 +173,8 @@ object ChrootDetection {
             }
         }
 
-        val installed = marker || shell || dir
+        // A leftover empty directory after uninstall is not an install.
+        val installed = marker || shell
         putCache(path, installed)
         return Snapshot(
             installed = installed,

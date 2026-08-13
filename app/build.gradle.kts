@@ -177,7 +177,7 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
           # Remove legacy name so aapt never sees *.tar.gz
           rm -f app/src/main/assets/rootfs/alpine_3.24_rootfs.tar.gz
         fi
-        for rf in fedora_43_rootfs.tar.xz void_20250202_rootfs.tar.xz \
+        for rf in fedora_44_rootfs.tar.xz void_20250202_rootfs.tar.xz \
                  opensuse_tumbleweed_rootfs.tar.xz \
                  deepin_25_rootfs.tar.xz chimera_20251220_rootfs.tar.xz \
                  manjaro_arm_rootfs.tar.xz; do
@@ -190,7 +190,7 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
     inputs.files(
         rootProject.file("assets/rootfs/debian_13_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/alpine_3.24_rootfs.tar.gz"),
-        rootProject.file("assets/rootfs/fedora_43_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/fedora_44_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/void_20250202_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/deepin_25_rootfs.tar.xz"),
@@ -200,7 +200,7 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
     outputs.files(
         file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"),
         file("src/main/assets/rootfs/alpine_3.24_rootfs.minirootfs"),
-        file("src/main/assets/rootfs/fedora_43_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/fedora_44_rootfs.tar.xz"),
         file("src/main/assets/rootfs/void_20250202_rootfs.tar.xz"),
         file("src/main/assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
         file("src/main/assets/rootfs/deepin_25_rootfs.tar.xz"),

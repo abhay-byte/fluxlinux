@@ -103,6 +103,43 @@ _flux_ensure_user() {
     done
 }
 
+# Fedora/sudo under proot still runs PAM account mgmt. pam_unix + audit
+# fail → "password is required" even with NOPASSWD.
+_flux_repair_sudo_pam() {
+    command -v sudo >/dev/null 2>&1 || return 0
+    if [ -f /etc/sudoers ]; then
+        grep -q '^Defaults !authenticate' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !authenticate' >> /etc/sudoers
+        grep -q '^Defaults !pam_session' /etc/sudoers 2>/dev/null \
+            || echo 'Defaults !pam_session' >> /etc/sudoers
+        chmod 0440 /etc/sudoers 2>/dev/null || true
+    fi
+    if [ -d /etc/pam.d ]; then
+        _permit=""
+        for _m in \
+            /usr/lib64/security/pam_permit.so \
+            /lib64/security/pam_permit.so \
+            /usr/lib/security/pam_permit.so \
+            /lib/security/pam_permit.so
+        do
+            if [ -f "$_m" ]; then _permit=1; break; fi
+        done
+        if [ -n "$_permit" ]; then
+            for _pam in /etc/pam.d/sudo /etc/pam.d/sudo-i; do
+                cat > "$_pam" <<'PAM'
+#%PAM-1.0
+# FluxLinux proot: pam_unix/audit cannot run → sudo asks for a password.
+auth       sufficient pam_permit.so
+account    sufficient pam_permit.so
+password   sufficient pam_permit.so
+session    sufficient pam_permit.so
+PAM
+                chmod 0644 "$_pam" 2>/dev/null || true
+            done
+        fi
+    fi
+}
+
 _flux_ensure_sudo() {
     if command -v sudo >/dev/null 2>&1; then
         mkdir -p /etc/sudoers.d
@@ -120,6 +157,7 @@ _flux_ensure_sudo() {
         done
         chown root:root /etc/sudoers /etc/sudoers.d /etc/sudoers.d/flux 2>/dev/null || true
         chmod 4755 /usr/bin/sudo 2>/dev/null || chmod 4755 /usr/sbin/sudo 2>/dev/null || true
+        _flux_repair_sudo_pam
     elif command -v doas >/dev/null 2>&1; then
         # Chimera ships doas (opendoas), not sudo.
         printf 'permit nopass flux\n' > /etc/doas.conf

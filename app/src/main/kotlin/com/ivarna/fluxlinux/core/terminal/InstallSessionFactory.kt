@@ -57,7 +57,8 @@ object InstallSessionFactory {
     fun openHostCommandSession(
         ctx: Context,
         command: String,
-        title: String = "Host Shell"
+        title: String = "Host Shell",
+        onClosed: ((Int) -> Unit)? = null
     ): Boolean {
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val (_, envMap) = HostCommandBuilder.build(ctx, shell, forceHostSetup = false)
@@ -72,7 +73,49 @@ object InstallSessionFactory {
         )
         return SessionRegistry.add(
             ctx,
-            SessionRegistry.ManagedSession(session, "host", title, "host")
+            SessionRegistry.ManagedSession(session, "host", title, "host", onClosed = onClosed)
+        )
+    }
+
+    /**
+     * Root session that runs [innerCmd] under `su -c`.
+     *
+     * Argv MUST be `[/system/bin/sh, -c, winchCmd]` (same as [ChrootCommandBuilder]).
+     * Passing only `[-c, winchCmd]` makes toybox/mksh treat the command string as
+     * a script filename → `c: trap …: No such file or directory`.
+     */
+    fun openRootInnerSession(
+        ctx: Context,
+        innerCmd: String,
+        title: String = "Root Shell",
+        onFinished: (() -> Unit)? = null,
+        rootfsFileName: String = DistroInstallProfile.DEBIAN_ROOTFS_NAME,
+        extraEnv: Map<String, String> = emptyMap(),
+        wrapWinch: Boolean = true,
+        onClosed: ((Int) -> Unit)? = null
+    ): Boolean {
+        val rootInner = RootShell.shellRootCommand(innerCmd)
+        // Uninstall is non-interactive; the WINCH trap has made toybox sh
+        // SIGSEGV after the script already succeeded (signal 11).
+        val sessionCmd = if (wrapWinch) rootSessionWinchCommand(rootInner) else rootInner
+        val env = HostCommandBuilder.envMap(ctx, includeTerm = false)
+        env["PATH"] = "/system/bin:/system/xbin:/sbin:" + (env["PATH"] ?: "")
+        env["TERM"] = "xterm-256color"
+        env["FLUX_ROOTFS_PATH"] = "${TermuxHostPaths.HOME}/$rootfsFileName"
+        extraEnv.forEach { (k, v) -> env[k] = v }
+        val session = TerminalSession(
+            com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC,
+            "/",
+            rootSessionArgv(sessionCmd),
+            env.map { "${it.key}=${it.value}" }.toTypedArray(),
+            10000,
+            SessionRegistry.sessionClient()
+        )
+        return SessionRegistry.add(
+            ctx,
+            SessionRegistry.ManagedSession(
+                session, "install", title, "chroot", onFinished, onClosed
+            )
         )
     }
 
@@ -84,27 +127,18 @@ object InstallSessionFactory {
         rootfsFileName: String = DistroInstallProfile.DEBIAN_ROOTFS_NAME,
         chrootPath: String? = null
     ): Boolean {
-        val rootInner = RootShell.shellRootCommand("sh '$scriptPath'")
-        val winchCmd =
-            "trap 'kill -WINCH -\$\$ 2>/dev/null; kill -WINCH 0 2>/dev/null' WINCH; $rootInner"
-        val env = HostCommandBuilder.envMap(ctx, includeTerm = false)
-        env["PATH"] = "/system/bin:/system/xbin:/sbin:" + (env["PATH"] ?: "")
-        env["TERM"] = "xterm-256color"
-        env["FLUX_ROOTFS_PATH"] = "${TermuxHostPaths.HOME}/$rootfsFileName"
-        if (chrootPath != null) {
-            env["FLUX_CHROOT"] = chrootPath
+        val extra = mutableMapOf<String, String>()
+        if (chrootPath != null) extra["FLUX_CHROOT"] = chrootPath
+        val exports = extra.entries.joinToString(" ") { (k, v) ->
+            "$k='${v.replace("'", "'\\''")}'"
         }
-        val session = TerminalSession(
-            com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC,
-            "/",
-            arrayOf("-c", winchCmd),
-            env.map { "${it.key}=${it.value}" }.toTypedArray(),
-            10000,
-            SessionRegistry.sessionClient()
-        )
-        return SessionRegistry.add(
-            ctx,
-            SessionRegistry.ManagedSession(session, "install", title, "chroot", onFinished)
+        val inner = if (exports.isEmpty()) {
+            "sh '$scriptPath'"
+        } else {
+            "export $exports; sh '$scriptPath'"
+        }
+        return openRootInnerSession(
+            ctx, inner, title, onFinished, rootfsFileName, extra
         )
     }
 
@@ -156,4 +190,15 @@ object InstallSessionFactory {
 
     private fun FileName(assetPath: String): String =
         assetPath.substringAfterLast('/')
+
+    fun rootSessionWinchCommand(rootInner: String): String =
+        "trap 'kill -WINCH -\$\$ 2>/dev/null; kill -WINCH 0 2>/dev/null' WINCH; $rootInner"
+
+    /** Full argv for [com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC]. */
+    fun rootSessionArgv(winchCmd: String): Array<String> =
+        arrayOf(
+            com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC,
+            "-c",
+            winchCmd
+        )
 }

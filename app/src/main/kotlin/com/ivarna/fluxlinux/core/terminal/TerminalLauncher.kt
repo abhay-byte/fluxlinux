@@ -83,6 +83,50 @@ object TerminalLauncher {
         ChrootDetection.invalidate()
     }
 
+    /**
+     * After a distro uninstall session (or its deep-link callback): drop the
+     * chroot TTL cache, clear prefs, and bump the Home/Distros refresh so the
+     * card does not stay "Installed" while the rootfs is already gone.
+     *
+     * Home/Distros read [isDistroInstalledOnFs], not prefs. Chroot detection
+     * on the main thread never re-probes, so a stale true cache would stick
+     * until process death. Proot is filesystem-only (no cache).
+     */
+    fun refreshInstalledAfterUninstall(ctx: Context, distroId: String) {
+        val appCtx = ctx.applicationContext
+        val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+        if (profile?.method == "chroot") {
+            val path = profile.chrootPath
+            if (!path.isNullOrEmpty()) {
+                ChrootDetection.invalidate(path)
+                ChrootDetection.markUninstalled(path)
+            } else {
+                ChrootDetection.invalidate()
+            }
+        }
+        try {
+            com.ivarna.fluxlinux.core.utils.StateManager.clearDistroState(appCtx, distroId)
+        } catch (_: Exception) {
+        }
+        com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+
+        val chrootPath = profile?.chrootPath
+        if (profile?.method == "chroot" && !chrootPath.isNullOrEmpty()) {
+            executor.execute {
+                val still = try {
+                    ChrootDetection.probe(forceRoot = true, path = chrootPath).installed
+                } catch (_: Exception) {
+                    false
+                }
+                if (still) {
+                    mainHandler.post {
+                        com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
+                    }
+                }
+            }
+        }
+    }
+
     fun isDebianChrootXfceInstalled(): Boolean =
         isChrootXfceInstalled(com.ivarna.fluxlinux.core.root.ChrootPaths.DEBIAN_CHROOT_PATH)
 

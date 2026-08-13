@@ -19,27 +19,39 @@ object UninstallSessionFactory {
     ): Boolean {
         val method = terminalComponentFor(distro.id).method
         val profile = DistroInstallProfile.forId(distro.id)
+        val appCtx = ctx.applicationContext
+        val onClosed: (Int) -> Unit = {
+            TerminalLauncher.refreshInstalledAfterUninstall(appCtx, distro.id)
+        }
         return when (method) {
             "chroot" -> {
                 val asset = profile?.chrootUninstallAsset
                     ?: "scripts/chroot/uninstall_debian13_chroot.sh"
                 val name = asset.substringAfterLast('/')
                 val staged = RootShell.stageAsset(ctx, asset)
-                    ?: return InstallSessionFactory.openRootScriptSession(
-                        ctx,
-                        TermuxHostPaths.hostScript(ctx, name).absolutePath,
-                        title = "Uninstall ${distro.name}",
-                        rootfsFileName = profile?.rootfsFileName
-                            ?: DistroInstallProfile.DEBIAN_ROOTFS_NAME,
-                        chrootPath = profile?.chrootPath
-                    )
-                InstallSessionFactory.openRootScriptSession(
+                    ?: TermuxHostPaths.hostScript(ctx, name).absolutePath
+                val chrootPath = profile?.chrootPath.orEmpty()
+                val tmpPath = "/data/local/tmp/$name"
+                val stagedQ = staged.replace("'", "'\\''")
+                val chrootQ = chrootPath.replace("'", "'\\''")
+                // Copy out of app-private storage (su often cannot read it),
+                // then run with FLUX_CHROOT on the su command (su drops env).
+                val inner =
+                    "cp -f '$stagedQ' '$tmpPath' && chmod 755 '$tmpPath' && " +
+                        "FLUX_CHROOT='$chrootQ' FLUX_DISTRO_ID='${distro.id}' " +
+                        "sh '$tmpPath'"
+                InstallSessionFactory.openRootInnerSession(
                     ctx,
-                    staged,
+                    inner,
                     title = "Uninstall ${distro.name}",
                     rootfsFileName = profile?.rootfsFileName
                         ?: DistroInstallProfile.DEBIAN_ROOTFS_NAME,
-                    chrootPath = profile?.chrootPath
+                    extraEnv = mapOf(
+                        "FLUX_CHROOT" to chrootPath,
+                        "FLUX_DISTRO_ID" to distro.id
+                    ),
+                    wrapWinch = false,
+                    onClosed = onClosed
                 )
             }
             else -> {
@@ -47,12 +59,21 @@ object UninstallSessionFactory {
                 val callback = "am start -a android.intent.action.VIEW -d " +
                     "\"fluxlinux://callback?result=success&name=distro_uninstall_${distro.id}\""
                 val cmd = buildString {
-                    append("proot-distro remove $removeName; RC=\$?; ")
+                    append("NAME=$removeName; ")
+                    append("DIR=\"\$PREFIX/var/lib/proot-distro/containers/\$NAME\"; ")
+                    append("proot-distro remove \$NAME; RC=\$?; ")
+                    append("rm -rf \"\$DIR\" 2>/dev/null || true; ")
+                    // Customization can leave root-owned fonts/icons; app-uid rm fails.
+                    append("if [ -e \"\$DIR\" ]; then ")
+                    append("if [ -x /system/bin/su ]; then /system/bin/su -c \"rm -rf \$DIR\" </dev/null; ")
+                    append("elif command -v su >/dev/null 2>&1; then su -c \"rm -rf \$DIR\" </dev/null; fi; ")
+                    append("fi; ")
                     append("rm -f \"\$HOME/.fluxlinux_distro_${distro.id}_installed\" 2>/dev/null; ")
+                    append("if [ ! -e \"\$DIR\" ]; then RC=0; fi; ")
                     append("if [ \$RC -eq 0 ]; then $callback; fi; exit \$RC")
                 }
                 InstallSessionFactory.openHostCommandSession(
-                    ctx, cmd, title = "Uninstall ${distro.name}"
+                    ctx, cmd, title = "Uninstall ${distro.name}", onClosed = onClosed
                 )
             }
         }
