@@ -58,6 +58,10 @@ object TerminalLauncher {
         if (File(root, "bin/busybox").isFile) return true
         if (File(root, "sbin/apk").isFile) return true
         if (File(root, "usr/bin/bash").isFile) return true
+        // Chimera: /bin -> usr/bin; probe both real paths so a broken bin
+        // symlink cannot false-negative (apk v3 lives at usr/lib/apk).
+        if (File(root, "usr/bin/sh").isFile) return true
+        if (File(root, "usr/bin/apk").isFile) return true
         try {
             if (java.nio.file.Files.isSymbolicLink(File(root, "bin/ash").toPath())) return true
         } catch (_: Exception) {

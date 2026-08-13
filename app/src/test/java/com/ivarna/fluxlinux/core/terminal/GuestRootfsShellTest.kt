@@ -33,6 +33,27 @@ class GuestRootfsShellTest {
     }
 
     @Test
+    fun chimera_usr_bin_sh_with_bin_symlink_counts_as_installed() {
+        val root = tmp.newFolder("chimera-rootfs")
+        File(root, "usr/bin").mkdirs()
+        File(root, "usr/bin/sh").writeText("x")
+        File(root, "usr/bin/apk").writeText("x")
+        // /bin -> usr/bin symlink, sh itself is a regular file
+        Files.createSymbolicLink(File(root, "bin").toPath(), File("usr/bin").toPath())
+        assertTrue(File(root, "bin/sh").exists())
+        assertTrue(TerminalLauncher.guestRootfsHasShell(root))
+    }
+
+    @Test
+    fun chimera_usr_bin_apk_without_bin_counts_as_installed() {
+        val root = tmp.newFolder("chimera-rootfs-nobin")
+        File(root, "usr/bin").mkdirs()
+        File(root, "usr/bin/apk").writeText("x")
+        // broken/missing bin symlink must not false-negative
+        assertTrue(TerminalLauncher.guestRootfsHasShell(root))
+    }
+
+    @Test
     fun empty_root_false() {
         val root = tmp.newFolder("empty")
         assertFalse(TerminalLauncher.guestRootfsHasShell(root))

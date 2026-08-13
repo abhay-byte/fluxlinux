@@ -19,27 +19,30 @@ object GuestApkDbRepair {
 
     private const val TAG = "GuestApkDbRepair"
 
-    private val REL_PATHS = listOf(
-        "lib/apk",
-        "var/cache/apk",
-        "var/log",
-        "etc/apk"
-    )
-
     /**
      * @param method `proot` | `chroot` (chroot uses real root — skip)
-     * @param distroId card id; only alpine proot is repaired
+     * @param distroId card id; only alpine/chimera proot is repaired
      */
     fun repairIfNeeded(ctx: Context, method: String, distroId: String? = null) {
         if (method != "proot") return
         val prootName = GuestZshrcRepair.resolveProotName(distroId)
-        if (prootName != "alpine") return
+        val isChimera = prootName == "chimera"
+        if (prootName != "alpine" && !isChimera) return
 
         val rootfs = File(
             ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/alpine/rootfs"
+            "usr/var/lib/proot-distro/containers/$prootName/rootfs"
         )
         if (!rootfs.isDirectory) return
+
+        // Chimera apk v3 lives at usr/lib/apk/db — never chown Alpine paths
+        // inside a Chimera rootfs (wrong-path chown is worse than none).
+        val relPaths = if (isChimera) {
+            listOf("usr/lib/apk", "var/cache/apk", "etc/apk")
+        } else {
+            listOf("lib/apk", "var/cache/apk", "var/log", "etc/apk")
+        }
+        val dbRel = if (isChimera) "usr/lib/apk/db" else "lib/apk/db"
 
         try {
             val etc = File(rootfs, "etc")
@@ -54,13 +57,13 @@ object GuestApkDbRepair {
             }
             if (refUid == null) return
 
-            for (rel in REL_PATHS) {
+            for (rel in relPaths) {
                 val dir = File(rootfs, rel)
                 if (!dir.exists()) continue
                 ensureWritableTree(dir)
             }
 
-            val db = File(rootfs, "lib/apk/db")
+            val db = File(rootfs, dbRel)
             db.mkdirs()
             val lock = File(db, "lock")
             if (lock.exists() && !lock.canWrite()) {

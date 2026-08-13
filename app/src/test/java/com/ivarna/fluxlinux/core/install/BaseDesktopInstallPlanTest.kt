@@ -1,6 +1,7 @@
 package com.ivarna.fluxlinux.core.install
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -125,6 +126,50 @@ class BaseDesktopInstallPlanTest {
         assertEquals("proot", BaseDesktopInstallPlan.methodFor("fedora"))
         assertEquals("chroot", BaseDesktopInstallPlan.methodFor("opensuse_chroot"))
         assertEquals("void", BaseDesktopInstallPlan.profileFor("void")!!.prootName)
+    }
+
+    @Test
+    fun distroById_deepin_chimera_manjaro() {
+        assertEquals("deepin", BaseDesktopInstallPlan.distroById("deepin")!!.id)
+        assertEquals("deepin_chroot", BaseDesktopInstallPlan.distroById("deepin_chroot")!!.id)
+        assertEquals("chimera", BaseDesktopInstallPlan.distroById("chimera")!!.id)
+        assertEquals("chimera_chroot", BaseDesktopInstallPlan.distroById("chimera_chroot")!!.id)
+        assertEquals("manjaro", BaseDesktopInstallPlan.distroById("manjaro")!!.id)
+        assertEquals("manjaro_chroot", BaseDesktopInstallPlan.distroById("manjaro_chroot")!!.id)
+    }
+
+    @Test
+    fun methodFor_deepin_chimera_manjaro() {
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("deepin"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("deepin_chroot"))
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("chimera"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("chimera_chroot"))
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("manjaro"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("manjaro_chroot"))
+    }
+
+    @Test
+    fun profileFor_deepin_chimera_manjaro() {
+        assertEquals("deepin", BaseDesktopInstallPlan.profileFor("deepin")!!.prootName)
+        assertEquals(
+            "manjaro",
+            BaseDesktopInstallPlan.profileFor("manjaro")!!.prootName
+        )
+        assertEquals(
+            "chimera",
+            BaseDesktopInstallPlan.profileFor("chimera")!!.prootName
+        )
+        assertEquals(
+            "chroot",
+            BaseDesktopInstallPlan.profileFor("chimera_chroot")!!.method
+        )
+        // New family paths must NOT contain debian/alpine (common gets prepended).
+        val chimera = BaseDesktopInstallPlan.profileFor("chimera")!!
+        assertFalse(chimera.familyScript.contains("debian"))
+        assertFalse(chimera.familyScript.contains("alpine"))
+        val deepin = BaseDesktopInstallPlan.profileFor("deepin")!!
+        assertFalse(deepin.familyScript.contains("debian"))
+        assertFalse(deepin.familyScript.contains("alpine"))
     }
 
     @Test

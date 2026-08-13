@@ -177,6 +177,12 @@ ensure_mounts() {
 
   bind_if_missing /dev "$FLUX_CHROOT/dev"
   bind_if_missing /sys "$FLUX_CHROOT/sys"
+  # /dev bind usually exposes kgsl. If the node is still missing, mknod (fail-soft).
+  if [ -e /dev/kgsl-3d0 ] && [ ! -e "$FLUX_CHROOT/dev/kgsl-3d0" ]; then
+    $BB mknod "$FLUX_CHROOT/dev/kgsl-3d0" c $($BB stat -c "%t %T" /dev/kgsl-3d0 2>/dev/null) \
+      >/dev/null 2>&1 || true
+    chmod 666 "$FLUX_CHROOT/dev/kgsl-3d0" >/dev/null 2>&1 || true
+  fi
   mount_type_if_missing proc proc "$FLUX_CHROOT/proc"
   ensure_devpts
   mount_type_if_missing tmpfs tmpfs "$FLUX_CHROOT/dev/shm" "size=512M,mode=1777"

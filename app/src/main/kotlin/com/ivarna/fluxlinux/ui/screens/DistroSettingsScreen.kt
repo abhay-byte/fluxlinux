@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroComponent
+import com.ivarna.fluxlinux.core.terminal.GpuAccelDetector
 import com.ivarna.fluxlinux.core.utils.InstallationQueueManager
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.components.GlassScaffold
@@ -487,7 +488,16 @@ fun DistroSettingsScreen(
                 Button(
                     onClick = {
                         showGpuDialog = false
-                        onInstallComponent(activeComponent!!, mapOf("FLUX_GPU" to selectedGpu))
+                        val det = GpuAccelDetector.detect()
+                        GpuAccelDetector.persist(context, det)
+                        val mode = GpuAccelDetector.resolveFluxGpu(selectedGpu)
+                        onInstallComponent(
+                            activeComponent!!,
+                            mapOf(
+                                "FLUX_GPU" to mode,
+                                "FLUX_GPU_VENDOR" to det.vendorHint
+                            )
+                        )
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)

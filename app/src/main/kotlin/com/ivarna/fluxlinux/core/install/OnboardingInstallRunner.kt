@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.service.BaseInstallService
+import com.ivarna.fluxlinux.core.terminal.GpuAccelDetector
 import com.ivarna.fluxlinux.core.terminal.HostCommandBuilder
 import com.ivarna.fluxlinux.core.terminal.ShellCommandRunner
 import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
@@ -262,19 +263,25 @@ class OnboardingInstallRunner(private val ctx: Context) {
             envPrefix = "FLUX_THEME=$theme " +
                 "FLUX_SKIP_THEME_ICONS=$skipAssets " +
                 "FLUX_SKIP_OMZ=$skipOmz " +
-                "FLUX_SKIP_POKEMON=1 " +
+                "FLUX_SKIP_POKEMON=0 " +
                 "FLUX_ASSET_DIR=/tmp/flux_xfce_assets"
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!customOk) {
             log(phases, 2, onProgress, "Customization failed or partial — you can retry from Distro Settings")
         }
+
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        val hwOk = runHwAccelIfPresent(
+            profile, method = "proot", phases, 2, onProgress, gen, chrootPath = null
+        )
+
         completePhase(phases, 2, onProgress, "Customization done")
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)
         StateManager.setComponentInstalled(appCtx, distroId, "xfce4_desktop", true)
-        if (profile.hwAccelScript != null) {
+        if (hwOk) {
             StateManager.setComponentInstalled(appCtx, distroId, "hw_accel", true)
         }
         if (customOk) {
@@ -394,6 +401,19 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, 4, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
+        // Stage theme/icon/cursor/wallpaper into the chroot guest /tmp (root copy).
+        // The customization script extracts from /tmp/flux_xfce_assets with guest
+        // tar; icons have no download fallback, so this staging is mandatory.
+        log(phases, 4, onProgress, "Staging XFCE theme/icons into chroot…")
+        try {
+            com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.installToChroot(
+                appCtx, theme, chrootPath
+            ) { line ->
+                if (!isStale(gen) && line.isNotBlank()) log(phases, 4, onProgress, line)
+            }
+        } catch (e: Exception) {
+            log(phases, 4, onProgress, "chroot theme stage error: ${e.message}")
+        }
         val customPayload = BaseDesktopInstallPlan.customizationPayload(appCtx, theme, distroId)
         val customExit = runChrootGuestBlocking(
             customPayload, user = "root", phases, 4, onProgress, chrootPath
@@ -402,12 +422,18 @@ class OnboardingInstallRunner(private val ctx: Context) {
         if (customExit != 0) {
             log(phases, 4, onProgress, "Customization failed or partial (exit $customExit)")
         }
+
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        val hwOk = runHwAccelIfPresent(
+            profile, method = "chroot", phases, 4, onProgress, gen, chrootPath = chrootPath
+        )
+
         completePhase(phases, 4, onProgress, "Customization done")
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)
         StateManager.setComponentInstalled(appCtx, distroId, "xfce4_desktop", true)
-        if (profile.hwAccelScript != null) {
+        if (hwOk) {
             StateManager.setComponentInstalled(appCtx, distroId, "hw_accel", true)
         }
         if (customExit == 0) {
@@ -415,6 +441,68 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
         StateManager.triggerRefresh()
         postSuccess(onProgress, phases)
+    }
+
+    /**
+     * Run the guest hw-accel installer with host-detected FLUX_GPU.
+     * Failure is logged and does not fail onboarding (family first-paint is VirGL).
+     */
+    private fun runHwAccelIfPresent(
+        profile: DistroInstallProfile,
+        method: String,
+        phases: List<BaseDesktopInstallPlan.Phase>,
+        phaseIndex: Int,
+        onProgress: (Progress) -> Unit,
+        gen: Int,
+        chrootPath: String?
+    ): Boolean {
+        val script = profile.hwAccelScript ?: return false
+        val gpu = GpuAccelDetector.detect()
+        GpuAccelDetector.persist(appCtx, gpu)
+        log(
+            phases, phaseIndex, onProgress,
+            "Hardware acceleration: mode=${gpu.mode} vendor=${gpu.vendorHint}"
+        )
+        val ok = try {
+            if (method == "chroot") {
+                val path = chrootPath
+                    ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
+                val payload = BaseDesktopInstallPlan.hwAccelPayload(
+                    appCtx, profile.distroId, gpu.mode, gpu.vendorHint
+                )
+                runChrootGuestBlocking(payload, user = "root", phases, phaseIndex, onProgress, path) == 0
+            } else {
+                stageFluxGpuCommon()
+                runProotGuestScript(
+                    phases, phaseIndex, onProgress, gen,
+                    prootName = profile.prootName,
+                    scriptAssetPath = script,
+                    envPrefix = "FLUX_GPU=${gpu.mode} FLUX_GPU_VENDOR=${gpu.vendorHint}"
+                )
+            }
+        } catch (e: Exception) {
+            log(phases, phaseIndex, onProgress, "Hardware acceleration error: ${e.message}")
+            false
+        }
+        if (ok) {
+            log(phases, phaseIndex, onProgress, "Hardware acceleration installed (${gpu.mode})")
+        } else {
+            log(
+                phases, phaseIndex, onProgress,
+                "Hardware acceleration skipped or failed — VirGL first-paint remains"
+            )
+        }
+        return ok
+    }
+
+    private fun stageFluxGpuCommon() {
+        val tmp = File(TermuxHostPaths.TMPDIR)
+        if (!tmp.exists()) tmp.mkdirs()
+        val dest = File(tmp, "flux_gpu_common.sh")
+        appCtx.assets.open("scripts/common/setup/flux_gpu_common.sh").use { input ->
+            dest.outputStream().use { input.copyTo(it) }
+        }
+        dest.setExecutable(true)
     }
 
     private fun runProotGuestScript(

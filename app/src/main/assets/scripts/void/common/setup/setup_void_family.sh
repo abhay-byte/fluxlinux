@@ -215,6 +215,14 @@ xbps-install -y \
 xbps-install -y Thunar 2>/dev/null || xbps-install -y thunar 2>/dev/null || true
 xbps-install -y adwaita-icon-theme dejavu-fonts-ttf mesa mesa-dri 2>/dev/null || true
 
+if ! ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US'; then
+    xbps-install -y glibc-locales 2>/dev/null || true
+fi
+printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+if command -v _flux_ensure_en_us_locale >/dev/null 2>&1; then
+    _flux_ensure_en_us_locale
+fi
+
 _flux_require_startxfce4
 _flux_ensure_user
 _flux_ensure_sudo

@@ -13,6 +13,9 @@ class TerminalComponentTest {
         assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("fedora"))
         assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("void"))
         assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("opensuse"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("deepin"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("chimera"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("manjaro"))
     }
 
     @Test
@@ -23,6 +26,9 @@ class TerminalComponentTest {
         assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("fedora_chroot"))
         assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("void_chroot"))
         assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("opensuse_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("deepin_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("chimera_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("manjaro_chroot"))
     }
 
     @Test

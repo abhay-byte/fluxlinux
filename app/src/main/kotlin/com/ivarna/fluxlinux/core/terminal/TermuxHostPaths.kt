@@ -236,6 +236,7 @@ object TermuxHostPaths {
      */
     fun ensureHostTmpDirs(filesDir: File = File(FILES)) {
         val shared = File(filesDir, "usr/tmp").also { it.mkdirs() }
+        File(shared, ".X11-unix").mkdirs()
         val glue = File(filesDir, "proot-tmp").also { it.mkdirs() }
         shared.setReadable(true, false)
         shared.setWritable(true, false)
@@ -243,5 +244,26 @@ object TermuxHostPaths {
         glue.setReadable(true, true)
         glue.setWritable(true, true)
         glue.setExecutable(true, true)
+        restoreAppDataSelinux(shared, filesDir)
+    }
+
+    /**
+     * Host PREFIX/tmp must keep the app_data_file label. A leftover tmpfs:s0
+     * (older chroot start used chcon -R) makes termux-x11 fail to create
+     * .X11-unix / lock files under enforcing SELinux.
+     */
+    private fun restoreAppDataSelinux(target: File, filesDir: File) {
+        try {
+            val clazz = Class.forName("android.os.SELinux")
+            val get = clazz.getMethod("getFileContext", String::class.java)
+            val set = clazz.getMethod("setFileContext", String::class.java, String::class.java)
+            val want = get.invoke(null, filesDir.absolutePath) as? String ?: return
+            if (want.isBlank() || want.contains("unlabeled")) return
+            val have = get.invoke(null, target.absolutePath) as? String
+            if (have == want) return
+            set.invoke(null, target.absolutePath, want)
+        } catch (_: Throwable) {
+            // JVM unit tests / missing API / SELinux deny
+        }
     }
 }

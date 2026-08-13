@@ -34,6 +34,18 @@ class ChrootPathsTest {
             ChrootPaths.OPENSUSE_CHROOT_PATH,
             ChrootPaths.pathForDistro("opensuse_chroot")
         )
+        assertEquals(
+            ChrootPaths.DEEPIN_CHROOT_PATH,
+            ChrootPaths.pathForDistro("deepin_chroot")
+        )
+        assertEquals(
+            ChrootPaths.CHIMERA_CHROOT_PATH,
+            ChrootPaths.pathForDistro("chimera_chroot")
+        )
+        assertEquals(
+            ChrootPaths.MANJARO_CHROOT_PATH,
+            ChrootPaths.pathForDistro("manjaro_chroot")
+        )
     }
 
     @Test
@@ -43,8 +55,18 @@ class ChrootPathsTest {
             ChrootPaths.ALPINE_CHROOT_PATH,
             ChrootPaths.FEDORA_CHROOT_PATH,
             ChrootPaths.VOID_CHROOT_PATH,
-            ChrootPaths.OPENSUSE_CHROOT_PATH
+            ChrootPaths.OPENSUSE_CHROOT_PATH,
+            ChrootPaths.DEEPIN_CHROOT_PATH,
+            ChrootPaths.CHIMERA_CHROOT_PATH,
+            ChrootPaths.MANJARO_CHROOT_PATH
         )
-        assertEquals(5, paths.size)
+        assertEquals(8, paths.size)
+    }
+
+    @Test
+    fun new_paths_match_plan_contract() {
+        assertEquals("/data/local/tmp/chrootDeepin", ChrootPaths.DEEPIN_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootChimera", ChrootPaths.CHIMERA_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootManjaro", ChrootPaths.MANJARO_CHROOT_PATH)
     }
 }

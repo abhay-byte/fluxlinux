@@ -168,7 +168,8 @@ else
     fi
     if ! icon_is_installed "$SEL_ICON"; then
         echo "FluxLinux: Installing icons $SEL_ICON..."
-        IFILE="$(find_asset "$ICON_TAR" || find_asset "papirus-dark-only.tar.gz" || true)"
+        IFILE="$(find_asset "$ICON_TAR" || find_asset "papirus-dark-only.tar.gz" \
+            || find_asset "papirus-dark-only.tar.xz" || true)"
         [ -n "$IFILE" ] || handle_error "Icons Archive Missing"
         extract_local_tar "$IFILE" "$ICON_DIR" "Papirus-Dark" 2>/dev/null || \
             extract_local_tar "$IFILE" "$ICON_DIR" || handle_error "Icons Extract"

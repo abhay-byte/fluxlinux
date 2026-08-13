@@ -198,7 +198,8 @@ else
         echo "FluxLinux: Icons $SEL_ICON already installed — skip"
     else
         echo "FluxLinux: Installing icons $SEL_ICON only..."
-        IFILE="$(find_asset "$ICON_TAR" || find_asset "papirus-dark-only.tar.gz" || true)"
+        IFILE="$(find_asset "$ICON_TAR" || find_asset "papirus-dark-only.tar.gz" \
+            || find_asset "papirus-dark-only.tar.xz" || true)"
         if [ -z "$IFILE" ]; then
             # Legacy fallback: full pack but still extract only Papirus-Dark/
             IFILE="$(find_asset "papirus-icon-theme-20250501.tar.gz" || true)"

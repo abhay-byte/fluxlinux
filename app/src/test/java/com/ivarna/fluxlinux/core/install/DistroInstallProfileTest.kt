@@ -65,7 +65,10 @@ class DistroInstallProfileTest {
         assertTrue(names.contains(DistroInstallProfile.FEDORA_ROOTFS_NAME))
         assertTrue(names.contains(DistroInstallProfile.VOID_ROOTFS_NAME))
         assertTrue(names.contains(DistroInstallProfile.OPENSUSE_ROOTFS_NAME))
-        assertEquals(5, names.size)
+        assertTrue(names.contains(DistroInstallProfile.DEEPIN_ROOTFS_NAME))
+        assertTrue(names.contains(DistroInstallProfile.CHIMERA_ROOTFS_NAME))
+        assertTrue(names.contains(DistroInstallProfile.MANJARO_ROOTFS_NAME))
+        assertEquals(8, names.size)
     }
 
     @Test
@@ -104,6 +107,12 @@ class DistroInstallProfileTest {
         assertTrue(DistroInstallProfile.isInstallable("void"))
         assertTrue(DistroInstallProfile.isInstallable("fedora"))
         assertTrue(DistroInstallProfile.isInstallable("opensuse_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("deepin"))
+        assertTrue(DistroInstallProfile.isInstallable("deepin_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("chimera"))
+        assertTrue(DistroInstallProfile.isInstallable("chimera_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("manjaro"))
+        assertTrue(DistroInstallProfile.isInstallable("manjaro_chroot"))
         assertFalse(DistroInstallProfile.isInstallable("archlinux"))
     }
 
@@ -150,10 +159,101 @@ class DistroInstallProfileTest {
         listOf(
             DistroInstallProfile.FEDORA_ROOTFS_SHA256,
             DistroInstallProfile.VOID_ROOTFS_SHA256,
-            DistroInstallProfile.OPENSUSE_ROOTFS_SHA256
+            DistroInstallProfile.OPENSUSE_ROOTFS_SHA256,
+            DistroInstallProfile.DEEPIN_ROOTFS_SHA256,
+            DistroInstallProfile.CHIMERA_ROOTFS_SHA256,
+            DistroInstallProfile.MANJARO_ROOTFS_SHA256
         ).forEach { sha ->
             assertEquals(64, sha.length)
             assertTrue(sha.matches(Regex("[0-9a-f]{64}")))
         }
+    }
+
+    @Test
+    fun deepin_proot_chroot_profiles() {
+        val proot = DistroInstallProfile.require("deepin")
+        assertEquals("proot", proot.method)
+        assertEquals("deepin", proot.prootName)
+        assertEquals(DistroInstallProfile.DEEPIN_ROOTFS_NAME, proot.rootfsFileName)
+        assertFalse(proot.rootfsAsset.endsWith(".gz"))
+        assertTrue(proot.rootfsMinBytes >= 40L * 1024L * 1024L)
+        assertTrue(proot.familyScript.contains("deepin"))
+        assertEquals("common/setup/setup_customization_xfce.sh", proot.customizationScript)
+        assertNotNull(proot.hwAccelScript)
+
+        val chroot = DistroInstallProfile.require("deepin_chroot")
+        assertEquals("chroot", chroot.method)
+        assertEquals(ChrootPaths.DEEPIN_CHROOT_PATH, chroot.chrootPath)
+        assertEquals("start_guest_gui.sh", chroot.chrootStartGuiScript)
+        assertTrue(chroot.chrootSetupAsset!!.contains("setup_guest_chroot"))
+        assertEquals(chroot.rootfsSha256, proot.rootfsSha256)
+    }
+
+    @Test
+    fun chimera_proot_chroot_profiles() {
+        val proot = DistroInstallProfile.require("chimera")
+        assertEquals("proot", proot.method)
+        assertEquals("chimera", proot.prootName)
+        assertEquals(DistroInstallProfile.CHIMERA_ROOTFS_NAME, proot.rootfsFileName)
+        assertFalse(proot.rootfsAsset.endsWith(".gz"))
+        assertTrue(proot.rootfsMinBytes >= 4L * 1024L * 1024L)
+        assertTrue(proot.familyScript.contains("chimera"))
+        assertEquals("common/setup/setup_customization_xfce.sh", proot.customizationScript)
+        assertNotNull(proot.hwAccelScript)
+
+        val chroot = DistroInstallProfile.require("chimera_chroot")
+        assertEquals("chroot", chroot.method)
+        assertEquals(ChrootPaths.CHIMERA_CHROOT_PATH, chroot.chrootPath)
+        assertEquals("start_guest_gui.sh", chroot.chrootStartGuiScript)
+        assertTrue(chroot.chrootSetupAsset!!.contains("setup_guest_chroot"))
+    }
+
+    @Test
+    fun manjaro_proot_chroot_profiles() {
+        val proot = DistroInstallProfile.require("manjaro")
+        assertEquals("proot", proot.method)
+        assertEquals("manjaro", proot.prootName)
+        assertEquals(DistroInstallProfile.MANJARO_ROOTFS_NAME, proot.rootfsFileName)
+        assertFalse(proot.rootfsAsset.endsWith(".gz"))
+        assertTrue(proot.rootfsMinBytes >= 80L * 1024L * 1024L)
+        assertTrue(proot.familyScript.contains("manjaro"))
+        assertEquals("common/setup/setup_customization_xfce.sh", proot.customizationScript)
+        assertNotNull(proot.hwAccelScript)
+
+        val chroot = DistroInstallProfile.require("manjaro_chroot")
+        assertEquals("chroot", chroot.method)
+        assertEquals(ChrootPaths.MANJARO_CHROOT_PATH, chroot.chrootPath)
+        assertEquals("start_guest_gui.sh", chroot.chrootStartGuiScript)
+        assertTrue(chroot.chrootSetupAsset!!.contains("setup_guest_chroot"))
+    }
+
+    @Test
+    fun allInstallable_have_hwAccelScript() {
+        DistroInstallProfile.allInstallable().forEach { p ->
+            assertNotNull("${p.distroId} missing hwAccelScript", p.hwAccelScript)
+            assertTrue(
+                "${p.distroId} hwAccelScript should be guest SSOT",
+                p.hwAccelScript!!.contains("setup_hw_accel_guest")
+            )
+        }
+    }
+
+    @Test
+    fun debian_and_alpine_have_hwAccelScript() {
+        assertNotNull(DistroInstallProfile.require("debian").hwAccelScript)
+        assertNotNull(DistroInstallProfile.require("debian13_chroot").hwAccelScript)
+        assertNotNull(DistroInstallProfile.require("alpine").hwAccelScript)
+        assertNotNull(DistroInstallProfile.require("alpine_chroot").hwAccelScript)
+    }
+
+    @Test
+    fun allInstallable_includes_six_new_cards() {
+        val ids = DistroInstallProfile.allInstallable().map { it.distroId }.toSet()
+        listOf(
+            "deepin", "deepin_chroot",
+            "chimera", "chimera_chroot",
+            "manjaro", "manjaro_chroot"
+        ).forEach { assertTrue(ids.contains(it)) }
+        assertEquals(16, ids.size)
     }
 }

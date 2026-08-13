@@ -36,6 +36,24 @@ case "$DISTRO" in
         ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a}"
         FAMILY_SCRIPT_NAME="setup_opensuse_family.sh"
         ;;
+    deepin)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-deepin_25_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698}"
+        FAMILY_SCRIPT_NAME="setup_deepin_family.sh"
+        ;;
+    chimera)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-chimera_20251220_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-0900e3f2554faaf005c14a6850596dadae1e7d8a996138180eebb0b4694a4a6c}"
+        FAMILY_SCRIPT_NAME="setup_chimera_family.sh"
+        ;;
+    manjaro)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-manjaro_arm_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156}"
+        FAMILY_SCRIPT_NAME="setup_manjaro_family.sh"
+        ;;
     *)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-debian_13_rootfs.tar.xz}"
         ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"
@@ -237,6 +255,7 @@ rootfs_has_shell() {
     [ -d "$_r" ] || return 1
     [ -L "$_r/bin/sh" ] || [ -e "$_r/bin/sh" ] || \
         [ -x "$_r/bin/busybox" ] || [ -f "$_r/sbin/apk" ] || \
+        [ -e "$_r/usr/bin/sh" ] || [ -f "$_r/usr/bin/apk" ] || \
         [ -x "$_r/usr/bin/bash" ] || [ -L "$_r/bin/ash" ]
 }
 

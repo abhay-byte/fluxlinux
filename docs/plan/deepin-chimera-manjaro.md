@@ -1,14 +1,18 @@
 # Plan: Deepin, Chimera, and Manjaro (proot + chroot)
 
 **Date:** 2026-08-13  
-**Status:** PLAN ONLY — do not implement until this contract is accepted.  
+**Status:** DEVICE PASS — 2026-08-13. Code review 2026-08-13: tree matches this contract. **New follow-up (not a DCM re-install):** Manjaro Applications menu ⊘ icons (stub Papirus + `Inherits=breeze-dark`) — same shared script as Fedora/openSUSE. SSOT: [`xfce-icons-locale-fastfetch.md`](./xfce-icons-locale-fastfetch.md). Other leftovers (operator docs, host `tar`/`xz`, Pulse, first-X SIGSYS, stale Terminal tabs) stay in §17–§19.  
 **Scope:** First-class FluxLinux guests for **Deepin 25 (crimson/beige)**, **Chimera Linux (2025-12-20 bootstrap)**, and **Manjaro ARM** — same product shape as Alpine / Debian / Fedora / Void / openSUSE: install → internal terminal → XFCE on the **embedded Termux:X11** display.
 
-**Not in this plan:** Arch Linux (no dedicated rootfs; do not activate the `archlinux` card). KDE, DDE, Debian-style feature modules (appdev / webdev / …), debug APKs, multi-arch.
+**Device snapshot (2026-08-13, Ivarna release, `adb install -r`, UI only):** All six cards I1–D5 + OMZ/pokemon PASS. Manjaro chroot I1 needed CheckSpace disabled without `sed` (bootstrap has none; Android bind mounts lie about free space). Agnosterzak `@flux` on Manjaro needs generated `en_US.UTF-8` (`locale.gen` ships fully commented). Chimera T2/T3 need `/etc/doas.conf` mode **0644** (OpenDoas reads the file as `flux`). Guest `timeout(1)` on Chimera dies with `sigaction(32)` — customization uses a portable watchdog.
 
-**Device policy:** `assembleIvarnaRelease` only + `adb install -r`. No APK uninstall unless signature mismatch. Test with a subagent; fix and retest until all **6** paths pass (3 distros × proot + chroot). Do not stop on the first green path.
+**Not in this plan:** Arch Linux (no dedicated rootfs; do not activate the `archlinux` card). Ubuntu / Kali / Parrot (separate plan). KDE, DDE, Debian-style feature modules (appdev / webdev / …), debug APKs, multi-arch.
+
+**Device policy:** `assembleIvarnaRelease` only + `adb install -r`. No APK uninstall unless signature mismatch. Test with a subagent; fix and retest until all **6** paths pass (3 distros × proot + chroot). Do not stop on the first green path. Do **not** start Ubuntu/Kali/Parrot/Arch in this slice.
 
 **References:** [`docs/scripts_reference.md`](../scripts_reference.md), [`docs/scripts_flowchart.md`](../scripts_flowchart.md), [`docs/adding_new_distro.md`](../adding_new_distro.md), live FVO contract [`docs/plan/fedora-void-opensuse.md`](./fedora-void-opensuse.md).
+
+**How to use this file now:** §17 = code review. §18 = manual test. §19 = paste-ready worker prompt (leftovers only — do not re-install the six guests).
 
 ---
 
@@ -24,7 +28,7 @@
 | Package managers | `apt-get` (Deepin), `apk` v3 (Chimera), `pacman` (Manjaro) | Native to each rootfs |
 | libc | Deepin + Manjaro = **glibc**; Chimera = **musl** | Chimera is closer to Alpine than to Debian |
 | Default user | `flux` / `flux`, NOPASSWD sudo | Alpine/Debian/FVO parity |
-| Login shell | zsh after customization | Same Flux `.zshrc` + Oh My Zsh (host-staged) |
+| Login shell | zsh after customization | Flux `.zshrc` + Oh My Zsh. Host `ProotZshBootstrap` needs PREFIX `git` (this APK has none) — **guest** `git clone` is the install path |
 | GUI | Shared `start_gui.sh` (proot) + generic `start_guest_gui.sh` (chroot) | FVO already parameterized `CHROOT_ROOT` |
 | HW accel | Mesa in family + dedicated `hw_accel` component | VirGL default; no Turnip tarball for these three |
 | Rootfs shipping | Convert provided `.tar.gz` → packaged `.tar.xz` (aapt2-safe) | Alpine lesson: aapt2 auto-decompresses `*.gz` |
@@ -72,6 +76,14 @@ sha256sum assets/rootfs/chimera_20251220_rootfs.tar.xz \
 ```
 
 Record those three SHA-256 values in this plan and in `DistroInstallProfile` **before** the first device install. `setup_guest_chroot.sh` and `flux_install.sh` already extract `*.tar.xz`.
+
+**Pinned packaged xz** (also in `DistroInstallProfile`):
+
+| Asset | SHA-256 |
+|-------|---------|
+| `chimera_20251220_rootfs.tar.xz` | `0900e3f2554faaf005c14a6850596dadae1e7d8a996138180eebb0b4694a4a6c` |
+| `deepin_25_rootfs.tar.xz` | `2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698` |
+| `manjaro_arm_rootfs.tar.xz` | `b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156` |
 
 Fallback if xz recompress is blocked: Alpine-style non-`.gz` names (`*.minirootfs`) holding the original gzip bytes, with SHA of the gzip. Prefer xz.
 
@@ -444,6 +456,8 @@ Shared `setup_customization_xfce.sh` (already Alpine branding, PM-agnostic after
 
 Honor `FLUX_SKIP_THEME_ICONS`, `FLUX_SKIP_OMZ`, `FLUX_SKIP_POKEMON`, `FLUX_ASSET_DIR` (host `ProotXfceAssetInstaller` / `ProotZshBootstrap`).
 
+**OMZ + pokemon (implemented):** `OnboardingInstallRunner` and Distro Settings export `FLUX_SKIP_POKEMON=0`. Shared `setup_customization_xfce.sh` defaults skip to **0** (try, 60s budget); skip only if explicitly `1`. Guest fail-closed on `git`/`zsh`; installs `python3`/`python` for `install.sh`. Theme/icon extract failures must **not** `handle_error` before OMZ/pokemon. Chimera `timeout(1)` dies under Android (`sigaction(32): Invalid argument`) — script probes timeout and uses a portable watchdog. Papirus ships as `papirus-dark-only.tar.xz` (aapt2).
+
 If Papirus/theme extract fails on musl (Chimera), keep Adwaita + DejaVu and still write xfconf so the session is not failsafe. Device gate D4 then records “fallback icons” vs “Papirus”. Prefer fixing the extract (need `unzip`/`tar`/`xz` only — already in family).
 
 ---
@@ -566,8 +580,10 @@ For **each** of `{deepin, chimera, manjaro}` × `{proot, chroot}`:
 |---|------|------|
 | I1 | Distros / onboarding install completes | `startxfce4` present; `.flux_configured` (chroot) |
 | T1 | Terminal card opens flux shell | Prompt; zsh after customization |
-| T2 | `sudo -n id` | uid 0 |
-| T3 | PM works | Deepin: `sudo apt-get update` (or `apt-cache policy`); Chimera: `sudo apk update` / `apk info`; Manjaro: `sudo pacman -Sy` or `-Q`; no lock EACCES |
+| T2 | `sudo -n id` | uid 0 (Chimera: `/usr/local/bin/sudo` → doas; `/etc/doas.conf` must be **0644**) |
+| T3 | PM works | Deepin: `sudo apt-get update` (beige/crimson only); Chimera: `sudo apk update` / `apk info`; Manjaro: `sudo pacman -Q` or `-Sy`; no lock EACCES |
+| S1 | Oh My Zsh | Fresh **User** shell: `echo $ZSH_THEME` → `agnosterzak`; prompt `@flux` (not `localhost%`); `~/.oh-my-zsh/oh-my-zsh.sh` exists |
+| S2 | pokemon-colorscripts | Sprite on User shell start; `command -v pokemon-colorscripts` is a real path (`/usr/local/bin` or `/usr/local/sbin`) |
 | D1 | Home → Start XFCE | Log shows Pulse + X server PID + startxfce4 |
 | D2 | Embedded X11 activity | `com.termux.x11.MainActivity` (or app-id X11) resumed |
 | D3 | Desktop paints | Screenshot: panel + wallpaper; **no** failsafe dialog |
@@ -587,6 +603,21 @@ Write a device report per path under `docs/plans/results/`:
 
 plus screenshots (`deepin_proot_xfce_pass.png`, …).
 
+### Device results (2026-08-13)
+
+| Path | I1 | T1 | T2 | T3 | D1–D5 | OMZ + pokemon (UI User shell) |
+|------|----|----|----|----|-------|-------------------------------|
+| `deepin` | PASS | PASS | PASS | PASS | PASS | PASS — `$ZSH_THEME=agnosterzak`, sprite, `/usr/local/bin/pokemon-colorscripts` |
+| `deepin_chroot` | PASS | PASS | PASS | PASS | PASS | PASS — same, `/usr/local/bin/pokemon-colorscripts` |
+| `chimera` | PASS | PASS | PASS | PASS | PASS | PASS — `$ZSH_THEME=agnosterzak`, sprite, `/usr/local/sbin/pokemon-colorscripts` |
+| `chimera_chroot` | PASS | PASS | PASS (doas 0644) | PASS (prior) | PASS | PASS — `$ZSH_THEME=agnosterzak`, sprite, `/usr/local/sbin/pokemon-colorscripts` |
+| `manjaro` | PASS | PASS | PASS | PASS | PASS | PASS — `$ZSH_THEME=agnosterzak`, sprite, `/usr/local/bin/pokemon-colorscripts` |
+| `manjaro_chroot` | PASS | PASS | PASS | PASS | PASS | PASS — `$ZSH_THEME=agnosterzak`, sprite, `/usr/local/bin/pokemon-colorscripts` |
+
+Manjaro chroot I1 (fixed this pass): CheckSpace on Android bind mounts reports `could not determine cachedir mount point /var/cache/pacman/pkg` then `not enough free disk space` even with ~83 GiB free. Family now comments CheckSpace with a POSIX rewrite **before** the first `pacman -S` (bootstrap has no `sed`). `dbus-broker-units` is pinned. `en_US.UTF-8` is generated so agnosterzak can paint `@flux` (`prompt_segment:5: character not in range` otherwise).
+
+Reports: `docs/plans/results/{deepin,chimera,manjaro}-{proot,chroot}-device-report.md`. Screenshots: `*_omz_pokemon.png`, `*_xfce_pass.png`, `manjaro_chroot_t2_t3.png`, `manjaro_proot_t2_t3.png`.
+
 **Storage:** Manjaro uncompressed + XFCE is the largest guest. Install/test **sequentially**. Uninstall a finished chroot via the in-app uninstall script only if `/data` is exhausted. Do **not** uninstall the FluxLinux APK. Do not delete Debian/Alpine/FVO guests unless the device is actually full.
 
 **APK size:** three more xz archives will grow the Ivarna APK significantly (Manjaro alone is ~200 MiB gzip / likely 150–190 MiB xz). Acceptable for this device-test track; do not split APKs.
@@ -594,6 +625,8 @@ plus screenshots (`deepin_proot_xfce_pass.png`, …).
 ---
 
 ## 12. Implementation order
+
+**Done (2026-08-13).** Kept as the historical sequence. New work uses §18 (retest) and §19 (leftovers only).
 
 1. Convert + pin rootfs xz; Gradle stage; record SHA-256 in profile + this plan.  
 2. Shared helper extensions (§5) + unit tests for stat/PM detection where cheap.  
@@ -610,7 +643,7 @@ plus screenshots (`deepin_proot_xfce_pass.png`, …).
    6. **Manjaro chroot**
 8. Fix-forward. Shared-script fixes require a sibling smoke (at least the last green path).
 
-Subagent tests the device the same way FVO was tested: UI install, Terminal User/Root, Home Start, embedded X11 screenshot, Stop.
+Subagent tests the device the same way FVO was tested: UI install, Terminal User/Root, Home Start, embedded X11 screenshot, Stop. Operator checklist is §18.
 
 ---
 
@@ -654,6 +687,14 @@ Subagent tests the device the same way FVO was tested: UI install, Terminal User
 - First `-Syu` against current arm-stable can be huge and scriptlet-heavy — prefer `-Sy` + targeted packages.
 - `HoldPkg` includes `manjaro-system`.
 - `community` repo still listed; if sync fails on community, drop that section rather than rewriting to ALARM.
+- `dbus-units` has two providers — pin `dbus-broker-units` so `--noconfirm` never waits.
+- Two Manjaro guests at once (proot + chroot XFCE) can exhaust device `/data`. Test sequentially; uninstall the finished proot via in-app uninstall if chroot needs the space.
+- CheckSpace on Android bind mounts is a false full-disk. Disable it with a POSIX rewrite **before** the first `pacman -S` — bootstrap has no `sed`.
+- Generate `en_US.UTF-8` (`locale.gen` is commented-out). Without it, agnosterzak prints `prompt_segment:5: character not in range` and hides `@flux`.
+
+### Chimera timeout
+
+- Guest `timeout(1)` under Android chroot/proot: `sigaction(32): Invalid argument` — child never execs. Do not treat that as a git timeout. Probe `timeout 1 true` and fall back to a sleep/kill watchdog.
 
 ---
 
@@ -689,9 +730,9 @@ Subagent tests the device the same way FVO was tested: UI install, Terminal User
 | `app/src/main/assets/scripts/debian/proot/setup/flux_install.sh` | Three `case` arms |
 | `app/src/main/assets/scripts/chroot/start_gui_chroot.sh` | Three dispatch arms |
 | `app/build.gradle.kts` | Stage three xz |
-| `docs/distro/{deepin,chimera,manjaro}.md` | Operator refs **after** device pass |
-| `docs/distro/README.md` | Link the three docs |
-| `docs/plans/results/*-device-report.md` | Per-path E2E evidence |
+| `docs/distro/{deepin,chimera,manjaro}.md` | Operator refs — **still missing** (worker §19 A) |
+| `docs/distro/README.md` | Link the three docs — **still missing** |
+| `docs/plans/results/*-device-report.md` | Per-path E2E evidence (written) |
 
 Icons already exist (`distro_deepin.webp`, `distro_chimera.webp`, `distro_manjaro.webp`). No new drawables.
 
@@ -699,17 +740,259 @@ Icons already exist (`distro_deepin.webp`, `distro_chimera.webp`, `distro_manjar
 
 ## 16. Definition of done
 
-- [ ] Six cards installable in the Ivarna release APK (not coming soon).  
-- [ ] All six device-matrix rows I1–D5 pass.  
-- [ ] Internal terminal User + Root works on each (T1–T3).  
-- [ ] XFCE paints on the **internal** display server with theme / icons / font (D3–D4).  
-- [ ] Unit tests listed in §10 green.  
-- [ ] This plan’s SHA-256 table updated to the **packaged xz** hashes.  
-- [ ] Per-path reports + screenshots under `docs/plans/results/`.  
-- [ ] Status line at the top of this file flipped to `DEVICE PASS` with the date.
+- [x] Six cards installable in the Ivarna release APK (not coming soon).  
+- [x] All six device-matrix rows I1–D5 pass.  
+- [x] Internal terminal User + Root works on each (T1–T3).  
+- [x] XFCE paints on the **internal** display server with theme / icons / font (D3–D4).  
+- [x] OMZ + pokemon on all six User shells (S1–S2).  
+- [x] Unit tests listed in §10 green (plus `OmzPokemonContractTest`).  
+- [x] This plan’s SHA-256 table updated to the **packaged xz** hashes.  
+- [x] Per-path reports + screenshots under `docs/plans/results/`.  
+- [x] Status line at the top of this file flipped to `DEVICE PASS` with the date.  
+- [ ] Operator refs `docs/distro/{deepin,chimera,manjaro}.md` + README links (post-pass leftover — worker §19).
 
-Until every box is checked, the work is not finished.
+### Landmines closed this pass
+
+- Manjaro CheckSpace + missing `sed` on the retry path (POSIX rewrite **before** first `pacman -S`; left disabled — Android bind mounts always lie).  
+- `dbus-units` provider prompt — pin `dbus-broker-units`.  
+- Manjaro `prompt_segment:5: character not in range` — generate `en_US.UTF-8` + `/etc/hostname=manjaro`.  
+- Chimera OpenDoas: `/etc/doas.conf` **0644** (0400 → `Permission denied` as flux).  
+- Chimera `timeout(1)` `sigaction(32)` — probe + sleep/kill watchdog.  
+- Papirus asset `.tar.xz` (aapt2 strips `*.gz`); guest `tar -xJf`; family installs `xz`/`xz-utils`.  
+- Theme/icon extract must **not** `handle_error` before OMZ/pokemon.  
+- `FLUX_SKIP_POKEMON` default **0**; runner never hardcodes `=1`.  
+- Chroot customization stages archives into **that** chroot `/tmp/flux_xfce_assets`, not the sibling proot.
 
 ---
 
-*This file is the implementation contract. Keep SHA-256 and card ids in sync with `DistroInstallProfile`. Do not start coding until the xz archives are pinned.*
+## 17. Code review (2026-08-13)
+
+Reviewed the tree against this plan after DEVICE PASS. **No DCM functional gaps.** Remaining items are docs and known non-blockers.
+
+### 17.1 Matches the contract
+
+| Area | What landed |
+|------|-------------|
+| Cards | Six live ids, `comingSoon=false`, mutually exclusive `prootSupported`/`chrootSupported`. Catalog installable count **16**. |
+| SSOT | `DistroInstallProfile` six profiles; xz SHA pins match §1; `allRootfsProfiles` size **8**. `DistroFamily.CHIMERA`; `PackageManager.APK` reused (no `APK3`). |
+| Paths | `/data/local/tmp/chroot{Deepin,Chimera,Manjaro}`. Host trio = generic `setup_guest_chroot.sh` + `start_guest_gui.sh`. |
+| Family | `setup_{deepin,chimera,manjaro}_family.sh`. Deepin never adds debian.org / DDE. Chimera apk v3 + `chimera-repo-user` + targeted XFCE (no meta). Manjaro never rewrites to ALARM; `pacman-key --init`; POSIX CheckSpace; `dbus-broker-units`. |
+| Shared | Portable `stat`; PM writable paths include apk v3 / pacman / apt; doas 0644 + `/usr/local/bin/sudo` shim. |
+| Customization | Shared `setup_customization_xfce.sh`: Chimera pkg map (`wget2`/`gtar`/`opendoas`), fail-closed `git`/`zsh`, python for pokemon, `FLUX_SKIP_POKEMON:-0`, OMZ clone + plugins + agnosterzak, pokemon gitlab clone + `install.sh`, timeout probe. |
+| Kotlin | `OnboardingInstallRunner` `FLUX_SKIP_POKEMON=0`; chroot `installToChroot`; Distro Settings does not set `FLUX_SKIP_THEME_ICONS` on chroot cards. `GuestZshrcRepair` `isApkGuest` = alpine\|chimera; glibc wrap includes apt/pacman. `GuestApkDbRepair` Chimera uses `usr/lib/apk` (never Alpine `/lib/apk`). `guestRootfsHasShell` accepts `usr/bin/sh` + `usr/bin/apk`. |
+| Gradle | `stageHostRootfs` copies the three xz. |
+| Tests | §10 files + `OmzPokemonContractTest` lock skip-default, runner `=0`, family `git zsh python`, no `sed -i CheckSpace` in Manjaro family. |
+| Device | Six reports under `docs/plans/results/` with `*_xfce_pass.png` and `*_omz_pokemon.png`. |
+
+### 17.2 Implemented deviations (keep)
+
+| Plan said | Tree does | Why keep |
+|-----------|-----------|----------|
+| Family scripts **source** `flux_guest_common.sh` | Each family file **inlines** a full copy (HostScriptDeployer runs them standalone). `BaseDesktopInstallPlan.familySetupPayload` also **prepends** common for chroot payloads | Functions are idempotent. **Edit `flux_guest_common.sh` and all three inlined copies together** (doas 0644 already had to be copied four ways). |
+| CheckSpace off “for the family run only” | Left commented permanently | Android bind mounts always lie; restoring it re-breaks `pacman -S`. |
+| Terminal catalog `Map<String, Boolean>` | Six booleans (same as FVO) | Works; map rewrite is not this slice. |
+| pokemon on PATH | Chimera lands in `/usr/local/sbin` (others `/usr/local/bin`) | `.zshrc` PATH includes both; `command -v` is the gate. |
+
+### 17.3 Leftovers (not DCM blockers)
+
+1. **Operator docs missing** — `docs/distro/{deepin,chimera,manjaro}.md` and README links (copy `docs/distro/fedora.md` shape).  
+2. **Host `tar: exec xz: Permission denied`** — Android host cannot xz-extract; guest extract is the real path. Do not treat host 126 as install failure.  
+3. **PulseAudio** — no host pulse process; panel pulse plugin stripped. Audio out of scope.  
+4. **First X SIGSYS** — `termux-x11` `createContext` can die once; retry paints.  
+5. **Stale Terminal tabs** — close kills the session (`-9`) but the tab chip can linger until recomposition (`TerminalScreen` revision collected, unused). New sessions attach.  
+6. **Chimera chroot T3** in the report is “prior” (doas 0644 + family). Re-run `sudo apk update` in that User shell if a worker touches apk/doas again.  
+7. **Manjaro (and Deepin) Applications ⊘ icons** — `papirus-dark-only.tar.xz` has empty `categories/` / `apps/`; `Inherits=breeze-dark`. Tracked in [`xfce-icons-locale-fastfetch.md`](./xfce-icons-locale-fastfetch.md), not a six-guest reinstall.
+
+### 17.4 Do not change
+
+- Do not point Deepin at `deb.debian.org`.  
+- Do not `apk add --no-cache` on Chimera.  
+- Do not `apk add xfce4` / `pacman -S xfce4` / `apt-get install xfce4` as the **first** XFCE step.  
+- Do not reuse `setup_arch_family.sh` or write ALARM mirrors.  
+- Do not `chmod 0400 /etc/doas.conf`.  
+- Do not default `FLUX_SKIP_POKEMON=1`.  
+- Do not `handle_error` on missing Papirus before OMZ/pokemon.  
+- Do not stage chroot theme assets into the sibling proot.  
+- Do not activate `archlinux` / Ubuntu / Kali / Parrot in this slice.  
+- Shared-script edits require a sibling smoke (at least Deepin proot Start + `sudo -n id`).
+
+---
+
+## 18. Manual testing (operator)
+
+Package `com.ivarna.fluxlinux`. Device Xiaomi 2311DRK48I (or any aarch64 + KernelSU for chroot).
+
+### 18.1 Build / install
+
+```sh
+cd /home/abhaybyte/repos/fluxlinux
+./gradlew :app:assembleIvarnaRelease --no-daemon
+adb install -r app/build/outputs/apk/ivarna/release/app-ivarna-release.apk
+# INSTALL_FAILED_UPDATE_INCOMPATIBLE → uninstall then install (signature only)
+adb shell am start -n com.ivarna.fluxlinux/.MainActivity
+```
+
+No debug APK. No APK uninstall unless signature mismatch. Sequential installs — Manjaro is the largest guest. Uninstall a finished **chroot** via in-app uninstall only if `/data` is exhausted. Do not delete Debian/Alpine/FVO guests unless the device is actually full.
+
+### 18.2 Per-card UI (repeat 6 times)
+
+Order: Deepin proot → Deepin chroot → Chimera proot → Chimera chroot → Manjaro proot → Manjaro chroot.
+
+1. **Home** MethodTabs: PRoot vs Chroot. Card must be live (Install, not Coming Soon).  
+2. **I1** Distros → card → Install (onboarding). Wait for family + customization. Partial customization is OK if Distro Settings re-run later completes S1/S2/D4.  
+3. **T1** Terminal → matching method tab → distro row → **User**. New session tab (e.g. `Deepin Shell` / `Chimera Chroot`).  
+4. **T2 / T3 / S1 / S2** in that User shell (type; do not rely on vision for pty text):
+
+```sh
+id
+sudo -n id
+echo $ZSH_THEME
+command -v pokemon-colorscripts
+```
+
+Then the PM line for that guest:
+
+```sh
+# Deepin
+sudo apt-get update
+# Chimera
+sudo apk update
+apk info | head -3
+# Manjaro
+sudo pacman -Q pacman
+```
+
+5. **D1–D5** Home → same method → card **Start** → Launch XFCE4. Log sheet: X server PID + `startxfce4`. Embedded X11 (`com.termux.x11.MainActivity`). Panel + Space wallpaper; no failsafe. **Stop** → card back to Start.
+
+Pass strings:
+
+| Check | Pass | Fail |
+|-------|------|------|
+| S1 theme | `agnosterzak` | empty / unset; prompt `localhost%` |
+| S1 prompt | `@flux` bar (Manjaro: no `prompt_segment:5: character not in range`) | glyph error; missing locale |
+| S2 | path printed; sprite on open | `command -v` empty |
+| T2 | `uid=0(root)` | `doas: … Permission denied`; sudo password prompt |
+| T3 Deepin | `community-packages.deepin.com/beige` + exit 0 | debian.org; lock EACCES |
+| T3 Chimera | `repo.chimera-linux.org` main+user `OK:` | Alpine CDN; doas denied |
+| T3 Manjaro | `pacman x.y` or sync OK | CheckSpace disk-full; ALARM mirror |
+| D4 | `xsettings.xml` ThemeName=`Space-transparency` (or `Space-light`), IconThemeName=`Papirus-Dark` | failsafe; stock `xfce-verticals` only |
+
+Filesystem probes (root for chroot; proot rootfs under app files):
+
+```sh
+# proot example
+RF=/data/data/com.ivarna.fluxlinux/files/usr/var/lib/proot-distro/containers/deepin/rootfs
+ls "$RF/usr/bin/startxfce4"
+ls "$RF/home/flux/.oh-my-zsh/oh-my-zsh.sh"
+grep ThemeName "$RF/home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
+
+# chroot example
+su -c 'ls /data/local/tmp/chrootChimera/.flux_configured /data/local/tmp/chrootChimera/usr/bin/startxfce4'
+su -c 'stat /data/local/tmp/chrootChimera/etc/doas.conf'   # expect -rw-r--r--
+su -c 'cat /data/local/tmp/chrootChimera/etc/doas.conf'    # permit nopass flux
+```
+
+### 18.3 Distro Settings re-run
+
+If first-boot customization aborted (historical: Icons Archive Missing): Distros → gear → XFCE4 Customization → Dark → Apply. Confirm log: `Oh My Zsh already valid` or clone success; `pokemon-colorscripts already present` or installed. Open a **new** User shell (old tabs may be pre-OMZ).
+
+Chroot re-run must log staging into `/data/local/tmp/chroot<Name>/tmp/flux_xfce_assets/`, not the proot container.
+
+### 18.4 Shared-script sibling smoke
+
+After any edit to `flux_guest_common.sh`, `setup_customization_xfce.sh`, `setup_hw_accel_guest.sh`, `setup_guest_chroot.sh`, or `flux_install.sh`: rebuild release → `adb install -r` → Deepin proot **Start** + User `sudo -n id`. Then retest the path you changed.
+
+### 18.5 Automation hints (worker, no vision)
+
+```sh
+adb shell dumpsys activity activities | rg -i 'termux.x11|fluxlinux|mResumed'
+adb shell uiautomator dump /sdcard/ui.xml && adb pull /sdcard/ui.xml /tmp/ui.xml
+adb exec-out screencap -p > docs/plans/results/<card>_<step>.png
+# pty text: redirect in-guest to /tmp/*.txt then adb/su cat
+```
+
+D3/D4 without a screenshot reader: `xsettings.xml` + process list (`xfce4-session`, `xfwm4`, `xfce4-panel`, `xfdesktop`) + no failsafe dialog in the UI dump.
+
+---
+
+## 19. Worker agent prompt (paste)
+
+Copy everything in the fence below into a new worker.
+
+```
+You are the FluxLinux DCM (Deepin / Chimera / Manjaro) worker.
+
+Repo: /home/abhaybyte/repos/fluxlinux
+Plan (SSOT): docs/plan/deepin-chimera-manjaro.md
+Package: com.ivarna.fluxlinux
+APK: ./gradlew :app:assembleIvarnaRelease --no-daemon
+     adb install -r app/build/outputs/apk/ivarna/release/app-ivarna-release.apk
+Device: Xiaomi 2311DRK48I (or current aarch64). KernelSU for chroot.
+Do not git push. Stop Gradle when done. No debug APK. No APK uninstall unless signature mismatch.
+
+STATUS (do not re-implement the six guests):
+DEVICE PASS 2026-08-13 — all 6 paths I1–D5 + OMZ/pokemon (S1–S2). Reports:
+  docs/plans/results/{deepin,chimera,manjaro}-{proot,chroot}-device-report.md
+Read §17 of the plan before touching anything.
+
+OUT OF SCOPE (hard):
+- Do not start Ubuntu / Kali / Parrot / Arch (docs/plan/ubuntu-kali-parrot-arch.md is a different slice).
+- Do not flip archlinux comingSoon. No KDE, DDE, Treeland, feature modules.
+- Do not change Debian / Alpine / FVO behavior except when a shared helper must move (then sibling-smoke Deepin proot Start + sudo -n id).
+- Do not point Deepin at debian.org. Do not apk add --no-cache on Chimera. Do not reuse setup_arch_family.sh / ALARM mirrors.
+- Do not chmod 0400 /etc/doas.conf. Do not default FLUX_SKIP_POKEMON=1. Do not abort customization before OMZ/pokemon on missing icons.
+
+YOUR JOB (leftovers + keep-green):
+
+A) Operator docs (required if you have no device bug):
+   Create docs/distro/deepin.md, chimera.md, manjaro.md in the shape of docs/distro/fedora.md
+   (cards, rootfs name + SHA from DistroInstallProfile, PM, desktop, user, guest scripts,
+   chroot path, landmines). Link them from docs/distro/README.md.
+
+B) Only if the user reports a regression, fix-forward in this order:
+   1. Identify owning file (family vs shared customization vs runner vs chroot staging).
+   2. If you edit flux_guest_common.sh, copy the same change into the inlined
+      copies at the top of setup_deepin_family.sh, setup_chimera_family.sh,
+      setup_manjaro_family.sh (HostScriptDeployer runs those files standalone).
+   3. Unit tests: :app:testIvarnaDebugUnitTest (or the repo’s usual Ivarna unit test task)
+      — DistroInstallProfileTest, DistroRepositoryTest, OmzPokemonContractTest,
+      GuestZshrcRepairTest, GuestRootfsShellTest, TerminalShellCatalogTest, ChrootPathsTest.
+   4. assembleIvarnaRelease + adb install -r.
+   5. Retest the broken path per §18. Shared-script change → also smoke last green sibling.
+
+C) Optional non-blockers (only if asked, or if you finish A and still have time):
+   - Host tar xz Permission denied (ProotXfceAssetInstaller): guest extract already works;
+     do not break guest tar -xJf. Prefer skipping host xz extract cleanly over forcing host xz.
+   - Stale Terminal tabs after close (TerminalScreen revision collected but unused).
+   - Do not chase PulseAudio or first-X SIGSYS in this slice unless they block D3.
+
+CONTRACT FACTS (do not regress):
+- Cards: deepin, deepin_chroot, chimera, chimera_chroot, manjaro, manjaro_chroot
+- Chroot paths: /data/local/tmp/chroot{Deepin,Chimera,Manjaro}
+- Customization: scripts/common/setup/setup_customization_xfce.sh
+  FLUX_SKIP_POKEMON default 0; guest git clone ohmyzsh + gitlab pokemon-colorscripts;
+  _flux_timeout_works (Chimera timeout dies: sigaction(32)).
+- OnboardingInstallRunner + BaseDesktopInstallPlan export FLUX_SKIP_POKEMON=0.
+- Chroot: ProotXfceAssetInstaller.installToChroot → $CHROOT/tmp/flux_xfce_assets
+  (never the sibling proot; never FLUX_SKIP_THEME_ICONS=1 for chroot).
+- Chimera: apk v3, /etc/apk/config without interactive, chimera-repo-user, opendoas,
+  doas.conf 0644 + /usr/local/bin/sudo shim, startxfce4 may need /usr/bin symlink.
+- Manjaro: POSIX CheckSpace disable BEFORE first pacman -S (no sed in bootstrap);
+  dbus-broker-units; locale-gen/localedef en_US.UTF-8; hostname manjaro.
+- Papirus asset: papirus-dark-only.tar.xz (not .gz). Family installs xz/xz-utils.
+
+VERIFY (no vision — do not invent pass from screenshot filenames):
+User shell: echo $ZSH_THEME → agnosterzak; command -v pokemon-colorscripts; sudo -n id → uid=0
+Deepin: sudo apt-get update hits community-packages.deepin.com/beige
+Chimera: sudo apk update OK; ls -l /etc/doas.conf is -rw-r--r--
+Manjaro: sudo pacman -Q pacman; no CheckSpace disk-full; no prompt_segment glyph error
+XFCE: xsettings.xml ThemeName=Space-transparency IconThemeName=Papirus-Dark;
+      processes xfce4-session/xfwm4/xfce4-panel/xfdesktop; Stop returns Start.
+Update the matching docs/plans/results/*-device-report.md if you retest.
+
+Do not flip this plan off DEVICE PASS unless a path actually fails after your change.
+```
+
+---
+
+*This file is the implementation contract. Keep SHA-256 and card ids in sync with `DistroInstallProfile`.*

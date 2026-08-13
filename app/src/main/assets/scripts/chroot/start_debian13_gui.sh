@@ -61,9 +61,15 @@ if command -v getenforce >/dev/null 2>&1; then
       || echo "FluxLinux: [WARN] setenforce 0 failed"
   fi
 fi
+# PREFIX/tmp must stay app_data_file. Labeling it tmpfs:s0 makes termux-x11
+# fail to create .X11-unix / .tX0-lock / dbus sockets when SELinux is enforcing.
 if command -v chcon >/dev/null 2>&1; then
-  chcon -R u:object_r:tmpfs:s0 "$TARGET_PREFIX/tmp" 2>/dev/null || true
+  _ctx=$(ls -Zd "$TARGET_PREFIX" 2>/dev/null | awk '{print $1}')
+  if [ -n "$_ctx" ]; then
+    chcon -R "$_ctx" "$TARGET_PREFIX/tmp" 2>/dev/null || true
+  fi
 fi
+restorecon -RF "$TARGET_PREFIX/tmp" 2>/dev/null || true
 
 HELPER="${HELPER:-/data/local/tmp/fluxlinux_chroot.sh}"
 echo "[1/5] Mounts (SSOT if available)..."
@@ -141,27 +147,32 @@ su - $USERNAME -c '
   export XDG_RUNTIME_DIR=/tmp
   export VTEST_SOCKET_NAME=/mnt/host-tmp/.virgl_test
 
-  GPU_MODE=virgl
-  if [ -r /etc/fluxlinux/gpu_mode ]; then
-    GPU_MODE=\$(tr -d \"[:space:]\" </etc/fluxlinux/gpu_mode)
-  fi
-  case \"\$GPU_MODE\" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
-  echo \"FluxLinux(guest): GPU mode=\$GPU_MODE\"
-
-  if [ \"\$GPU_MODE\" = turnip ]; then
-    export MESA_LOADER_DRIVER_OVERRIDE=zink
-    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-    export TU_DEBUG=noconform
-    export MESA_VK_WSI_DEBUG=sw
-    export MESA_GL_VERSION_OVERRIDE=4.6
-    export MESA_GLES_VERSION_OVERRIDE=3.2
-  elif [ \"\$GPU_MODE\" = virgl ] && [ -S /mnt/host-tmp/.virgl_test ]; then
-    export GALLIUM_DRIVER=virpipe
+  if [ -r /usr/local/lib/fluxlinux/apply_gpu_env.sh ]; then
+    . /usr/local/lib/fluxlinux/apply_gpu_env.sh
+    flux_gpu_apply_runtime
   else
-    export LIBGL_ALWAYS_SOFTWARE=1
-    export GALLIUM_DRIVER=llvmpipe
-    echo \"FluxLinux(guest): software GL fallback\"
+    GPU_MODE=virgl
+    if [ -r /etc/fluxlinux/gpu_mode ]; then
+      GPU_MODE=\$(tr -d \"[:space:]\" </etc/fluxlinux/gpu_mode)
+    fi
+    case \"\$GPU_MODE\" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
+    if [ \"\$GPU_MODE\" = turnip ]; then
+      export MESA_LOADER_DRIVER_OVERRIDE=zink
+      export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+      export TU_DEBUG=noconform
+      export MESA_VK_WSI_DEBUG=sw
+      export MESA_GL_VERSION_OVERRIDE=4.6
+      export MESA_GLES_VERSION_OVERRIDE=3.2
+    elif [ \"\$GPU_MODE\" = virgl ] && [ -S /mnt/host-tmp/.virgl_test ]; then
+      export GALLIUM_DRIVER=virpipe
+    else
+      export LIBGL_ALWAYS_SOFTWARE=1
+      export GALLIUM_DRIVER=llvmpipe
+      echo \"FluxLinux(guest): software GL fallback\"
+    fi
+    export GPU_MODE
   fi
+  echo \"FluxLinux(guest): GPU mode=\$GPU_MODE\"
 
   xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
   exec dbus-launch --exit-with-session startxfce4

@@ -41,10 +41,23 @@ pkill -f termux-x11 2>/dev/null || true
 pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 2
 # Stale UNIX sockets make Loader fail with "server already running"
-rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" \
+rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" \
   "$TMPDIR/.X11-unix/X0" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
-mkdir -p "$TMPDIR/.X11-unix"
+# PREFIX/tmp must stay app_data_file. A leftover tmpfs:s0 label (older chroot
+# start used chcon -R tmpfs) makes mkdir .X11-unix, the X lock, and dbus
+# sockets fail with Permission denied under enforcing SELinux.
+if [ -e "$TMPDIR/.X11-unix" ] && [ ! -d "$TMPDIR/.X11-unix" ]; then
+  rm -f "$TMPDIR/.X11-unix" 2>/dev/null || true
+fi
+mkdir -p "$TMPDIR/.X11-unix" 2>/dev/null || {
+  rm -rf "$TMPDIR/.X11-unix" 2>/dev/null || true
+  mkdir -p "$TMPDIR/.X11-unix"
+}
 chmod 1777 "$TMPDIR" "$TMPDIR/.X11-unix" 2>/dev/null || true
+_ctx=$(ls -Zd "$TERMUX_PREFIX" 2>/dev/null | awk '{print $1}')
+if [ -n "$_ctx" ] && command -v chcon >/dev/null 2>&1; then
+  chcon -R "$_ctx" "$TMPDIR" 2>/dev/null || chcon "$_ctx" "$TMPDIR" 2>/dev/null || true
+fi
 
 # Start PulseAudio over TCP
 if $IS_ROOT; then
@@ -175,7 +188,11 @@ else
   if [ ! -x "$ROOTFS/bin/bash" ] && [ ! -x "$ROOTFS/usr/bin/bash" ]; then
     GUEST_SHELL=/bin/sh
   fi
-  python "$TERMUX_PREFIX/bin/proot-distro" login "$DISTRO" --shared-tmp -- $GUEST_SHELL -c '
+  _KGSL_BIND=""
+  if [ -e /dev/kgsl-3d0 ]; then
+    _KGSL_BIND="--bind=/dev/kgsl-3d0"
+  fi
+  python "$TERMUX_PREFIX/bin/proot-distro" login "$DISTRO" --shared-tmp $_KGSL_BIND -- $GUEST_SHELL -c '
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     unset PROOT_TMP_DIR
     export TMPDIR=/tmp
@@ -195,8 +212,9 @@ else
     unset DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID DBUS_SESSION_BUS_WINDOWID
     export XDG_CONFIG_DIRS=/etc/xdg
     export XDG_DATA_DIRS=/usr/local/share:/usr/share
-    # Runtime dir mode 700 — world-writable /tmp breaks some dbus/xfconfd stacks.
-    export XDG_RUNTIME_DIR=/tmp/runtime-flux
+    # Runtime dir must be 700 *and* writable by flux. /tmp/runtime-flux lives on
+    # --shared-tmp (host PREFIX/tmp, app uid) so guest flux cannot chmod/chown it.
+    export XDG_RUNTIME_DIR=/home/flux/.cache/runtime
     mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
     mkdir -p /tmp/.ICE-unix && chmod 1777 /tmp/.ICE-unix
 
@@ -219,9 +237,9 @@ else
       # Open perms: host uid vs guest flux uid mismatch is common under proot
       chmod -R 777 /home/flux/.config /home/flux/.cache /home/flux/.local 2>/dev/null || true
     fi
-    if [ -d "$XDG_RUNTIME_DIR" ]; then
-      chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
-      chown flux:flux "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    if [ -d /home/flux/.cache/runtime ]; then
+      chmod 700 /home/flux/.cache/runtime 2>/dev/null || true
+      chown flux:flux /home/flux/.cache/runtime 2>/dev/null || true
     fi
     # dbus machine-id (session bus soft-depends on it on some builds)
     if command -v dbus-uuidgen >/dev/null 2>&1; then
@@ -233,14 +251,15 @@ else
       fi
     fi
 
-    GPU_MODE=virgl
-    if [ -r /etc/fluxlinux/gpu_mode ]; then
-      GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
-    fi
-    case "$GPU_MODE" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
-    echo "FluxLinux(guest): GPU mode=$GPU_MODE"
-
-    apply_gpu_env() {
+    if [ -r /usr/local/lib/fluxlinux/apply_gpu_env.sh ]; then
+      . /usr/local/lib/fluxlinux/apply_gpu_env.sh
+      flux_gpu_apply_runtime
+    else
+      GPU_MODE=virgl
+      if [ -r /etc/fluxlinux/gpu_mode ]; then
+        GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
+      fi
+      case "$GPU_MODE" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
       unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES
       unset LIBGL_ALWAYS_SOFTWARE TU_DEBUG MESA_VK_WSI_DEBUG
       case "$GPU_MODE" in
@@ -266,10 +285,9 @@ else
           export GALLIUM_DRIVER=llvmpipe
           ;;
       esac
-    }
-
-    apply_gpu_env
-    export GPU_MODE
+      export GPU_MODE
+    fi
+    echo "FluxLinux(guest): GPU mode=$GPU_MODE"
     # Fedora 43 / Tumbleweed GTK+glycin execs bwrap to load PNG/SVG.
     # Real bubblewrap needs user namespaces (missing under proot) and
     # "chmod a-x bwrap" becomes "Could not spawn bwrap: Permission denied"
@@ -311,7 +329,7 @@ BWRAP_EOF
       export XDG_CONFIG_HOME=/home/flux/.config
       export XDG_CACHE_HOME=/home/flux/.cache
       export XDG_DATA_HOME=/home/flux/.local/share
-      export XDG_RUNTIME_DIR=/tmp/runtime-flux
+      export XDG_RUNTIME_DIR=/home/flux/.cache/runtime
       mkdir -p /home/flux/.config /home/flux/.cache /home/flux/.local/share
       mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\"
       export VTEST_SOCKET_NAME=/tmp/.virgl_test
@@ -320,19 +338,24 @@ BWRAP_EOF
         export GDK_DEBUG=no-glycin
       fi
       export GSK_RENDERER=cairo
-      export GPU_MODE=$GPU_MODE
-      if [ \"\$GPU_MODE\" = turnip ]; then
-        export MESA_LOADER_DRIVER_OVERRIDE=zink
-        export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-        export TU_DEBUG=noconform
-        export MESA_VK_WSI_DEBUG=sw
-        export MESA_GL_VERSION_OVERRIDE=4.6
-        export MESA_GLES_VERSION_OVERRIDE=3.2
-      elif [ \"\$GPU_MODE\" = virgl ] && [ -S /tmp/.virgl_test ]; then
-        export GALLIUM_DRIVER=virpipe
+      if [ -r /usr/local/lib/fluxlinux/apply_gpu_env.sh ]; then
+        . /usr/local/lib/fluxlinux/apply_gpu_env.sh
+        flux_gpu_apply_runtime
       else
-        export LIBGL_ALWAYS_SOFTWARE=1
-        export GALLIUM_DRIVER=llvmpipe
+        export GPU_MODE=$GPU_MODE
+        if [ \"\$GPU_MODE\" = turnip ]; then
+          export MESA_LOADER_DRIVER_OVERRIDE=zink
+          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+          export TU_DEBUG=noconform
+          export MESA_VK_WSI_DEBUG=sw
+          export MESA_GL_VERSION_OVERRIDE=4.6
+          export MESA_GLES_VERSION_OVERRIDE=3.2
+        elif [ \"\$GPU_MODE\" = virgl ] && [ -S /tmp/.virgl_test ]; then
+          export GALLIUM_DRIVER=virpipe
+        else
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export GALLIUM_DRIVER=llvmpipe
+        fi
       fi
       if command -v dbus-run-session >/dev/null 2>&1; then
         exec dbus-run-session -- startxfce4

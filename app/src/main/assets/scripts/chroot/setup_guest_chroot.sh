@@ -70,6 +70,7 @@ extract_file() {
     _archive="${2:-}"
     progress "Extracting file from $_archive ..."
     if [ -L "$_dest/bin/sh" ] || [ -e "$_dest/bin/sh" ] || \
+       [ -e "$_dest/usr/bin/sh" ] || [ -e "$_dest/usr/bin/apk" ] || \
        [ -x "$_dest/usr/bin/bash" ] || [ -x "$_dest/bin/bash" ]; then
         printf "\033[1;33m[!] Rootfs appears populated: %s\033[0m\n" "$_dest"
         return 0
@@ -289,6 +290,15 @@ main() {
     fi
 
     extract_file "$GUESTPATH" "$ROOTFS_ARCHIVE"
+    # Pacman CheckSpace cannot see Android bind-mount free space
+    # ("could not determine cachedir mount point /var/cache/pacman/pkg").
+    if [ -f "$GUESTPATH/etc/pacman.conf" ]; then
+        if grep -q '^CheckSpace' "$GUESTPATH/etc/pacman.conf" 2>/dev/null; then
+            sed -i 's/^CheckSpace/#CheckSpace/' "$GUESTPATH/etc/pacman.conf" || true
+            progress "Disabled pacman CheckSpace (Android bind mounts)"
+        fi
+        mkdir -p "$GUESTPATH/var/cache/pacman/pkg"
+    fi
     configure_guest_chroot
     exit 0
 }

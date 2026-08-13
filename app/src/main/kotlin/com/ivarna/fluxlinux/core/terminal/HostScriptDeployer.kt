@@ -51,6 +51,7 @@ object HostScriptDeployer {
         ),
         // Shared glibc-guest helpers (Fedora / Void / openSUSE)
         HostScript("flux_guest_common.sh", "scripts/common/setup/flux_guest_common.sh"),
+        HostScript("flux_gpu_common.sh", "scripts/common/setup/flux_gpu_common.sh"),
         HostScript(
             "setup_customization_xfce.sh",
             "scripts/common/setup/setup_customization_xfce.sh"
@@ -71,6 +72,19 @@ object HostScriptDeployer {
         HostScript(
             "setup_opensuse_family.sh",
             "scripts/opensuse/common/setup/setup_opensuse_family.sh"
+        ),
+        // Deepin / Chimera / Manjaro guests
+        HostScript(
+            "setup_deepin_family.sh",
+            "scripts/deepin/common/setup/setup_deepin_family.sh"
+        ),
+        HostScript(
+            "setup_chimera_family.sh",
+            "scripts/chimera/common/setup/setup_chimera_family.sh"
+        ),
+        HostScript(
+            "setup_manjaro_family.sh",
+            "scripts/manjaro/common/setup/setup_manjaro_family.sh"
         ),
         // EVP_md2 stub for TW libldap vs OpenSSL 3.5 (sudo/zypper)
         HostScript(

@@ -1,7 +1,7 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
 # start_gui_chroot.sh — Launch XFCE4 in chroot (app-uid host + root guest)
 # Host stack mirrors start_gui.sh (Pulse/VirGL/embedded X11).
-# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot.
+# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot|deepin_chroot|chimera_chroot|manjaro_chroot.
 # NEVER am force-stop own package.
 
 DISTRO_HINT="${1:-${FLUX_CHROOT_DISTRO:-debian13_chroot}}"
@@ -39,6 +39,18 @@ case "$DISTRO_HINT" in
     ;;
   opensuse|opensuse_chroot)
     CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootOpenSUSE}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  deepin|deepin_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootDeepin}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  chimera|chimera_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootChimera}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  manjaro|manjaro_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootManjaro}"
     ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
     ;;
   *)
@@ -142,9 +154,19 @@ if [ ! -f "$APP_LIB_DIR/libXlorie.so" ] && [ -n "$TERMUX_X11_APK_PATH" ]; then
     mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
 fi
 
-mkdir -p "$TMPDIR/.X11-unix"
-chmod 1777 "$TMPDIR/.X11-unix" 2>/dev/null || true
-rm -f "$TMPDIR/.X0-lock" 2>/dev/null || true
+rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" 2>/dev/null || true
+if [ -e "$TMPDIR/.X11-unix" ] && [ ! -d "$TMPDIR/.X11-unix" ]; then
+  rm -f "$TMPDIR/.X11-unix" 2>/dev/null || true
+fi
+mkdir -p "$TMPDIR/.X11-unix" 2>/dev/null || {
+  rm -rf "$TMPDIR/.X11-unix" 2>/dev/null || true
+  mkdir -p "$TMPDIR/.X11-unix"
+}
+chmod 1777 "$TMPDIR" "$TMPDIR/.X11-unix" 2>/dev/null || true
+_ctx=$(ls -Zd "$TERMUX_PREFIX" 2>/dev/null | awk '{print $1}')
+if [ -n "$_ctx" ] && command -v chcon >/dev/null 2>&1; then
+  chcon -R "$_ctx" "$TMPDIR" 2>/dev/null || chcon "$_ctx" "$TMPDIR" 2>/dev/null || true
+fi
 
 LD_LIBRARY_PATH="" LD_PRELOAD="" \
 CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \

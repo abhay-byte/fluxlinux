@@ -82,8 +82,39 @@ object BaseDesktopInstallPlan {
         val body = ScriptManager(ctx).getScriptContent(profile.customizationScript)
         return buildString {
             append("export FLUX_THEME='").append(theme).append("'\n")
+            // Guest installs pokemon (60s budget). Host never ships it.
+            append("export FLUX_SKIP_POKEMON='0'\n")
             append("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n\n")
             append(body)
+        }
+    }
+
+    /**
+     * Guest hw-accel payload: [flux_gpu_common.sh] + installer.
+     * [fluxGpu] must already be `turnip`, `virgl`, or `ask` — never `auto`.
+     */
+    fun hwAccelPayload(
+        ctx: Context,
+        distroId: String,
+        fluxGpu: String,
+        vendor: String
+    ): String {
+        val profile = DistroInstallProfile.forId(distroId)
+            ?: DistroInstallProfile.require("debian")
+        val sm = ScriptManager(ctx)
+        val installerPath = profile.hwAccelScript ?: "common/setup/setup_hw_accel_guest.sh"
+        val installer = sm.getScriptContent(installerPath)
+        val common = runCatching {
+            sm.getScriptContent("common/setup/flux_gpu_common.sh")
+        }.getOrDefault("")
+        return buildString {
+            append("export FLUX_GPU='").append(fluxGpu).append("'\n")
+            append("export FLUX_GPU_VENDOR='").append(vendor).append("'\n")
+            append("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n\n")
+            if (common.isNotBlank()) {
+                append(common).append("\n\n")
+            }
+            append(installer)
         }
     }
 }

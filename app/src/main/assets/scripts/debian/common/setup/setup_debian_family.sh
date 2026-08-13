@@ -11,6 +11,16 @@ export DEBIAN_FRONTEND=noninteractive
 apt update -y || exit 1
 apt install -y sudo xfce4 xfce4-goodies dbus-x11 tigervnc-standalone-server || exit 1
 
+# Stock Mesa for first XFCE paint. hw-accel may replace this with Turnip later.
+DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
+    mesa-utils libgl1-mesa-dri libegl1 mesa-vulkan-drivers \
+    || DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
+        mesa-utils libgl1-mesa-dri libegl1 \
+    || true
+mkdir -p /etc/fluxlinux
+printf '%s\n' virgl > /etc/fluxlinux/gpu_mode
+echo "FluxLinux: gpu_mode=virgl (first-paint; hw-accel may upgrade)"
+
 # 2. Create User 'flux'
 if ! id "flux" &>/dev/null; then
     useradd -m -s /bin/bash flux

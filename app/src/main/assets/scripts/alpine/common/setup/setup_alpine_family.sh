@@ -208,5 +208,9 @@ _flux_fix_apk_writable() {
 echo "FluxLinux: Ensuring apk database is writable (proot-safe)…"
 _flux_fix_apk_writable
 
+mkdir -p /etc/fluxlinux
+printf '%s\n' virgl > /etc/fluxlinux/gpu_mode
+echo "FluxLinux: gpu_mode=virgl (first-paint; hw-accel may upgrade)"
+
 echo "FluxLinux: ${DISTRO_NAME} Alpine setup complete!"
 exit 0

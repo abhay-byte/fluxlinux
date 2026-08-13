@@ -77,6 +77,25 @@ data class DistroInstallProfile(
             "bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a"
         const val OPENSUSE_ROOTFS_MIN_BYTES = 15L * 1024L * 1024L
 
+        // Chimera Linux 2025-12-20 bootstrap (aarch64, musl, apk v3).
+        // Packaged as xz: aapt2 strips *.gz, so gzip bytes were recompressed.
+        const val CHIMERA_ROOTFS_NAME = "chimera_20251220_rootfs.tar.xz"
+        const val CHIMERA_ROOTFS_SHA256 =
+            "0900e3f2554faaf005c14a6850596dadae1e7d8a996138180eebb0b4694a4a6c"
+        const val CHIMERA_ROOTFS_MIN_BYTES = 4L * 1024L * 1024L
+
+        // Deepin 25 (crimson/beige) docker rootfs aarch64 (glibc, apt).
+        const val DEEPIN_ROOTFS_NAME = "deepin_25_rootfs.tar.xz"
+        const val DEEPIN_ROOTFS_SHA256 =
+            "2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698"
+        const val DEEPIN_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+
+        // Manjaro ARM aarch64 rootfs (glibc, pacman).
+        const val MANJARO_ROOTFS_NAME = "manjaro_arm_rootfs.tar.xz"
+        const val MANJARO_ROOTFS_SHA256 =
+            "b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156"
+        const val MANJARO_ROOTFS_MIN_BYTES = 80L * 1024L * 1024L
+
         private const val XFCE_CUSTOM = "common/setup/setup_customization_xfce.sh"
         private const val HW_ACCEL_GUEST = "common/setup/setup_hw_accel_guest.sh"
         private const val GUEST_CHROOT_SETUP = "scripts/chroot/setup_guest_chroot.sh"
@@ -92,6 +111,7 @@ data class DistroInstallProfile(
             rootfsMinBytes = DEBIAN_ROOTFS_MIN_BYTES,
             familyScript = "debian/common/setup/setup_debian_family.sh",
             customizationScript = "debian/common/setup/setup_customization_debian.sh",
+            hwAccelScript = HW_ACCEL_GUEST,
             displayName = "Debian",
         )
 
@@ -105,6 +125,7 @@ data class DistroInstallProfile(
             rootfsMinBytes = DEBIAN_ROOTFS_MIN_BYTES,
             familyScript = "debian/common/setup/setup_debian_family.sh",
             customizationScript = "debian/common/setup/setup_customization_debian.sh",
+            hwAccelScript = HW_ACCEL_GUEST,
             chrootSetupAsset = "scripts/chroot/setup_debian13_chroot.sh",
             chrootUninstallAsset = "scripts/chroot/uninstall_debian13_chroot.sh",
             chrootPath = ChrootPaths.DEBIAN_CHROOT_PATH,
@@ -123,6 +144,7 @@ data class DistroInstallProfile(
             rootfsMinBytes = ALPINE_ROOTFS_MIN_BYTES,
             familyScript = "alpine/common/setup/setup_alpine_family.sh",
             customizationScript = "alpine/common/setup/setup_customization_alpine.sh",
+            hwAccelScript = HW_ACCEL_GUEST,
             displayName = "Alpine",
         )
 
@@ -136,6 +158,7 @@ data class DistroInstallProfile(
             rootfsMinBytes = ALPINE_ROOTFS_MIN_BYTES,
             familyScript = "alpine/common/setup/setup_alpine_family.sh",
             customizationScript = "alpine/common/setup/setup_customization_alpine.sh",
+            hwAccelScript = HW_ACCEL_GUEST,
             chrootSetupAsset = "scripts/chroot/setup_alpine_chroot.sh",
             chrootUninstallAsset = "scripts/chroot/uninstall_alpine_chroot.sh",
             chrootPath = ChrootPaths.ALPINE_CHROOT_PATH,
@@ -243,6 +266,105 @@ data class DistroInstallProfile(
             displayName = "openSUSE (Rooted)",
         )
 
+        private val DEEPIN_PROOT = DistroInstallProfile(
+            distroId = "deepin",
+            prootName = "deepin",
+            method = "proot",
+            rootfsAsset = "rootfs/$DEEPIN_ROOTFS_NAME",
+            rootfsFileName = DEEPIN_ROOTFS_NAME,
+            rootfsSha256 = DEEPIN_ROOTFS_SHA256,
+            rootfsMinBytes = DEEPIN_ROOTFS_MIN_BYTES,
+            familyScript = "deepin/common/setup/setup_deepin_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Deepin",
+        )
+
+        private val DEEPIN_CHROOT = DistroInstallProfile(
+            distroId = "deepin_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$DEEPIN_ROOTFS_NAME",
+            rootfsFileName = DEEPIN_ROOTFS_NAME,
+            rootfsSha256 = DEEPIN_ROOTFS_SHA256,
+            rootfsMinBytes = DEEPIN_ROOTFS_MIN_BYTES,
+            familyScript = "deepin/common/setup/setup_deepin_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.DEEPIN_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Deepin (Rooted)",
+        )
+
+        private val CHIMERA_PROOT = DistroInstallProfile(
+            distroId = "chimera",
+            prootName = "chimera",
+            method = "proot",
+            rootfsAsset = "rootfs/$CHIMERA_ROOTFS_NAME",
+            rootfsFileName = CHIMERA_ROOTFS_NAME,
+            rootfsSha256 = CHIMERA_ROOTFS_SHA256,
+            rootfsMinBytes = CHIMERA_ROOTFS_MIN_BYTES,
+            familyScript = "chimera/common/setup/setup_chimera_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Chimera",
+        )
+
+        private val CHIMERA_CHROOT = DistroInstallProfile(
+            distroId = "chimera_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$CHIMERA_ROOTFS_NAME",
+            rootfsFileName = CHIMERA_ROOTFS_NAME,
+            rootfsSha256 = CHIMERA_ROOTFS_SHA256,
+            rootfsMinBytes = CHIMERA_ROOTFS_MIN_BYTES,
+            familyScript = "chimera/common/setup/setup_chimera_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.CHIMERA_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Chimera (Rooted)",
+        )
+
+        private val MANJARO_PROOT = DistroInstallProfile(
+            distroId = "manjaro",
+            prootName = "manjaro",
+            method = "proot",
+            rootfsAsset = "rootfs/$MANJARO_ROOTFS_NAME",
+            rootfsFileName = MANJARO_ROOTFS_NAME,
+            rootfsSha256 = MANJARO_ROOTFS_SHA256,
+            rootfsMinBytes = MANJARO_ROOTFS_MIN_BYTES,
+            familyScript = "manjaro/common/setup/setup_manjaro_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Manjaro",
+        )
+
+        private val MANJARO_CHROOT = DistroInstallProfile(
+            distroId = "manjaro_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$MANJARO_ROOTFS_NAME",
+            rootfsFileName = MANJARO_ROOTFS_NAME,
+            rootfsSha256 = MANJARO_ROOTFS_SHA256,
+            rootfsMinBytes = MANJARO_ROOTFS_MIN_BYTES,
+            familyScript = "manjaro/common/setup/setup_manjaro_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.MANJARO_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Manjaro (Rooted)",
+        )
+
         private val BY_ID: Map<String, DistroInstallProfile> = mapOf(
             "debian" to DEBIAN_PROOT,
             "debian13_chroot" to DEBIAN_CHROOT,
@@ -255,16 +377,26 @@ data class DistroInstallProfile(
             "void_chroot" to VOID_CHROOT,
             "opensuse" to OPENSUSE_PROOT,
             "opensuse_chroot" to OPENSUSE_CHROOT,
+            "deepin" to DEEPIN_PROOT,
+            "deepin_chroot" to DEEPIN_CHROOT,
+            "chimera" to CHIMERA_PROOT,
+            "chimera_chroot" to CHIMERA_CHROOT,
+            "manjaro" to MANJARO_PROOT,
+            "manjaro_chroot" to MANJARO_CHROOT,
         )
 
         /** All profiles that ship a distinct rootfs archive (deduped by file name). */
-        fun allRootfsProfiles(): List<DistroInstallProfile> =
-            listOf(DEBIAN_PROOT, ALPINE_PROOT, FEDORA_PROOT, VOID_PROOT, OPENSUSE_PROOT)
+        fun allRootfsProfiles(): List<DistroInstallProfile> = listOf(
+            DEBIAN_PROOT, ALPINE_PROOT, FEDORA_PROOT, VOID_PROOT, OPENSUSE_PROOT,
+            DEEPIN_PROOT, CHIMERA_PROOT, MANJARO_PROOT,
+        )
 
         /** Installable cards in catalog order (proot then matching chroot). */
         fun allInstallable(): List<DistroInstallProfile> = listOf(
             DEBIAN_PROOT, ALPINE_PROOT, FEDORA_PROOT, VOID_PROOT, OPENSUSE_PROOT,
             DEBIAN_CHROOT, ALPINE_CHROOT, FEDORA_CHROOT, VOID_CHROOT, OPENSUSE_CHROOT,
+            DEEPIN_PROOT, CHIMERA_PROOT, MANJARO_PROOT,
+            DEEPIN_CHROOT, CHIMERA_CHROOT, MANJARO_CHROOT,
         )
 
         fun forId(distroId: String): DistroInstallProfile? = BY_ID[distroId]

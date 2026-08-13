@@ -1,7 +1,7 @@
 # Plan: Fedora, Void, and openSUSE (proot + chroot)
 
 **Date:** 2026-08-13  
-**Status:** DEVICE PASS (2026-08-13) — all 6 paths install + terminal/sudo + XFCE on embedded X11. See `docs/plans/results/`.  
+**Status:** DEVICE PASS (2026-08-13) — I1–D3/D5/T2/T3 still stand. **Follow-up (not implemented):** Fedora locale + fastfetch disk flood + XFCE ⊘ category icons (openSUSE + shared Papirus stub). SSOT: [`xfce-icons-locale-fastfetch.md`](./xfce-icons-locale-fastfetch.md).  
 **Scope:** First-class FluxLinux guests for **Fedora 43**, **Void Linux (glibc aarch64, 2025-02-02)**, and **openSUSE Tumbleweed (20251127)** — same product shape as Alpine/Debian: install → internal terminal → XFCE on the embedded X11 display.
 
 **Not in this plan:** Arch Linux (no rootfs provided). KDE, Debian-style feature modules (appdev/webdev/…), and debug APKs.

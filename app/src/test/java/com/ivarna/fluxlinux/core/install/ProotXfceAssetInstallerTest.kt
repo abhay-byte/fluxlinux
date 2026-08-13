@@ -52,6 +52,17 @@ class ProotXfceAssetInstallerTest {
     }
 
     @Test
+    fun icon_asset_must_not_end_in_gz_aapt2_rule() {
+        // aapt2 auto-decompresses *.gz assets (renames to *.tar) — asset paths
+        // opened via AssetManager must never end in .gz.
+        assertFalse(ProotXfceAssetInstaller.ICON_ASSET.endsWith(".gz"))
+        assertFalse(ProotXfceAssetInstaller.ICON_FILE.endsWith(".gz"))
+        assertTrue(ProotXfceAssetInstaller.ICON_FILE.endsWith(".tar.xz"))
+        assertFalse(ProotXfceAssetInstaller.ICON_CATEGORIES_ASSET.endsWith(".gz"))
+        assertTrue(ProotXfceAssetInstaller.ICON_CATEGORIES_FILE.endsWith(".tar.xz"))
+    }
+
+    @Test
     fun isSelectionInstalled_all_or_nothing() {
         val root = tmp.newFolder("rootfs3")
         val sel = ProotXfceAssetInstaller.selectionFor("dark")

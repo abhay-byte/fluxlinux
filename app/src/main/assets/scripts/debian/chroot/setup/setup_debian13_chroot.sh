@@ -504,12 +504,16 @@ rm -rf \$TARGET_TERMUX_PREFIX/tmp/.X1-lock
 mkdir -p \$TARGET_TERMUX_PREFIX/tmp/.X11-unix
 chmod 1777 \$TARGET_TERMUX_PREFIX/tmp/.X11-unix
 
-# 3. Fix SELinux contexts (HyperOS fix)
+# 3. Restore PREFIX/tmp to the app data label (never tmpfs:s0 — that
+#    blocks termux-x11 mkdir/lock/dbus under enforcing SELinux).
 if command -v chcon >/dev/null 2>&1; then
-    echo "[3/7] Fixing SELinux contexts..."
-    chcon -R u:object_r:tmpfs:s0 \$TARGET_TERMUX_PREFIX/tmp 2>/dev/null || true
-    chcon u:object_r:tmpfs:s0 \$TARGET_TERMUX_PREFIX/tmp/.X11-unix 2>/dev/null || true
+    echo "[3/7] Restoring host tmp SELinux context..."
+    _ctx=\$(ls -Zd \$TARGET_TERMUX_PREFIX 2>/dev/null | awk '{print \$1}')
+    if [ -n "\$_ctx" ]; then
+      chcon -R "\$_ctx" \$TARGET_TERMUX_PREFIX/tmp 2>/dev/null || true
+    fi
 fi
+restorecon -RF \$TARGET_TERMUX_PREFIX/tmp 2>/dev/null || true
 
 # 4. Start Termux X11 app
 echo "[4/7] Starting Termux X11 app..."

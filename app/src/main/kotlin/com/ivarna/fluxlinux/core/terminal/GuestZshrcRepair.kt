@@ -28,9 +28,13 @@ object GuestZshrcRepair {
 # Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
 export PATH="${'$'}HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Setup Locales
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
+  export LANG=en_US.UTF-8
+  export LC_ALL=en_US.UTF-8
+else
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
+fi
 
 # Host PROOT_TMP_DIR is not writable as guest uid; use guest /tmp.
 unset PROOT_TMP_DIR
@@ -38,6 +42,10 @@ export TMPDIR="${'$'}{TMPDIR:-/tmp}"
 
 # Fix XDG_RUNTIME_DIR (not set in PRoot/chroot — no systemd-logind)
 export XDG_RUNTIME_DIR="${'$'}{XDG_RUNTIME_DIR:-/tmp}"
+
+# proot does not implement tcsetpgrp — zsh job control would ENOSYS and the
+# shell can get SIGTTIN-killed. Disable MONITOR (job control) for the guest.
+setopt no_monitor
 
 # Background visuals - don't block shell startup; skip missing tools (no error spam)
 {
@@ -72,7 +80,7 @@ fi
      */
     private val ALPINE_APK_WRAPPER = """
 
-# Alpine: package manager needs root. NOPASSWD sudo is configured for flux.
+# Alpine/Chimera: package manager needs root. NOPASSWD sudo is configured for flux.
 if command -v apk >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
   apk() { command sudo apk "${'$'}@"; }
 fi
@@ -82,6 +90,15 @@ fi
 
 # Guest package managers need root. NOPASSWD sudo is configured for flux.
 if command -v sudo >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get() { command sudo apt-get "${'$'}@"; }
+  fi
+  if command -v apt >/dev/null 2>&1; then
+    apt() { command sudo apt "${'$'}@"; }
+  fi
+  if command -v pacman >/dev/null 2>&1; then
+    pacman() { command sudo pacman "${'$'}@"; }
+  fi
   if command -v dnf >/dev/null 2>&1; then
     dnf() { command sudo dnf "${'$'}@"; }
   fi
@@ -100,9 +117,8 @@ fi
     fun repairIfNeeded(ctx: Context, method: String, distroId: String? = null) {
         val zshrc = resolveZshrc(ctx, method, distroId) ?: return
         val rootfs = zshrc.parentFile?.parentFile?.parentFile // home/flux/.zshrc → rootfs
-        val isAlpine = resolveProotName(distroId) == "alpine" ||
-            (distroId?.contains("alpine", ignoreCase = true) == true)
-        val needsPmWrap = !isAlpine && isGlibcGuest(distroId)
+        val isApkGuest = isApkGuest(distroId)
+        val needsPmWrap = !isApkGuest && isGlibcGuest(distroId)
         try {
             if (zshrc.isFile) {
                 val text = zshrc.readText()
@@ -110,15 +126,17 @@ fi
                     if (!zshrc.canWrite()) {
                         Log.w(TAG, "zshrc needs repair but not writable: ${zshrc.absolutePath}")
                     } else {
-                        zshrc.writeText(profileFor(isAlpine, needsPmWrap))
+                        zshrc.writeText(profileFor(isApkGuest, needsPmWrap))
                         Log.i(TAG, "Repaired defensive .zshrc at ${zshrc.absolutePath}")
                     }
-                } else if (isAlpine && !text.contains("apk() {") && zshrc.canWrite()) {
+                } else if (isApkGuest && !text.contains("apk() {") && zshrc.canWrite()) {
                     zshrc.appendText("\n$ALPINE_APK_WRAPPER")
-                    Log.i(TAG, "Appended Alpine apk() wrapper to ${zshrc.absolutePath}")
+                    Log.i(TAG, "Appended apk() wrapper to ${zshrc.absolutePath}")
                 } else if (needsPmWrap && !text.contains("dnf() {") &&
                     !text.contains("xbps-install() {") &&
                     !text.contains("zypper() {") &&
+                    !text.contains("apt-get() {") &&
+                    !text.contains("pacman() {") &&
                     zshrc.canWrite()
                 ) {
                     zshrc.appendText("\n$GLIBC_PM_WRAPPER")
@@ -131,27 +149,82 @@ fi
                 if (!home.canWrite() && !zshrc.canWrite()) {
                     Log.w(TAG, "cannot create .zshrc (home not writable): ${home.absolutePath}")
                 } else {
-                    zshrc.writeText(profileFor(isAlpine, needsPmWrap))
+                    zshrc.writeText(profileFor(isApkGuest, needsPmWrap))
                     Log.i(TAG, "Created defensive .zshrc at ${zshrc.absolutePath}")
                 }
             }
             ensureZprofile(zshrc.parentFile)
             // Prefer zsh login shell when binary exists (Alpine often left /bin/bash)
             if (rootfs != null) ensureFluxLoginShellZsh(rootfs)
+            writeFastfetchPresets(zshrc.parentFile, rootfs)
         } catch (e: Exception) {
             Log.w(TAG, "zshrc repair failed: ${e.message}")
         }
     }
 
-    private fun profileFor(isAlpine: Boolean, glibcPm: Boolean = false): String = when {
-        isAlpine -> DEFENSIVE_ZSHRC + "\n" + ALPINE_APK_WRAPPER
+    /** Always overwrite the Flux fastfetch preset (disk=/ only, no pacman format). */
+    internal val TERMUX_JSONC = """
+{
+  "logo": null,
+  "display": { "separator": " ›  " },
+  "modules": [
+    { "type": "os", "key": "OS  " },
+    { "type": "kernel", "key": "KER " },
+    { "type": "cpu", "key": "CPU " },
+    { "type": "gpu", "key": "GPU " },
+    { "type": "packages", "key": "PKG " },
+    { "type": "shell", "key": "SH  " },
+    { "type": "terminal", "key": "TER " },
+    {
+      "type": "disk",
+      "key": "DSK ",
+      "folders": ["/"],
+      "showRemovable": false,
+      "showHidden": false,
+      "showSubvolumes": false
+    },
+    { "type": "memory", "key": "MEM " },
+    { "type": "swap", "key": "SWP " }
+  ]
+}
+""".trimStart()
+
+    internal fun writeFastfetchPresets(fluxHome: File?, rootfs: File?) {
+        val homes = mutableListOf<File>()
+        if (fluxHome != null) homes.add(fluxHome)
+        if (rootfs != null) homes.add(File(rootfs, "root"))
+        for (home in homes) {
+            if (!home.isDirectory) continue
+            val dest = File(home, ".local/share/fastfetch/presets/termux.jsonc")
+            try {
+                dest.parentFile?.mkdirs()
+                if (!dest.canWrite() && dest.isFile) continue
+                dest.writeText(TERMUX_JSONC)
+                Log.i(TAG, "Wrote fastfetch preset at ${dest.absolutePath}")
+            } catch (e: Exception) {
+                Log.w(TAG, "fastfetch preset write failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun profileFor(isApkGuest: Boolean, glibcPm: Boolean = false): String = when {
+        isApkGuest -> DEFENSIVE_ZSHRC + "\n" + ALPINE_APK_WRAPPER
         glibcPm -> DEFENSIVE_ZSHRC + "\n" + GLIBC_PM_WRAPPER
         else -> DEFENSIVE_ZSHRC
     }
 
     private fun isGlibcGuest(distroId: String?): Boolean {
         val name = resolveProotName(distroId)
-        return name == "fedora" || name == "void" || name == "opensuse"
+        return name == "fedora" || name == "void" || name == "opensuse" ||
+            name == "deepin" || name == "manjaro"
+    }
+
+    /** apk-based guests: Alpine (v2) + Chimera (v3, musl). */
+    private fun isApkGuest(distroId: String?): Boolean {
+        val name = resolveProotName(distroId)
+        return name == "alpine" || name == "chimera" ||
+            (distroId?.contains("alpine", ignoreCase = true) == true) ||
+            (distroId?.contains("chimera", ignoreCase = true) == true)
     }
 
     /** Login zsh (`su -` / `zsh -l`) does not read `.zshrc` unless also interactive. */
@@ -249,6 +322,11 @@ fi
         if (hardPokemon) return true
         // Host TMPDIR/PROOT_TMP_DIR leaked → nested proot glue errors.
         if (!text.contains("unset PROOT_TMP_DIR")) return true
+        // Missing job-control guard → zsh dies with "can't set tty pgrp" under
+        // proot (tcsetpgrp ENOSYS → SIGTTIN → session SIGKILL).
+        if (!text.contains("setopt no_monitor")) return true
+        // Hard LANG=en_US.UTF-8 without locale -a fallback spam-fails on Fedora.
+        if (!text.contains("locale -a")) return true
         return false
     }
 }

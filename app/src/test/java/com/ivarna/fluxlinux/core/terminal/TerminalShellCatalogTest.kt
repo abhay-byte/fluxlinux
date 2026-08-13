@@ -25,11 +25,17 @@ class TerminalShellCatalogTest {
         fedoraProot: Boolean = false,
         voidProot: Boolean = false,
         opensuseProot: Boolean = false,
+        deepinProot: Boolean = false,
+        chimeraProot: Boolean = false,
+        manjaroProot: Boolean = false,
         debianChroot: Boolean = false,
         alpineChroot: Boolean = false,
         fedoraChroot: Boolean = false,
         voidChroot: Boolean = false,
         opensuseChroot: Boolean = false,
+        deepinChroot: Boolean = false,
+        chimeraChroot: Boolean = false,
+        manjaroChroot: Boolean = false,
         rootAvailable: Boolean = false
     ) = TerminalShellAvailability(
         debianProot = debianProot,
@@ -37,11 +43,17 @@ class TerminalShellCatalogTest {
         fedoraProot = fedoraProot,
         voidProot = voidProot,
         opensuseProot = opensuseProot,
+        deepinProot = deepinProot,
+        chimeraProot = chimeraProot,
+        manjaroProot = manjaroProot,
         debianChroot = debianChroot,
         alpineChroot = alpineChroot,
         fedoraChroot = fedoraChroot,
         voidChroot = voidChroot,
         opensuseChroot = opensuseChroot,
+        deepinChroot = deepinChroot,
+        chimeraChroot = chimeraChroot,
+        manjaroChroot = manjaroChroot,
         rootAvailable = rootAvailable
     )
 
@@ -140,8 +152,8 @@ class TerminalShellCatalogTest {
         )
         assertEquals(
             listOf(
-                "PROOT", "PROOT", "PROOT", "PROOT", "PROOT",
-                "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT",
+                "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT",
+                "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT",
                 "OPTIONAL"
             ),
             sections.map { it.subtitle }
@@ -149,7 +161,9 @@ class TerminalShellCatalogTest {
         assertEquals(
             listOf(
                 "DEBIAN SHELL", "ALPINE SHELL", "FEDORA SHELL", "VOID SHELL", "OPENSUSE SHELL",
+                "DEEPIN SHELL", "CHIMERA SHELL", "MANJARO SHELL",
                 "DEBIAN SHELL", "ALPINE SHELL", "FEDORA SHELL", "VOID SHELL", "OPENSUSE SHELL",
+                "DEEPIN SHELL", "CHIMERA SHELL", "MANJARO SHELL",
                 "HOST"
             ),
             sections.map { it.title }
@@ -183,5 +197,83 @@ class TerminalShellCatalogTest {
         val a = avail(debianProot = true, debianChroot = true)
         assertTrue(a.prootInstalled)
         assertTrue(a.chrootInstalled)
+    }
+
+    @Test
+    fun deepinProotInstalled_cardsEnabled() {
+        val cards = TerminalShellCatalog.sections(ctx(), avail(deepinProot = true))
+            .first { it.title == "DEEPIN SHELL" && it.subtitle == "PROOT" }.cards
+        assertTrue(cards.all { it.enabled })
+        assertEquals("deepin", cards[0].def.distroId)
+    }
+
+    @Test
+    fun chimeraProotInstalled_cardsEnabled() {
+        val cards = TerminalShellCatalog.sections(ctx(), avail(chimeraProot = true))
+            .first { it.title == "CHIMERA SHELL" && it.subtitle == "PROOT" }.cards
+        assertTrue(cards.all { it.enabled })
+        assertEquals("chimera", cards[0].def.distroId)
+    }
+
+    @Test
+    fun manjaroProotInstalled_cardsEnabled() {
+        val cards = TerminalShellCatalog.sections(ctx(), avail(manjaroProot = true))
+            .first { it.title == "MANJARO SHELL" && it.subtitle == "PROOT" }.cards
+        assertTrue(cards.all { it.enabled })
+        assertEquals("manjaro", cards[0].def.distroId)
+    }
+
+    @Test
+    fun deepinChrootInstalledAndRoot_enabled() {
+        val chroot = TerminalShellCatalog.sections(
+            ctx(),
+            avail(deepinChroot = true, rootAvailable = true)
+        ).first { it.title == "DEEPIN SHELL" && it.subtitle == "CHROOT" }.cards
+        chroot.forEach { card ->
+            assertTrue(card.enabled)
+            assertNull(card.disabledReason)
+            assertEquals("deepin_chroot", card.def.distroId)
+        }
+    }
+
+    @Test
+    fun chimeraChrootMissing_disabledChrootNotInstalled() {
+        val chroot = TerminalShellCatalog.sections(
+            ctx(),
+            avail(chimeraProot = true, rootAvailable = true)
+        ).first { it.title == "CHIMERA SHELL" && it.subtitle == "CHROOT" }.cards
+        chroot.forEach { card ->
+            assertFalse(card.enabled)
+            assertEquals("Chroot not installed", card.disabledReason)
+        }
+    }
+
+    @Test
+    fun manjaroChroot_noRoot_disabledRootRequired() {
+        val chroot = TerminalShellCatalog.sections(
+            ctx(),
+            avail(manjaroChroot = true, rootAvailable = false)
+        ).first { it.title == "MANJARO SHELL" && it.subtitle == "CHROOT" }.cards
+        chroot.forEach { card ->
+            assertFalse(card.enabled)
+            assertEquals("Root required", card.disabledReason)
+        }
+    }
+
+    @Test
+    fun prootDefs_deepin_chimera_manjaro() {
+        assertEquals("deepin", TerminalShellCatalog.prootDefs("deepin")[0].distroId)
+        assertEquals("chimera", TerminalShellCatalog.prootDefs("chimera")[0].distroId)
+        assertEquals("manjaro", TerminalShellCatalog.prootDefs("manjaro")[0].distroId)
+    }
+
+    @Test
+    fun chrootDefs_deepin_chimera_manjaro() {
+        val ids = listOf("deepin_chroot", "chimera_chroot", "manjaro_chroot")
+        ids.forEach { id ->
+            val defs = TerminalShellCatalog.chrootDefs(id)
+            assertEquals(listOf("shell", "shell-root"), defs.map { it.type })
+            assertTrue(defs.all { it.method == "chroot" && it.distroId == id })
+        }
     }
 }

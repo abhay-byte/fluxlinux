@@ -11,6 +11,7 @@ enum class DistroFamily {
     ALPINE,
     VOID,
     SUSE,
+    CHIMERA,
     OTHER
 }
 
@@ -100,6 +101,27 @@ enum class SupportedDistro(
         id = "opensuse",
         family = DistroFamily.SUSE,
         packageManager = PackageManager.ZYPPER,
+        releaseType = ReleaseType.ROLLING
+    ),
+
+    DEEPIN(
+        id = "deepin",
+        family = DistroFamily.DEBIAN,
+        packageManager = PackageManager.APT,
+        releaseType = ReleaseType.FIXED
+    ),
+
+    CHIMERA(
+        id = "chimera",
+        family = DistroFamily.CHIMERA,
+        packageManager = PackageManager.APK,
+        releaseType = ReleaseType.ROLLING
+    ),
+
+    MANJARO(
+        id = "manjaro",
+        family = DistroFamily.ARCH,
+        packageManager = PackageManager.PACMAN,
         releaseType = ReleaseType.ROLLING
     )
 }

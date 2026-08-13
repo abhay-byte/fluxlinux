@@ -1,6 +1,6 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
 # stop_gui_chroot.sh — app-uid: stop Pulse + root stop_*_gui.sh
-# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot
+# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot|deepin_chroot|chimera_chroot|manjaro_chroot
 # Does NOT pkill proot.
 
 DISTRO_HINT="${1:-${FLUX_CHROOT_DISTRO:-debian13_chroot}}"
@@ -30,6 +30,18 @@ case "$DISTRO_HINT" in
     ;;
   opensuse|opensuse_chroot)
     CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootOpenSUSE}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  deepin|deepin_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootDeepin}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  chimera|chimera_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootChimera}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  manjaro|manjaro_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootManjaro}"
     ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
     ;;
   *)

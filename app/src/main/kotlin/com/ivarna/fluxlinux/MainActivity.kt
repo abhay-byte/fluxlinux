@@ -196,6 +196,34 @@ class MainActivity : ComponentActivity() {
             component.scriptName.contains("setup_customization")
 
     /**
+     * Load a component script and prepend flux_gpu_common.sh for hw_accel.
+     * [extraEnv] is already resolved (no FLUX_GPU=auto).
+     */
+    private fun loadGuestComponentScript(
+        ctx: android.content.Context,
+        component: com.ivarna.fluxlinux.core.data.DistroComponent,
+        extraEnv: Map<String, String>
+    ): String? {
+        val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(ctx)
+        val envBlock = extraEnv.entries.joinToString("\n") {
+            "export ${it.key}=\"${it.value}\""
+        }
+        val base = scriptManager.getScriptContent(component.scriptName)
+        val common = if (component.id == "hw_accel") {
+            runCatching {
+                scriptManager.getScriptContent("common/setup/flux_gpu_common.sh")
+            }.getOrDefault("")
+        } else {
+            ""
+        }
+        return buildString {
+            if (extraEnv.isNotEmpty()) append(envBlock).append("\n\n")
+            if (common.isNotBlank()) append(common).append("\n\n")
+            append(base)
+        }
+    }
+
+    /**
      * Host-stage theme/icons + Oh My Zsh into the proot rootfs before guest
      * customization runs. Distro Settings used to skip this (only onboarding
      * did), so guest hung on missing git / corrupt OMZ rm. Merges skip flags
@@ -213,10 +241,27 @@ class MainActivity : ComponentActivity() {
         val theme = extraEnv["FLUX_THEME"] ?: "dark"
         val merged = extraEnv.toMutableMap()
         val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+        // Chroot cards stage into the chroot guest /tmp (root copy) and let the
+        // guest extract. Never target the sibling proot container, and never
+        // set FLUX_SKIP_THEME_ICONS for a chroot — the guest must extract.
+        if (profile?.method == "chroot") {
+            val chrootPath = profile.chrootPath
+                ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
+            try {
+                com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.installToChroot(
+                    activity, theme, chrootPath
+                ) { line ->
+                    android.util.Log.i("FluxLinux", "Chroot theme ($chrootPath): $line")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("FluxLinux", "Chroot theme stage failed", e)
+            }
+            // OMZ + pokemon are guest-side for pure chroot (no host git).
+            // Do not set FLUX_SKIP_OMZ / FLUX_SKIP_POKEMON — script defaults try.
+            return merged
+        }
         val prootName = profile?.prootName?.takeIf { it.isNotBlank() }
             ?: distroId.removeSuffix("_chroot").ifBlank { "debian" }
-        // Chroot customization stages into the matching proot container only when
-        // that container exists; OMZ for pure-chroot is guest-side.
         try {
             val themeOk = com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.install(
                 activity, theme, prootName
@@ -238,9 +283,9 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             android.util.Log.w("FluxLinux", "Host OMZ stage failed", e)
         }
-        // Default: skip pokemon (gitlab often stalls under proot)
+        // Try pokemon on Distro Settings re-run (60s guest clone; skip only if caller set 1).
         if (!merged.containsKey("FLUX_SKIP_POKEMON")) {
-            merged["FLUX_SKIP_POKEMON"] = "1"
+            merged["FLUX_SKIP_POKEMON"] = "0"
         }
         return merged
     }
@@ -255,18 +300,16 @@ class MainActivity : ComponentActivity() {
         if (index >= components.size) return
         val component = components[index]
         val baseEnv = if (component.id == "hw_accel") {
-            mapOf("FLUX_GPU" to gpu)
+            val det = com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.detect()
+            com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.persist(this, det)
+            val mode = com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.resolveFluxGpu(gpu)
+            mapOf("FLUX_GPU" to mode, "FLUX_GPU_VENDOR" to det.vendorHint)
         } else {
             mapOf("FLUX_THEME" to theme)
         }
         fun openWith(extraEnv: Map<String, String>) {
             val scriptContent = try {
-                val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(this)
-                val envBlock = extraEnv.entries.joinToString("\n") {
-                    "export ${it.key}=\"${it.value}\""
-                }
-                val base = scriptManager.getScriptContent(component.scriptName)
-                if (extraEnv.isNotEmpty()) "$envBlock\n\n$base" else base
+                loadGuestComponentScript(this, component, extraEnv)
             } catch (e: Exception) {
                 android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
                 null
@@ -331,12 +374,7 @@ class MainActivity : ComponentActivity() {
             }
             fun openWith(env: Map<String, String>) {
                 val scriptContent = try {
-                    val scriptManager = com.ivarna.fluxlinux.core.data.ScriptManager(activity)
-                    val envBlock = env.entries.joinToString("\n") {
-                        "export ${it.key}=\"${it.value}\""
-                    }
-                    val base = scriptManager.getScriptContent(component.scriptName)
-                    if (env.isNotEmpty()) "$envBlock\n\n$base" else base
+                    loadGuestComponentScript(activity, component, env)
                 } catch (e: Exception) {
                     android.util.Log.e("FluxLinux", "Failed to load ${component.scriptName}", e)
                     null
@@ -361,6 +399,20 @@ class MainActivity : ComponentActivity() {
                     onOpenTerminalScreen()
                 }
             }
+            val resolvedEnv = if (!isUninstall && component.id == "hw_accel") {
+                val merged = extraEnv.toMutableMap()
+                val raw = extraEnv["FLUX_GPU"]
+                val det = com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.detect()
+                com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.persist(activity, det)
+                merged["FLUX_GPU"] =
+                    com.ivarna.fluxlinux.core.terminal.GpuAccelDetector.resolveFluxGpu(raw)
+                if (!merged.containsKey("FLUX_GPU_VENDOR")) {
+                    merged["FLUX_GPU_VENDOR"] = det.vendorHint
+                }
+                merged
+            } else {
+                extraEnv
+            }
             if (!isUninstall && isCustomizationComponent(component)) {
                 android.widget.Toast.makeText(
                     activity, "Preparing themes & Oh My Zsh on host…",
@@ -371,7 +423,7 @@ class MainActivity : ComponentActivity() {
                     activity.runOnUiThread { openWith(env) }
                 }.start()
             } else {
-                openWith(extraEnv)
+                openWith(resolvedEnv)
             }
         }
     }

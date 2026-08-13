@@ -44,11 +44,17 @@ data class TerminalShellAvailability(
     val fedoraProot: Boolean = false,
     val voidProot: Boolean = false,
     val opensuseProot: Boolean = false,
+    val deepinProot: Boolean = false,
+    val chimeraProot: Boolean = false,
+    val manjaroProot: Boolean = false,
     val debianChroot: Boolean,
     val alpineChroot: Boolean,
     val fedoraChroot: Boolean = false,
     val voidChroot: Boolean = false,
     val opensuseChroot: Boolean = false,
+    val deepinChroot: Boolean = false,
+    val chimeraChroot: Boolean = false,
+    val manjaroChroot: Boolean = false,
     val rootAvailable: Boolean
 ) {
     /** Back-compat aliases used by older tests / call sites. */
@@ -61,6 +67,9 @@ data class TerminalShellAvailability(
         "fedora" -> fedoraProot
         "void" -> voidProot
         "opensuse" -> opensuseProot
+        "deepin" -> deepinProot
+        "chimera" -> chimeraProot
+        "manjaro" -> manjaroProot
         else -> false
     }
 
@@ -70,6 +79,9 @@ data class TerminalShellAvailability(
         "fedora_chroot" -> fedoraChroot
         "void_chroot" -> voidChroot
         "opensuse_chroot" -> opensuseChroot
+        "deepin_chroot" -> deepinChroot
+        "chimera_chroot" -> chimeraChroot
+        "manjaro_chroot" -> manjaroChroot
         else -> false
     }
 }
@@ -82,6 +94,9 @@ object TerminalShellCatalog {
             "fedora" -> "Fedora" to R.drawable.distro_fedora
             "void" -> "Void" to R.drawable.distro_void
             "opensuse" -> "openSUSE" to R.drawable.distro_opensuse
+            "deepin" -> "Deepin" to R.drawable.distro_deepin
+            "chimera" -> "Chimera" to R.drawable.distro_chimera
+            "manjaro" -> "Manjaro" to R.drawable.distro_manjaro
             else -> "Debian" to R.drawable.distro_debian
         }
         return listOf(
@@ -114,6 +129,12 @@ object TerminalShellCatalog {
                 Triple("Void Chroot", R.drawable.distro_void, "void_chroot")
             "opensuse_chroot", "opensuse" ->
                 Triple("openSUSE Chroot", R.drawable.distro_opensuse, "opensuse_chroot")
+            "deepin_chroot", "deepin" ->
+                Triple("Deepin Chroot", R.drawable.distro_deepin, "deepin_chroot")
+            "chimera_chroot", "chimera" ->
+                Triple("Chimera Chroot", R.drawable.distro_chimera, "chimera_chroot")
+            "manjaro_chroot", "manjaro" ->
+                Triple("Manjaro Chroot", R.drawable.distro_manjaro, "manjaro_chroot")
             else ->
                 Triple("Debian Chroot", R.drawable.distro_debian, "debian13_chroot")
         }
@@ -154,11 +175,17 @@ object TerminalShellCatalog {
             fedoraProot = TerminalLauncher.isProotInstalled(ctx, "fedora"),
             voidProot = TerminalLauncher.isProotInstalled(ctx, "void"),
             opensuseProot = TerminalLauncher.isProotInstalled(ctx, "opensuse"),
+            deepinProot = TerminalLauncher.isProotInstalled(ctx, "deepin"),
+            chimeraProot = TerminalLauncher.isProotInstalled(ctx, "chimera"),
+            manjaroProot = TerminalLauncher.isProotInstalled(ctx, "manjaro"),
             debianChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.DEBIAN_CHROOT_PATH),
             alpineChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.ALPINE_CHROOT_PATH),
             fedoraChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.FEDORA_CHROOT_PATH),
             voidChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.VOID_CHROOT_PATH),
             opensuseChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.OPENSUSE_CHROOT_PATH),
+            deepinChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.DEEPIN_CHROOT_PATH),
+            chimeraChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.CHIMERA_CHROOT_PATH),
+            manjaroChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.MANJARO_CHROOT_PATH),
             rootAvailable = rootAvailable
         )
 
@@ -215,11 +242,17 @@ object TerminalShellCatalog {
             prootSection("FEDORA", "fedora", avail.prootInstalled("fedora")),
             prootSection("VOID", "void", avail.prootInstalled("void")),
             prootSection("OPENSUSE", "opensuse", avail.prootInstalled("opensuse")),
+            prootSection("DEEPIN", "deepin", avail.prootInstalled("deepin")),
+            prootSection("CHIMERA", "chimera", avail.prootInstalled("chimera")),
+            prootSection("MANJARO", "manjaro", avail.prootInstalled("manjaro")),
             chrootSection("DEBIAN", "debian13_chroot", avail.chrootInstalled("debian13_chroot")),
             chrootSection("ALPINE", "alpine_chroot", avail.chrootInstalled("alpine_chroot")),
             chrootSection("FEDORA", "fedora_chroot", avail.chrootInstalled("fedora_chroot")),
             chrootSection("VOID", "void_chroot", avail.chrootInstalled("void_chroot")),
             chrootSection("OPENSUSE", "opensuse_chroot", avail.chrootInstalled("opensuse_chroot")),
+            chrootSection("DEEPIN", "deepin_chroot", avail.chrootInstalled("deepin_chroot")),
+            chrootSection("CHIMERA", "chimera_chroot", avail.chrootInstalled("chimera_chroot")),
+            chrootSection("MANJARO", "manjaro_chroot", avail.chrootInstalled("manjaro_chroot")),
             TerminalShellSection(
                 title = "HOST",
                 subtitle = "OPTIONAL",

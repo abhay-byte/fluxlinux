@@ -247,6 +247,16 @@ if [ -f /tmp/bwrap-proot-shim ] && [ "$(stat -c %s /tmp/bwrap-proot-shim 2>/dev/
     chmod 755 /usr/bin/bwrap
 fi
 
+# Container image ships only C.utf8. Launchers export en_US.UTF-8.
+$DNF $DNF_OPTS install glibc-langpack-en || true
+if ! ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US'; then
+    localedef -i en_US -f UTF-8 en_US.UTF-8 || true
+fi
+printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+if command -v _flux_ensure_en_us_locale >/dev/null 2>&1; then
+    _flux_ensure_en_us_locale
+fi
+
 _flux_require_startxfce4
 _flux_ensure_user
 _flux_ensure_sudo

@@ -17,6 +17,10 @@ object ChrootPaths {
     const val VOID_CHROOT_PATH = "/data/local/tmp/chrootVoid"
     const val OPENSUSE_CHROOT_PATH = "/data/local/tmp/chrootOpenSUSE"
 
+    const val DEEPIN_CHROOT_PATH = "/data/local/tmp/chrootDeepin"
+    const val CHIMERA_CHROOT_PATH = "/data/local/tmp/chrootChimera"
+    const val MANJARO_CHROOT_PATH = "/data/local/tmp/chrootManjaro"
+
     /**
      * Default chroot path for unscoped APIs (settings / legacy).
      * Prefer [DEBIAN_CHROOT_PATH] / [ALPINE_CHROOT_PATH] or profile.chrootPath.
@@ -38,6 +42,9 @@ object ChrootPaths {
         "fedora_chroot" -> FEDORA_CHROOT_PATH
         "void_chroot" -> VOID_CHROOT_PATH
         "opensuse_chroot" -> OPENSUSE_CHROOT_PATH
+        "deepin_chroot" -> DEEPIN_CHROOT_PATH
+        "chimera_chroot" -> CHIMERA_CHROOT_PATH
+        "manjaro_chroot" -> MANJARO_CHROOT_PATH
         else -> CHROOT_PATH
     }
 }

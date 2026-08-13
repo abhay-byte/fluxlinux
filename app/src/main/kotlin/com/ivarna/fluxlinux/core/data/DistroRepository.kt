@@ -22,8 +22,8 @@ object DistroRepository {
         DistroComponent(
             id = "hw_accel",
             name = "Hardware Acceleration",
-            description = "VirGL & Zink drivers for GPU acceleration. Mandatory for GUI.",
-            scriptName = "debian/common/setup/setup_hw_accel_debian.sh",
+            description = "Turnip (Adreno) or VirGL GPU setup. Mandatory for GUI.",
+            scriptName = "common/setup/setup_hw_accel_guest.sh",
             sizeEstimate = "50 MB",
             isMandatory = true
         ),
@@ -165,6 +165,14 @@ object DistroRepository {
             isMandatory = false
         ),
         DistroComponent(
+            id = "hw_accel",
+            name = "Hardware Acceleration",
+            description = "Turnip (Adreno) or VirGL GPU setup for Alpine.",
+            scriptName = "common/setup/setup_hw_accel_guest.sh",
+            sizeEstimate = "80 MB",
+            isMandatory = true
+        ),
+        DistroComponent(
             id = "customization",
             name = "XFCE4 Customization",
             description = "FluxLinux theme, wallpapers, fonts, and Zsh for Alpine.",
@@ -185,7 +193,7 @@ object DistroRepository {
         DistroComponent(
             id = "hw_accel",
             name = "Hardware Acceleration",
-            description = "Mesa / VirGL GPU setup (Turnip on Fedora when available).",
+            description = "Turnip (Adreno) or VirGL GPU setup for this guest.",
             scriptName = "common/setup/setup_hw_accel_guest.sh",
             sizeEstimate = "80 MB",
             isMandatory = true
@@ -207,6 +215,15 @@ object DistroRepository {
     )
     private val opensuseComponents = glibcXfceComponents(
         "opensuse/common/setup/setup_opensuse_family.sh"
+    )
+    private val deepinComponents = glibcXfceComponents(
+        "deepin/common/setup/setup_deepin_family.sh"
+    )
+    private val chimeraComponents = glibcXfceComponents(
+        "chimera/common/setup/setup_chimera_family.sh"
+    )
+    private val manjaroComponents = glibcXfceComponents(
+        "manjaro/common/setup/setup_manjaro_family.sh"
     )
 
     val supportedDistros = listOf(
@@ -335,6 +352,78 @@ object DistroRepository {
             configuration = SupportedDistro.OPENSUSE,
             components = opensuseComponents
         ),
+        Distro(
+            id = "deepin",
+            name = "Deepin",
+            description = "Deepin 25 with apt and XFCE4 (proot).",
+            color = Color(0xFF2CA7F8),
+            iconRes = R.drawable.distro_deepin,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.DEEPIN,
+            components = deepinComponents
+        ),
+        Distro(
+            id = "deepin_chroot",
+            name = "Deepin (Rooted)",
+            description = "Deepin 25 chroot environment (Requires Root).",
+            color = Color(0xFF2CA7F8),
+            iconRes = R.drawable.distro_deepin,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.DEEPIN,
+            components = deepinComponents
+        ),
+        Distro(
+            id = "chimera",
+            name = "Chimera",
+            description = "Chimera Linux (musl, apk v3) with XFCE4 (proot).",
+            color = Color(0xFFFF6B35),
+            iconRes = R.drawable.distro_chimera,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.CHIMERA,
+            components = chimeraComponents
+        ),
+        Distro(
+            id = "chimera_chroot",
+            name = "Chimera (Rooted)",
+            description = "Chimera Linux chroot environment (Requires Root).",
+            color = Color(0xFFFF6B35),
+            iconRes = R.drawable.distro_chimera,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.CHIMERA,
+            components = chimeraComponents
+        ),
+        Distro(
+            id = "manjaro",
+            name = "Manjaro",
+            description = "Manjaro ARM with pacman and XFCE4 (proot).",
+            color = Color(0xFF35BF5C),
+            iconRes = R.drawable.distro_manjaro,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.MANJARO,
+            components = manjaroComponents
+        ),
+        Distro(
+            id = "manjaro_chroot",
+            name = "Manjaro (Rooted)",
+            description = "Manjaro ARM chroot environment (Requires Root).",
+            color = Color(0xFF35BF5C),
+            iconRes = R.drawable.distro_manjaro,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.MANJARO,
+            components = manjaroComponents
+        ),
         
         // Coming Soon - Sorted alphabetically
         Distro(
@@ -389,26 +478,6 @@ object DistroRepository {
             prootSupported = false, // Not in proot-distro
             chrootSupported = true
         ),
-        Distro(
-            id = "chimera",
-            name = "Chimera Linux",
-            description = "Modern, general-purpose Linux distribution.",
-            color = Color(0xFFFF6B35),
-            iconRes = R.drawable.distro_chimera,
-            comingSoon = true,
-            prootSupported = true, // unstable
-            chrootSupported = true
-        ),
-        Distro(
-            id = "deepin",
-            name = "Deepin",
-            description = "Debian-based distribution with beautiful DDE.",
-            color = Color(0xFF2CA7F8),
-            iconRes = R.drawable.distro_deepin,
-            comingSoon = true,
-            prootSupported = true, // only 64bit
-            chrootSupported = true
-        ),
 
         Distro(
             id = "gentoo",
@@ -428,16 +497,6 @@ object DistroRepository {
             iconRes = R.drawable.distro_kali,
             comingSoon = true,
             prootSupported = false, // Not in proot-distro
-            chrootSupported = true
-        ),
-        Distro(
-            id = "manjaro",
-            name = "Manjaro",
-            description = "User-friendly Arch-based distribution.",
-            color = Color(0xFF35BF5C),
-            iconRes = R.drawable.distro_manjaro,
-            comingSoon = true,
-            prootSupported = true, // aarch64 only
             chrootSupported = true
         ),
         Distro(

@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.core.install
 
 import android.content.Context
 import android.util.Log
+import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.terminal.TermuxHostPaths
 import java.io.File
 import java.io.FileOutputStream
@@ -11,8 +12,10 @@ import java.net.URL
 /**
  * Host-side XFCE theme/icon/cursor/wallpaper install into the **proot rootfs**.
  *
- * Icons: **Papirus-Dark only** (shipped as `papirus-dark-only.tar.gz` ~690 KB —
- * not the full multi-variant Papirus pack). Light/dark UI themes both use it.
+ * Icons: **Papirus-Dark only** (shipped as `papirus-dark-only.tar.xz` ~300 KB
+ * plus `papirus-xfce-categories.tar.xz` extras). Light/dark UI themes both use it.
+ * Shipped as `.tar.xz`: aapt2 auto-decompresses `*.gz` assets (renames to
+ * `.tar`), which breaks `AssetManager.open("…tar.gz")`.
  *
  * Native host `tar` into the proot rootfs avoids slow proot extract.
  * Skips when theme + icons + cursor are already present.
@@ -25,8 +28,10 @@ object ProotXfceAssetInstaller {
 
     /** Sole icon set we ship / install. */
     const val ICON_NAME = "Papirus-Dark"
-    const val ICON_ASSET = "xfce4/icons/papirus-dark-only.tar.gz"
-    const val ICON_FILE = "papirus-dark-only.tar.gz"
+    const val ICON_ASSET = "xfce4/icons/papirus-dark-only.tar.xz"
+    const val ICON_FILE = "papirus-dark-only.tar.xz"
+    const val ICON_CATEGORIES_ASSET = "xfce4/icons/papirus-xfce-categories.tar.xz"
+    const val ICON_CATEGORIES_FILE = "papirus-xfce-categories.tar.xz"
 
     data class Selection(
         val themeName: String,
@@ -115,6 +120,7 @@ object ProotXfceAssetInstaller {
             onLog("Themes/icons already installed (${sel.themeName} + ${sel.iconName}) — skip extract")
             // Still ensure wallpaper if missing (cheap)
             ensureWallpaper(app, rootfs, sel, onLog)
+            stageCategoryExtras(app, rootfs, onLog)
             return true
         }
 
@@ -153,6 +159,28 @@ object ProotXfceAssetInstaller {
                 )
                 val dest = File(rootfs, "usr/share/icons").also { it.mkdirs() }
                 when {
+                    iconsTar != null && iconsTar.name.endsWith(".tar.xz") -> {
+                        // Archive contains only Papirus-Dark/; still pass prefix for safety
+                        if (!hostTarExtract(
+                                iconsTar, dest,
+                                stripXz = true,
+                                onlyPrefix = ICON_NAME,
+                                onLog
+                            )
+                        ) {
+                            // Retry full extract if path filter fails on some tar builds
+                            if (!hostTarExtract(
+                                    iconsTar, dest,
+                                    stripXz = true,
+                                    onlyPrefix = null,
+                                    onLog
+                                )
+                            ) {
+                                onLog("Icon extract failed for $ICON_NAME")
+                                ok = false
+                            }
+                        }
+                    }
                     iconsTar != null &&
                         (iconsTar.name.endsWith(".tar.gz") || iconsTar.name.endsWith(".tgz")) -> {
                         // Archive contains only Papirus-Dark/; still pass prefix for safety
@@ -204,6 +232,7 @@ object ProotXfceAssetInstaller {
             }
 
             ensureWallpaper(app, rootfs, sel, onLog)
+            stageCategoryExtras(app, rootfs, onLog)
         } catch (e: Exception) {
             Log.e(TAG, "install failed", e)
             onLog("Host XFCE asset install error: ${e.message}")
@@ -217,6 +246,92 @@ object ProotXfceAssetInstaller {
             onLog("Host extract finished but selection not fully detected")
         }
         return installed
+    }
+
+    /**
+     * Stage the selected theme/icon/cursor/wallpaper archives into a chroot
+     * guest's `/tmp/flux_xfce_assets` (root copy). The guest customization
+     * script finds them via its default `FLUX_ASSET_DIR` and extracts them
+     * with guest tar (chroot /tmp is the rootfs /tmp — fluxlinux_chroot.sh
+     * `ensure_sticky_tmp` never binds host tmp over it).
+     *
+     * @return true when every asset was staged (or already present).
+     */
+    fun installToChroot(
+        ctx: Context,
+        theme: String,
+        chrootPath: String,
+        onLog: (String) -> Unit = {}
+    ): Boolean {
+        val app = ctx.applicationContext
+        val sel = selectionFor(theme)
+        val cache = File(app.cacheDir, "flux_chroot_assets").also { it.mkdirs() }
+        val assets = listOf(
+            sel.themeAsset to File(sel.themeAsset).name,
+            ICON_ASSET to ICON_FILE,
+            ICON_CATEGORIES_ASSET to ICON_CATEGORIES_FILE,
+            sel.cursorAsset to File(sel.cursorAsset).name,
+            sel.wallpaperAsset to sel.wallpaperFileName
+        )
+        val staged = mutableListOf<Pair<File, String>>()
+        var allOk = true
+        for ((asset, name) in assets) {
+            val f = File(cache, name)
+            if (!f.isFile || f.length() < 1024) {
+                try {
+                    app.assets.open(asset).use { input ->
+                        f.outputStream().use { input.copyTo(it) }
+                    }
+                } catch (e: Exception) {
+                    onLog("chroot asset missing: $asset (${e.message})")
+                    allOk = false
+                    continue
+                }
+            }
+            if (f.isFile && f.length() >= 1024) {
+                staged.add(f to name)
+            }
+        }
+        if (staged.isEmpty()) return false
+        val dst = "$chrootPath/tmp/flux_xfce_assets"
+        val cmd = buildString {
+            append("mkdir -p '$dst' && chmod 1777 '$dst' 2>/dev/null; ")
+            for ((f, name) in staged) {
+                append("cp -f '${f.absolutePath}' '$dst/$name' && chmod 644 '$dst/$name'; ")
+            }
+            append("echo STAGED_OK")
+        }
+        return try {
+            val out = RootShell.capture(cmd, timeoutMs = 60_000L)
+            if (out.contains("STAGED_OK")) {
+                onLog("chroot assets staged at $dst")
+                allOk
+            } else {
+                onLog("chroot root copy failed: $out")
+                false
+            }
+        } catch (e: Exception) {
+            onLog("chroot asset stage error: ${e.message}")
+            false
+        }
+    }
+
+    /** Stage + extract XFCE category extras onto Papirus-Dark (existing + new). */
+    private fun stageCategoryExtras(app: Context, rootfs: File, onLog: (String) -> Unit) {
+        val cache = File(app.cacheDir, "flux_xfce_assets").also { it.mkdirs() }
+        val shared = File(TermuxHostPaths.TMPDIR, "flux_xfce_assets").also { it.mkdirs() }
+        val tar = materialize(
+            app, cache, shared,
+            assetPath = ICON_CATEGORIES_ASSET,
+            fileName = ICON_CATEGORIES_FILE,
+            urlFallback = null,
+            onLog
+        ) ?: return
+        val dest = File(rootfs, "usr/share/icons")
+        dest.mkdirs()
+        if (hostTarExtract(tar, dest, stripXz = true, onlyPrefix = null, onLog)) {
+            onLog("Seeded Papirus XFCE category icons")
+        }
     }
 
     private fun ensureWallpaper(
