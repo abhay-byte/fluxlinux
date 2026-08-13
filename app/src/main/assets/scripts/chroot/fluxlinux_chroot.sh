@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# fluxlinux-chroot v2.2
+# fluxlinux-chroot v2.3
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
@@ -17,7 +17,7 @@
 #   FLUX_CHROOT  FLUX_PACKAGE  FLUX_HOST_TMP  FLUX_PREFIX  FLUX_BB  FLUX_SHELL
 set -u
 
-VERSION_STR="fluxlinux-chroot v2.2"
+VERSION_STR="fluxlinux-chroot v2.3"
 # Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
 if [ -z "${FLUX_PACKAGE:-}" ]; then
   if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
@@ -256,7 +256,82 @@ guest_chroot_env() {
   exec $BB chroot "$FLUX_CHROOT" /usr/bin/env -i $GUEST_ENV_ARGS "$@"
 }
 
+guest_bin_exists() {
+  [ -x "$FLUX_CHROOT/bin/$1" ] || [ -x "$FLUX_CHROOT/usr/bin/$1" ]
+}
+
+# App uid cannot stat /data/local/tmp (SELinux). Resolve as root from the rootfs.
+resolve_login_shell() {
+  _req="${1:-zsh}"
+  case "$_req" in
+    ash) _req=sh ;;
+  esac
+  if guest_bin_exists "$_req"; then
+    printf '%s' "$_req"
+    return
+  fi
+  for _s in zsh bash sh; do
+    if guest_bin_exists "$_s"; then
+      printf '%s' "$_s"
+      return
+    fi
+  done
+  printf '%s' "sh"
+}
+
+# Seed Flux zsh profile when customization never wrote one (Alpine chroot).
+ensure_flux_zsh_profile() {
+  [ "$USER_NAME" = "flux" ] || return 0
+  _home="$FLUX_CHROOT/home/flux"
+  [ -d "$_home" ] || return 0
+  if [ ! -f "$_home/.zshrc" ]; then
+    cat > "$_home/.zshrc" <<'ZSHRC'
+# Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
+export PATH="$HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+unset PROOT_TMP_DIR
+export TMPDIR="${TMPDIR:-/tmp}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+{
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+  fi
+} &!
+
+export ZSH="${ZSH:-$HOME/.oh-my-zsh}"
+if [ -f "$ZSH/oh-my-zsh.sh" ]; then
+  ZSH_THEME="agnosterzak"
+  DISABLE_UPDATE_PROMPT=true
+  DISABLE_AUTO_UPDATE=true
+  ZSH_DISABLE_COMPFIX=true
+  plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+  source "$ZSH/oh-my-zsh.sh"
+fi
+
+if command -v apk >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+  apk() { command sudo apk "$@"; }
+fi
+ZSHRC
+  fi
+  if [ ! -f "$_home/.zprofile" ]; then
+    printf '%s\n' '[[ -o interactive ]] || { [ -f "$HOME/.zshrc" ] && . "$HOME/.zshrc"; }' \
+      > "$_home/.zprofile"
+  fi
+  if [ -x "$FLUX_CHROOT/bin/zsh" ] && [ -f "$FLUX_CHROOT/etc/passwd" ] && \
+     grep -q '^flux:' "$FLUX_CHROOT/etc/passwd" && \
+     ! grep -q '^flux:.*zsh$' "$FLUX_CHROOT/etc/passwd"; then
+    sed -i 's|^\(flux:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*\):.*|\1:/bin/zsh|' \
+      "$FLUX_CHROOT/etc/passwd" 2>/dev/null || true
+  fi
+  chown --reference="$_home" "$_home/.zshrc" "$_home/.zprofile" 2>/dev/null || true
+}
+
 guest_login() {
+  ensure_flux_zsh_profile
+  LOGIN_SHELL="$(resolve_login_shell "${LOGIN_SHELL:-zsh}")"
   # Optional project cwd (workspace shell). Path must not contain single quotes.
   _cd=""
   if [ -n "${LOGIN_WORKDIR:-}" ]; then
@@ -293,6 +368,14 @@ guest_login() {
             guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash
           fi
           ;;
+        sh|ash)
+          # Alpine minirootfs / portable shell (no zsh/bash required)
+          if [ -n "$_cd" ]; then
+            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh -c "${_cd}exec /bin/sh -l"
+          else
+            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh
+          fi
+          ;;
         zsh|*)
           if [ -n "$_cd" ]; then
             guest_chroot_env /bin/su - "$USER_NAME" -s /bin/zsh -c "${_cd}exec /bin/zsh -l"
@@ -320,10 +403,13 @@ guest_sh() {
     return
   fi
   # Fallback only if host has no base64 (should not happen on Android root)
+  # Prefer bash when present; Alpine minirootfs only has /bin/sh until bootstrap.
+  _gshell=/bin/sh
+  [ -x "${FLUX_CHROOT:-}/bin/bash" ] || [ -x /bin/bash ] && _gshell=/bin/bash
   if [ "$USER_NAME" = "root" ]; then
-    guest_chroot_env /bin/bash --noprofile --norc -c "$_cmd"
+    guest_chroot_env "$_gshell" -c "$_cmd"
   else
-    guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash -c "$_cmd"
+    guest_chroot_env /bin/su - "$USER_NAME" -s "$_gshell" -c "$_cmd"
   fi
 }
 
@@ -340,20 +426,22 @@ guest_exec() {
   fi
 }
 
-# Base64 payload → bash as USER_NAME (Kotlin / RootShell path).
+# Base64 payload → guest shell as USER_NAME (Kotlin / RootShell path).
 # Absolute /usr/bin/base64 — never depend on guest PATH for decode bootstrap.
-# TTY-safe: decode to temp script then bash FILE (do NOT pipe into bash — that steals stdin
+# TTY-safe: decode to temp script then run FILE (do NOT pipe into bash — that steals stdin
 # and breaks TUI tools needing /dev/tty: bubbletea, grok, claude, opencode).
+# Prefers /bin/bash when present; falls back to /bin/sh for Alpine minirootfs.
 guest_b64() {
   _b64="$1"
   [ -n "$_b64" ] || die "b64 requires payload"
   # alphabet-only payload — safe inside single quotes
   # \$ preserved for guest; host expands only ${_b64}
-  _inner="_b='${_b64}'; _f=/tmp/.nc_b64_\$\$; { echo \$_b | /usr/bin/base64 -d 2>/dev/null || echo \$_b | /bin/base64 -d; } >\$_f || exit 2; /bin/bash --noprofile --norc \$_f; _e=\$?; rm -f \$_f; exit \$_e"
+  _inner="_b='${_b64}'; _f=/tmp/.nc_b64_\$\$; { echo \$_b | /usr/bin/base64 -d 2>/dev/null || echo \$_b | /bin/base64 -d; } >\$_f || exit 2; if [ -x /bin/bash ]; then /bin/bash --noprofile --norc \$_f; else /bin/sh \$_f; fi; _e=\$?; rm -f \$_f; exit \$_e"
   if [ "$USER_NAME" = "root" ]; then
-    guest_chroot_env /bin/bash --noprofile --norc -c "$_inner"
+    # Outer bootstrap: sh always exists; inner script picks bash if available
+    guest_chroot_env /bin/sh -c "$_inner"
   else
-    guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash -c "$_inner"
+    guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh -c "$_inner"
   fi
 }
 

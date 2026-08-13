@@ -1,6 +1,9 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
-# stop_gui_chroot.sh — app-uid: stop Pulse + root stop_debian13_gui.sh
+# stop_gui_chroot.sh — app-uid: stop Pulse + root stop_*_gui.sh
+# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot
 # Does NOT pkill proot.
+
+DISTRO_HINT="${1:-${FLUX_CHROOT_DISTRO:-debian13_chroot}}"
 
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
 _HOST_ENV="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}/etc/fluxlinux-host.env"
@@ -12,11 +15,34 @@ TERMUX_HOME="${TERMUX__HOME:-/data/data/$PKG/files/home}"
 export HOME="$TERMUX_HOME"
 export PATH="$TERMUX_PREFIX/bin:$TERMUX_PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
 
-ROOT_STOP_SCRIPT="$TERMUX_HOME/stop_debian13_gui.sh"
-ROOT_STOP_TMP="/data/local/tmp/stop_debian13_gui.sh"
+case "$DISTRO_HINT" in
+  alpine|alpine_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootAlpine}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_alpine_gui.sh}"
+    ;;
+  fedora|fedora_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootFedora}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  void|void_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootVoid}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  opensuse|opensuse_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootOpenSUSE}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_guest_gui.sh}"
+    ;;
+  *)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootDebian13}"
+    ROOT_STOP_NAME="${ROOT_STOP_NAME:-stop_debian13_gui.sh}"
+    ;;
+esac
+ROOT_STOP_SCRIPT="$TERMUX_HOME/$ROOT_STOP_NAME"
+ROOT_STOP_TMP="/data/local/tmp/$ROOT_STOP_NAME"
 
 echo "========================================"
 echo "FluxLinux: STOP XFCE (chroot mode)"
+echo "  distro=$DISTRO_HINT path=$CHROOT_PATH"
 echo "========================================"
 
 if [ ! -f "$ROOT_STOP_SCRIPT" ]; then
@@ -26,7 +52,9 @@ else
   for s in /system/bin/su /system/xbin/su /sbin/su; do
     if [ -x "$s" ]; then SU_BIN="$s"; break; fi
   done
-  "$SU_BIN" -c "cp -f '$ROOT_STOP_SCRIPT' '$ROOT_STOP_TMP' 2>/dev/null; chmod 755 '$ROOT_STOP_TMP'; TARGET_PREFIX='$TERMUX_PREFIX' sh '$ROOT_STOP_TMP'"
+  "$SU_BIN" -c "cp -f '$ROOT_STOP_SCRIPT' '$ROOT_STOP_TMP' 2>/dev/null; chmod 755 '$ROOT_STOP_TMP'; \
+    DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
+    TARGET_PREFIX='$TERMUX_PREFIX' sh '$ROOT_STOP_TMP'"
 fi
 
 echo "Stopping PulseAudio + VirGL (app uid)..."
@@ -34,7 +62,6 @@ pkill -f "virgl_test_server" 2>/dev/null || true
 pulseaudio --kill 2>/dev/null || true
 pkill -f pulseaudio 2>/dev/null || true
 
-# Also stop X11 from app context (broadcast handled by app; pkill backup)
 pkill -9 -f "termux-x11" 2>/dev/null || true
 pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 

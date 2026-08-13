@@ -2,29 +2,27 @@ package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
 import android.util.Log
+import com.ivarna.fluxlinux.core.install.DistroInstallProfile
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 
 /**
- * Deploys host + distro shell scripts from assets into `$HOME` and copies the
- * pinned Debian rootfs archive into `$HOME` for proot/chroot installs.
+ * Deploys host + distro shell scripts from assets into `$HOME` and copies
+ * pinned rootfs archives into `$HOME` for proot/chroot installs.
  *
- * Fail-closed: missing/corrupt rootfs or any [HostScript.required] asset
- * makes [deployScripts] return false so [TerminalLauncher.prepareHost] fails.
+ * Fail-closed: missing/corrupt **any** required rootfs or [HostScript.required]
+ * asset makes [deployScripts] return false so [TerminalLauncher.prepareHost] fails.
  */
 object HostScriptDeployer {
 
     private const val TAG = "HostScriptDeployer"
 
-    /** Pinned Debian 13 rootfs identity (shared proot + chroot path). */
-    const val ROOTFS_SHA256 = "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803"
-    const val ROOTFS_MIN_BYTES = 50L * 1024L * 1024L
+    /** @deprecated Use [DistroInstallProfile.DEBIAN_ROOTFS_SHA256]. */
+    const val ROOTFS_SHA256 = DistroInstallProfile.DEBIAN_ROOTFS_SHA256
+    /** @deprecated Use [DistroInstallProfile.DEBIAN_ROOTFS_MIN_BYTES]. */
+    const val ROOTFS_MIN_BYTES = DistroInstallProfile.DEBIAN_ROOTFS_MIN_BYTES
 
-    /**
-     * Single source of truth: home script name → asset path + required flag.
-     * Add new scripts here only — no parallel lists / when-chains.
-     */
     private data class HostScript(
         val name: String,
         val assetPath: String,
@@ -34,16 +32,60 @@ object HostScriptDeployer {
     private val HOST_SCRIPTS: List<HostScript> = listOf(
         HostScript("setup_termux.sh", "scripts/host/setup_termux.sh"),
         HostScript("flux_install.sh", "scripts/debian/proot/setup/flux_install.sh"),
+        // Debian guest
         HostScript("setup_debian_family.sh", "scripts/debian/common/setup/setup_debian_family.sh"),
-        HostScript("setup_customization_debian.sh", "scripts/debian/common/setup/setup_customization_debian.sh"),
+        HostScript(
+            "setup_customization_debian.sh",
+            "scripts/debian/common/setup/setup_customization_debian.sh"
+        ),
         HostScript(
             "setup_hw_accel_debian.sh",
             "scripts/debian/common/setup/setup_hw_accel_debian.sh",
             required = false
         ),
+        // Alpine guest
+        HostScript("setup_alpine_family.sh", "scripts/alpine/common/setup/setup_alpine_family.sh"),
+        HostScript(
+            "setup_customization_alpine.sh",
+            "scripts/alpine/common/setup/setup_customization_alpine.sh"
+        ),
+        // Shared glibc-guest helpers (Fedora / Void / openSUSE)
+        HostScript("flux_guest_common.sh", "scripts/common/setup/flux_guest_common.sh"),
+        HostScript(
+            "setup_customization_xfce.sh",
+            "scripts/common/setup/setup_customization_xfce.sh"
+        ),
+        HostScript("setup_hw_accel_guest.sh", "scripts/common/setup/setup_hw_accel_guest.sh"),
+        HostScript(
+            "bwrap-proot-shim.sh",
+            "scripts/common/setup/bwrap-proot-shim.sh",
+            required = false
+        ),
+        HostScript(
+            "bwrap-proot-shim",
+            "scripts/common/setup/bwrap-proot-shim",
+            required = false
+        ),
+        HostScript("setup_fedora_family.sh", "scripts/fedora/common/setup/setup_fedora_family.sh"),
+        HostScript("setup_void_family.sh", "scripts/void/common/setup/setup_void_family.sh"),
+        HostScript(
+            "setup_opensuse_family.sh",
+            "scripts/opensuse/common/setup/setup_opensuse_family.sh"
+        ),
+        // EVP_md2 stub for TW libldap vs OpenSSL 3.5 (sudo/zypper)
+        HostScript(
+            "libevp_md2.so",
+            "scripts/opensuse/common/libevp_md2.so",
+            required = false
+        ),
+        // Chroot setup/uninstall
         HostScript("setup_debian13_chroot.sh", "scripts/chroot/setup_debian13_chroot.sh"),
         HostScript("uninstall_debian13_chroot.sh", "scripts/chroot/uninstall_debian13_chroot.sh"),
+        HostScript("setup_alpine_chroot.sh", "scripts/chroot/setup_alpine_chroot.sh"),
+        HostScript("uninstall_alpine_chroot.sh", "scripts/chroot/uninstall_alpine_chroot.sh"),
         HostScript("fluxlinux_chroot.sh", "scripts/chroot/fluxlinux_chroot.sh"),
+        HostScript("chroot_processes.sh", "scripts/chroot/chroot_processes.sh", required = false),
+        HostScript("chroot_size.sh", "scripts/chroot/chroot_size.sh", required = false),
         // Desktop (proot)
         HostScript("start_gui.sh", "scripts/debian/proot/start/start_gui.sh"),
         HostScript("stop_gui.sh", "scripts/debian/proot/stop/stop_gui.sh"),
@@ -52,6 +94,12 @@ object HostScriptDeployer {
         HostScript("stop_gui_chroot.sh", "scripts/chroot/stop_gui_chroot.sh"),
         HostScript("start_debian13_gui.sh", "scripts/chroot/start_debian13_gui.sh"),
         HostScript("stop_debian13_gui.sh", "scripts/chroot/stop_debian13_gui.sh"),
+        HostScript("start_alpine_gui.sh", "scripts/chroot/start_alpine_gui.sh"),
+        HostScript("stop_alpine_gui.sh", "scripts/chroot/stop_alpine_gui.sh"),
+        HostScript("setup_guest_chroot.sh", "scripts/chroot/setup_guest_chroot.sh"),
+        HostScript("uninstall_guest_chroot.sh", "scripts/chroot/uninstall_guest_chroot.sh"),
+        HostScript("start_guest_gui.sh", "scripts/chroot/start_guest_gui.sh"),
+        HostScript("stop_guest_gui.sh", "scripts/chroot/stop_guest_gui.sh"),
     )
 
     /** @return false when any required deploy step fails (fail-closed contract). */
@@ -72,7 +120,6 @@ object HostScriptDeployer {
                     if (script.required) ok = false
                 }
             }
-            // Optional terminal font (best-effort; terminal falls back to default)
             try {
                 val termuxDir = File(homeDir, ".termux").also { it.mkdirs() }
                 val fontOut = File(termuxDir, "font.ttf")
@@ -83,7 +130,7 @@ object HostScriptDeployer {
                 }
             } catch (_: Exception) {
             }
-            val rootfsOk = deployRootfsFromAssets(ctx)
+            val rootfsOk = deployAllRootfsFromAssets(ctx)
             if (!rootfsOk) Log.w(TAG, "rootfs deploy failed — host not ready")
             val loaderOk = deployLoaderApk(ctx)
             if (!loaderOk) Log.w(TAG, "loader.apk deploy failed — host not ready")
@@ -94,7 +141,6 @@ object HostScriptDeployer {
         }
     }
 
-    /** Stage Termux:X11 loader.apk into the prefix (required by setup_termux gate). */
     fun deployLoaderApk(ctx: Context): Boolean {
         return try {
             val dest = File(ctx.filesDir, "usr/libexec/termux-x11/loader.apk")
@@ -113,34 +159,58 @@ object HostScriptDeployer {
     }
 
     /**
-     * Copy `assets/rootfs/debian_13_rootfs.tar.xz` → `$HOME`.
-     * Size (> 50 MiB) AND SHA256 gates; skip re-copy only when both pass.
-     *
-     * @return true when the on-disk archive satisfies size + SHA
+     * Deploy every pinned rootfs (Debian + Alpine). Fail-closed if any fails.
      */
-    fun deployRootfsFromAssets(ctx: Context): Boolean {
+    fun deployAllRootfsFromAssets(ctx: Context): Boolean {
+        var allOk = true
+        for (profile in DistroInstallProfile.allRootfsProfiles()) {
+            if (!deployRootfsProfile(ctx, profile)) {
+                allOk = false
+            }
+        }
+        return allOk
+    }
+
+    /**
+     * Copy `assets/rootfs/debian_13_rootfs.tar.xz` → `$HOME` (legacy single-path API).
+     */
+    fun deployRootfsFromAssets(ctx: Context): Boolean =
+        deployRootfsProfile(ctx, DistroInstallProfile.require("debian"))
+
+    fun deployRootfsProfile(ctx: Context, profile: DistroInstallProfile): Boolean {
         val homeDir = TermuxHostPaths.homeDir(ctx).also { it.mkdirs() }
-        val out = File(homeDir, "debian_13_rootfs.tar.xz")
-        if (out.isFile && out.length() > ROOTFS_MIN_BYTES && sha256(out) == ROOTFS_SHA256) {
+        val out = File(homeDir, profile.rootfsFileName)
+        if (
+            out.isFile &&
+            out.length() > profile.rootfsMinBytes &&
+            sha256(out) == profile.rootfsSha256
+        ) {
             Log.i(TAG, "Rootfs already deployed and verified: ${out.absolutePath}")
             return true
         }
         return try {
-            ctx.assets.open("rootfs/debian_13_rootfs.tar.xz").use { input ->
+            ctx.assets.open(profile.rootfsAsset).use { input ->
                 FileOutputStream(out).use { input.copyTo(it) }
             }
-            val sizeOk = out.length() > ROOTFS_MIN_BYTES
-            val shaOk = sha256(out) == ROOTFS_SHA256
+            val sizeOk = out.length() > profile.rootfsMinBytes
+            val shaOk = sha256(out) == profile.rootfsSha256
             if (sizeOk && shaOk) {
-                Log.i(TAG, "Deployed rootfs: ${out.absolutePath} (${out.length()} bytes, SHA OK)")
+                Log.i(
+                    TAG,
+                    "Deployed rootfs: ${out.absolutePath} (${out.length()} bytes, SHA OK)"
+                )
                 true
             } else {
-                Log.e(TAG, "Rootfs deploy failed gate: size=${out.length()} sha=${sha256(out)}")
+                Log.e(
+                    TAG,
+                    "Rootfs deploy failed gate for ${profile.rootfsFileName}: " +
+                        "size=${out.length()} sha=${sha256(out)}"
+                )
                 out.delete()
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to deploy rootfs archive from assets", e)
+            Log.e(TAG, "Failed to deploy ${profile.rootfsAsset}", e)
             out.delete()
             false
         }

@@ -1,31 +1,37 @@
 package com.ivarna.fluxlinux.core.data
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
+import org.junit.Assert.fail
 import org.junit.Test
 
-/** Routing helper tests — the `termux` card must never resolve to a component. */
 class TerminalComponentTest {
 
     @Test
-    fun debian_routesToFluxTerminal() {
-        val c = terminalComponentFor("debian")
-        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, c)
-        assertEquals("proot", c.method)
+    fun prootCards() {
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("debian"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("alpine"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("fedora"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("void"))
+        assertEquals(TerminalComponent.TERMUX_FLUX_TERMINAL, terminalComponentFor("opensuse"))
     }
 
     @Test
-    fun debian13Chroot_routesToRootShell() {
-        val c = terminalComponentFor("debian13_chroot")
-        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, c)
-        assertEquals("chroot", c.method)
+    fun chrootCards() {
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("debian13_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("debian_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("alpine_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("fedora_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("void_chroot"))
+        assertEquals(TerminalComponent.CHROOT_ROOT_SHELL, terminalComponentFor("opensuse_chroot"))
     }
 
     @Test
-    fun removedTermuxCard_throws() {
-        // Legacy "termux" install card was removed; any path reaching it is a bug.
-        assertThrows(IllegalArgumentException::class.java) {
-            terminalComponentFor("termux")
+    fun unknownThrows() {
+        try {
+            terminalComponentFor("archlinux")
+            fail("expected")
+        } catch (e: IllegalArgumentException) {
+            assertEquals(true, e.message!!.contains("unsupported"))
         }
     }
 }

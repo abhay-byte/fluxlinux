@@ -81,6 +81,53 @@ class BaseDesktopInstallPlanTest {
     }
 
     @Test
+    fun distroById_alpine_found() {
+        val d = BaseDesktopInstallPlan.distroById("alpine")
+        assertNotNull(d)
+        assertEquals("alpine", d!!.id)
+        assertTrue(d.prootSupported)
+        assertEquals(false, d.comingSoon)
+    }
+
+    @Test
+    fun distroById_alpineChroot_found() {
+        val d = BaseDesktopInstallPlan.distroById("alpine_chroot")
+        assertNotNull(d)
+        assertEquals("alpine_chroot", d!!.id)
+        assertTrue(d.chrootSupported)
+    }
+
+    @Test
+    fun methodFor_alpine() {
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("alpine"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("alpine_chroot"))
+    }
+
+    @Test
+    fun phasesFor_alpineDisplayName() {
+        val phases = BaseDesktopInstallPlan.phasesFor("proot", "Alpine")
+        assertTrue(phases.any { it.label.contains("Alpine") })
+        assertEquals(100, phases.sumOf { it.weight })
+    }
+
+    @Test
+    fun profileFor_alpine() {
+        val p = BaseDesktopInstallPlan.profileFor("alpine")
+        assertNotNull(p)
+        assertEquals("alpine", p!!.prootName)
+    }
+
+    @Test
+    fun distroById_fedora_void_opensuse() {
+        assertEquals("fedora", BaseDesktopInstallPlan.distroById("fedora")!!.id)
+        assertEquals("void_chroot", BaseDesktopInstallPlan.distroById("void_chroot")!!.id)
+        assertEquals("opensuse", BaseDesktopInstallPlan.distroById("opensuse")!!.id)
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("fedora"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("opensuse_chroot"))
+        assertEquals("void", BaseDesktopInstallPlan.profileFor("void")!!.prootName)
+    }
+
+    @Test
     fun terminalComponentFor_rejectsUnknownDistro() {
         try {
             com.ivarna.fluxlinux.core.data.terminalComponentFor("nope")

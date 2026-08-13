@@ -2,35 +2,64 @@ package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
 
-/** Builds shell arguments and environment map for proot Debian sessions.
+/** Builds shell arguments and environment map for proot sessions.
  *  Ported from termux-lib `ProotCommandBuilder`. */
 object ProotCommandBuilder {
+
+    /** Guest PATH only — host `$PREFIX/bin` must not leak (nested proot glue errors). */
+    const val GUEST_PATH =
+        "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+    /**
+     * Clean guest env for `proot-distro login … -- env -i …`.
+     * Drops host `TMPDIR`/`PROOT_TMP_DIR`/`PATH` so guest uid 1000 never tries
+     * to write the host glue dir or exec host `proot`.
+     */
+    fun guestLoginEnv(user: String): String {
+        val u = if (user == "root") "root" else "flux"
+        val home = if (u == "root") "/root" else "/home/flux"
+        return "env -i HOME=$home USER=$u LOGNAME=$u " +
+            "TERM=\"\${TERM:-xterm-256color}\" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 " +
+            "TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PATH=$GUEST_PATH"
+    }
+
+    /** Prefer zsh (customization), then bash, then ash/sh (Alpine minirootfs). */
+    const val GUEST_LOGIN_SHELL =
+        "/bin/sh -lc 'if [ -x /bin/zsh ]; then exec /bin/zsh -l; " +
+            "elif [ -x /bin/bash ]; then exec /bin/bash -l; else exec /bin/sh -l; fi'"
 
     /**
      * Pure argv builder (unit-testable without Android).
      * Interactive login when [shellCmd] is a login sentinel; otherwise a
      * single-quoted guest payload (host bash never expands `$HOME`/`$PATH`).
+     *
+     * @param distro proot-distro container name (`debian`, `alpine`, …)
      */
     fun buildArgs(
         shell: String,
         prootDistro: String,
         shellCmd: String,
         user: String = "flux",
-        useSharedTmp: Boolean = true
+        useSharedTmp: Boolean = true,
+        distro: String = "debian"
     ): Array<String> {
         val sharedTmpFlag = if (useSharedTmp) "--shared-tmp" else ""
+        val env = guestLoginEnv(user)
         return if (shellCmd == "exec zsh" || shellCmd == "/bin/bash --login" || shellCmd.isBlank()) {
             arrayOf(
                 shell, "-c",
-                "exec python $prootDistro login debian $sharedTmpFlag --user $user"
+                "exec python $prootDistro login $distro $sharedTmpFlag --user $user -- " +
+                    "$env $GUEST_LOGIN_SHELL"
             )
         } else {
             // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
             // Escape embedded single quotes: ' → '\''
+            // Use /bin/sh so Alpine (pre-zsh) and Debian both work.
             val escaped = shellCmd.replace("'", "'\\''")
             arrayOf(
                 shell, "-c",
-                "exec python $prootDistro login debian $sharedTmpFlag --user $user -- zsh -c '$escaped'"
+                "exec python $prootDistro login $distro $sharedTmpFlag --user $user -- " +
+                    "$env /bin/sh -c '$escaped'"
             )
         }
     }
@@ -39,11 +68,12 @@ object ProotCommandBuilder {
         ctx: Context,
         shellCmd: String,
         user: String = "flux",
-        useSharedTmp: Boolean = true
+        useSharedTmp: Boolean = true,
+        distro: String = "debian"
     ): Pair<Array<String>, HashMap<String, String>> {
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val prootDistro = TermuxHostPaths.PROOT_DISTRO
-        val args = buildArgs(shell, prootDistro, shellCmd, user, useSharedTmp)
+        val args = buildArgs(shell, prootDistro, shellCmd, user, useSharedTmp, distro)
         // Host package env + interactive TERM (guest login inherits package identity)
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
         return args to envMap

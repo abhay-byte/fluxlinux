@@ -29,6 +29,17 @@ class ChrootCommandBuilderTest {
     }
 
     @Test
+    fun interactiveAlpine_loginSh() {
+        val inner = ChrootCommandBuilder.buildRootInner(
+            "exec zsh",
+            user = "flux",
+            loginShellFlux = "sh",
+            loginShellRoot = "sh"
+        )
+        assertEquals("exec sh $helper login --user flux --shell sh", inner)
+    }
+
+    @Test
     fun workdir_login_usesWorkdir() {
         val inner = ChrootCommandBuilder.buildRootInner("mkdir -p /home/flux/proj && cd /home/flux/proj && exec zsh", user = "flux")
         assertEquals("exec sh $helper login --user flux --shell zsh --workdir '/home/flux/proj'", inner)
@@ -83,5 +94,15 @@ class ChrootCommandBuilderTest {
         assertEquals("/system/bin:/system/xbin:/sbin:" + System.getenv("PATH").orEmpty(), env["PATH"])
         val fluxEnv = ChrootCommandBuilder.buildEnv(user = "flux")
         assertEquals("/home/flux", fluxEnv["HOME"])
+        assertEquals(ChrootPaths.CHROOT_PATH, fluxEnv["FLUX_CHROOT"])
+    }
+
+    @Test
+    fun buildEnv_alpinePath() {
+        val env = ChrootCommandBuilder.buildEnv(
+            user = "flux",
+            chrootPath = ChrootPaths.ALPINE_CHROOT_PATH
+        )
+        assertEquals(ChrootPaths.ALPINE_CHROOT_PATH, env["FLUX_CHROOT"])
     }
 }

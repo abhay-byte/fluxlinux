@@ -154,6 +154,61 @@ object DistroRepository {
         )
     )
 
+    // Alpine MVP components (apk/musl — no Debian module scripts)
+    private val alpineComponents = listOf(
+        DistroComponent(
+            id = "xfce4_desktop",
+            name = "XFCE4 Desktop",
+            description = "Base XFCE4 desktop via apk (Alpine community).",
+            scriptName = "alpine/common/setup/setup_alpine_family.sh",
+            sizeEstimate = "250 MB",
+            isMandatory = false
+        ),
+        DistroComponent(
+            id = "customization",
+            name = "XFCE4 Customization",
+            description = "FluxLinux theme, wallpapers, fonts, and Zsh for Alpine.",
+            scriptName = "alpine/common/setup/setup_customization_alpine.sh",
+            sizeEstimate = "150 MB"
+        )
+    )
+
+    private fun glibcXfceComponents(familyScript: String) = listOf(
+        DistroComponent(
+            id = "xfce4_desktop",
+            name = "XFCE4 Desktop",
+            description = "Base XFCE4 desktop, user flux, Mesa, and dbus.",
+            scriptName = familyScript,
+            sizeEstimate = "350 MB",
+            isMandatory = false
+        ),
+        DistroComponent(
+            id = "hw_accel",
+            name = "Hardware Acceleration",
+            description = "Mesa / VirGL GPU setup (Turnip on Fedora when available).",
+            scriptName = "common/setup/setup_hw_accel_guest.sh",
+            sizeEstimate = "80 MB",
+            isMandatory = true
+        ),
+        DistroComponent(
+            id = "customization",
+            name = "XFCE4 Customization",
+            description = "FluxLinux theme, Papirus icons, Nerd Font, and Zsh.",
+            scriptName = "common/setup/setup_customization_xfce.sh",
+            sizeEstimate = "150 MB"
+        )
+    )
+
+    private val fedoraComponents = glibcXfceComponents(
+        "fedora/common/setup/setup_fedora_family.sh"
+    )
+    private val voidComponents = glibcXfceComponents(
+        "void/common/setup/setup_void_family.sh"
+    )
+    private val opensuseComponents = glibcXfceComponents(
+        "opensuse/common/setup/setup_opensuse_family.sh"
+    )
+
     val supportedDistros = listOf(
         // Currently Available
         Distro(
@@ -181,6 +236,105 @@ object DistroRepository {
             configuration = SupportedDistro.DEBIAN,
             components = debianComponents
         ),
+
+        Distro(
+            id = "alpine",
+            name = "Alpine",
+            description = "Security-oriented, lightweight musl/apk Linux (proot).",
+            color = Color(0xFF0D597F),
+            iconRes = R.drawable.distro_alpine,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.ALPINE,
+            components = alpineComponents
+        ),
+
+        Distro(
+            id = "alpine_chroot",
+            name = "Alpine (Rooted)",
+            description = "Lightweight Alpine 3.24 chroot environment (Requires Root).",
+            color = Color(0xFF0D597F),
+            iconRes = R.drawable.distro_alpine,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.ALPINE,
+            components = alpineComponents
+        ),
+
+        Distro(
+            id = "fedora",
+            name = "Fedora",
+            description = "Fedora 43 with dnf/dnf5 and XFCE4 (proot).",
+            color = Color(0xFF294172),
+            iconRes = R.drawable.distro_fedora,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.FEDORA,
+            components = fedoraComponents
+        ),
+        Distro(
+            id = "fedora_chroot",
+            name = "Fedora (Rooted)",
+            description = "Fedora 43 chroot environment (Requires Root).",
+            color = Color(0xFF294172),
+            iconRes = R.drawable.distro_fedora,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.FEDORA,
+            components = fedoraComponents
+        ),
+        Distro(
+            id = "void",
+            name = "Void",
+            description = "Independent glibc/xbps rolling distro with XFCE4 (proot).",
+            color = Color(0xFF478061),
+            iconRes = R.drawable.distro_void,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.VOID,
+            components = voidComponents
+        ),
+        Distro(
+            id = "void_chroot",
+            name = "Void (Rooted)",
+            description = "Void Linux chroot environment (Requires Root).",
+            color = Color(0xFF478061),
+            iconRes = R.drawable.distro_void,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.VOID,
+            components = voidComponents
+        ),
+        Distro(
+            id = "opensuse",
+            name = "openSUSE",
+            description = "openSUSE Tumbleweed with zypper and XFCE4 (proot).",
+            color = Color(0xFF73BA25),
+            iconRes = R.drawable.distro_opensuse,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.OPENSUSE,
+            components = opensuseComponents
+        ),
+        Distro(
+            id = "opensuse_chroot",
+            name = "openSUSE (Rooted)",
+            description = "openSUSE Tumbleweed chroot environment (Requires Root).",
+            color = Color(0xFF73BA25),
+            iconRes = R.drawable.distro_opensuse,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.OPENSUSE,
+            components = opensuseComponents
+        ),
         
         // Coming Soon - Sorted alphabetically
         Distro(
@@ -191,16 +345,6 @@ object DistroRepository {
             iconRes = R.drawable.distro_adelie,
             comingSoon = true,
             prootSupported = false, // no i686 support
-            chrootSupported = true
-        ),
-        Distro(
-            id = "alpine",
-            name = "Alpine Linux",
-            description = "Security-oriented, lightweight Linux distribution.",
-            color = Color(0xFF0D597F),
-            iconRes = R.drawable.distro_alpine,
-            comingSoon = true,
-            prootSupported = true, // frozen version
             chrootSupported = true
         ),
         Distro(
@@ -265,16 +409,7 @@ object DistroRepository {
             prootSupported = true, // only 64bit
             chrootSupported = true
         ),
-        Distro(
-            id = "fedora",
-            name = "Fedora",
-            description = "Innovative platform for hardware, clouds, and containers.",
-            color = Color(0xFF294172),
-            iconRes = R.drawable.distro_fedora,
-            comingSoon = true,
-            prootSupported = true, // unstable
-            chrootSupported = true
-        ),
+
         Distro(
             id = "gentoo",
             name = "Gentoo",
@@ -315,16 +450,7 @@ object DistroRepository {
             prootSupported = false, // Not in proot-distro
             chrootSupported = true
         ),
-        Distro(
-            id = "opensuse",
-            name = "OpenSUSE",
-            description = "Stable, easy to use and complete multi-purpose distribution.",
-            color = Color(0xFF73BA25),
-            iconRes = R.drawable.distro_opensuse,
-            comingSoon = true,
-            prootSupported = true, // only 64bit
-            chrootSupported = true
-        ),
+
         Distro(
             id = "parrot",
             name = "Parrot OS",
@@ -356,15 +482,6 @@ object DistroRepository {
             chrootSupported = true,
             configuration = SupportedDistro.UBUNTU
         ),
-        Distro(
-            id = "void",
-            name = "Void Linux",
-            description = "Independent distribution with runit init system.",
-            color = Color(0xFF478061),
-            iconRes = R.drawable.distro_void,
-            comingSoon = true,
-            prootSupported = true,
-            chrootSupported = true
-        )
+
     )
 }

@@ -21,13 +21,19 @@ object GuestSessionFactory {
         type: String,
         title: String = type,
         shellCmd: String = "exec zsh",
-        method: String
+        method: String,
+        distroId: String? = null
     ): Boolean {
         if (!SessionRegistry.hasFreeTab()) return false
-        // Patch guest .zshrc if it still hard-sources missing oh-my-zsh / pokemon.
-        GuestZshrcRepair.repairIfNeeded(ctx, method)
+        // Patch guest .zshrc if it still hard-sources missing oh-my-zsh / pokemon,
+        // or create a missing Flux profile (Alpine installs that never wrote one).
+        GuestZshrcRepair.repairIfNeeded(ctx, method, distroId)
+        // Alpine proot: ensure apk db/lock is app-writable so `sudo apk` works.
+        GuestApkDbRepair.repairIfNeeded(ctx, method, distroId)
         val user = LinuxCommandBuilder.sessionUserForType(type)
-        val (args, envMap) = LinuxCommandBuilder.build(ctx, shellCmd, user = user, method = method)
+        val (args, envMap) = LinuxCommandBuilder.build(
+            ctx, shellCmd, user = user, method = method, distroId = distroId
+        )
 
         val isChroot = method == "chroot"
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
@@ -105,7 +111,8 @@ object GuestSessionFactory {
             append(envPrefix)
             append("echo '$b64' | base64 -d > /tmp/flux_feature.sh; ")
             append("chmod +x /tmp/flux_feature.sh; ")
-            append("bash /tmp/flux_feature.sh$arg; RC=\$?; ")
+            append("if [ -x /bin/bash ]; then bash /tmp/flux_feature.sh$arg; ")
+            append("else sh /tmp/flux_feature.sh$arg; fi; RC=\$?; ")
             append("rm -f /tmp/flux_feature.sh; ")
             append("exit \$RC")
         }
@@ -113,7 +120,9 @@ object GuestSessionFactory {
         // Root required: customization / feature setup scripts call apt & chown.
         // Interactive shells stay flux via openSession(sessionUserForType).
         val user = "root"
-        val (args, envMap) = LinuxCommandBuilder.build(ctx, guestPayload, user = user, method = method)
+        val (args, envMap) = LinuxCommandBuilder.build(
+            ctx, guestPayload, user = user, method = method, distroId = distro.id
+        )
         val isChroot = method == "chroot"
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val sessionExec = if (isChroot) com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC else shell

@@ -34,26 +34,65 @@ object TerminalLauncher {
         BootstrapInstaller.isExtracted(ctx)
 
     /** Filesystem truth for "Debian (proot) installed" (P4-T13 migration SSOT). */
-    fun isDebianProotInstalled(ctx: Context): Boolean =
-        File(ctx.filesDir, "usr/var/lib/proot-distro/containers/debian/rootfs/bin/sh").exists()
+    fun isDebianProotInstalled(ctx: Context): Boolean = isProotInstalled(ctx, "debian")
+
+    /**
+     * Proot container looks installed. Alpine minirootfs uses absolute
+     * `bin/sh -> /bin/busybox`; [File.exists] follows the link on the host and
+     * returns false — so also accept busybox/apk/bash and symlink nodes.
+     */
+    fun isProotInstalled(ctx: Context, prootName: String): Boolean {
+        val root = File(ctx.filesDir, "usr/var/lib/proot-distro/containers/$prootName/rootfs")
+        return guestRootfsHasShell(root)
+    }
+
+    /** Host-safe guest rootfs shell probe (absolute busybox symlinks OK). */
+    fun guestRootfsHasShell(root: File): Boolean {
+        if (!root.isDirectory) return false
+        val sh = File(root, "bin/sh")
+        if (sh.exists()) return true
+        try {
+            if (java.nio.file.Files.isSymbolicLink(sh.toPath())) return true
+        } catch (_: Exception) {
+        }
+        if (File(root, "bin/busybox").isFile) return true
+        if (File(root, "sbin/apk").isFile) return true
+        if (File(root, "usr/bin/bash").isFile) return true
+        try {
+            if (java.nio.file.Files.isSymbolicLink(File(root, "bin/ash").toPath())) return true
+        } catch (_: Exception) {
+        }
+        return false
+    }
 
     /**
      * Debian chroot installed — delegates to [ChrootDetection] (auto-detect +
      * root probe; SELinux-safe).
      */
-    fun isDebianChrootInstalled(): Boolean = ChrootDetection.isInstalled()
+    fun isDebianChrootInstalled(): Boolean =
+        isChrootInstalled(com.ivarna.fluxlinux.core.root.ChrootPaths.DEBIAN_CHROOT_PATH)
+
+    fun isChrootInstalled(chrootPath: String): Boolean =
+        ChrootDetection.isInstalled(chrootPath)
 
     fun invalidateChrootInstalledCache() {
         ChrootDetection.invalidate()
     }
 
-    fun isDebianChrootXfceInstalled(): Boolean = ChrootDetection.isXfceInstalled()
+    fun isDebianChrootXfceInstalled(): Boolean =
+        isChrootXfceInstalled(com.ivarna.fluxlinux.core.root.ChrootPaths.DEBIAN_CHROOT_PATH)
+
+    fun isChrootXfceInstalled(chrootPath: String): Boolean =
+        ChrootDetection.isXfceInstalled(chrootPath)
 
     /** @return true when the distro rootfs exists on disk for [distroId]. */
-    fun isDistroInstalledOnFs(ctx: Context, distroId: String): Boolean = when (distroId) {
-        "debian" -> isDebianProotInstalled(ctx)
-        "debian13_chroot", "debian_chroot" -> isDebianChrootInstalled()
-        else -> false
+    fun isDistroInstalledOnFs(ctx: Context, distroId: String): Boolean {
+        val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+            ?: return false
+        return when (profile.method) {
+            "chroot" -> isChrootInstalled(profile.chrootPath ?: return false)
+            else -> isProotInstalled(ctx, profile.prootName)
+        }
     }
 
     /**

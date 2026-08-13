@@ -18,14 +18,27 @@ object ChrootCommandBuilder {
     fun build(
         ctx: Context,
         shellCmd: String,
-        user: String = "flux"
+        user: String = "flux",
+        chrootPath: String = ChrootPaths.CHROOT_PATH
     ): Pair<Array<String>, HashMap<String, String>> {
         ensureHelperScript(ctx)
-        val rootInner = buildRootInner(shellCmd, user)
-        val cmd = RootShell.shellRootCommand(rootInner)
+        // Always request zsh for flux. App uid cannot stat /data/local/tmp
+        // (SELinux) so a File.exists() probe falsely forced Alpine onto ash.
+        // Helper resolves the real binary as root and falls back sh/bash.
+        val isAlpine = chrootPath.contains("Alpine", ignoreCase = true)
+        val loginShellFlux = "zsh"
+        val loginShellRoot = if (isAlpine) "sh" else "bash"
+        val rootInner = buildRootInner(
+            shellCmd, user,
+            loginShellFlux = loginShellFlux,
+            loginShellRoot = loginShellRoot
+        )
+        // Pin FLUX_CHROOT for Alpine/Debian multi-chroot coexistence
+        val withPath = "export FLUX_CHROOT='$chrootPath'; $rootInner"
+        val cmd = RootShell.shellRootCommand(withPath)
         // Inline WINCH trap on outer sh (mShellPid). Keep this shell as parent (no leading exec).
         val winchCmd = winchWrap(cmd)
-        return arrayOf(SESSION_EXEC, "-c", winchCmd) to buildEnv(user)
+        return arrayOf(SESSION_EXEC, "-c", winchCmd) to buildEnv(user, chrootPath)
     }
 
     /** Inline WINCH trap prefix for the outer `/system/bin/sh` session. */
@@ -36,7 +49,9 @@ object ChrootCommandBuilder {
     fun buildRootInner(
         shellCmd: String,
         user: String = "flux",
-        helper: String = ChrootPaths.CHROOT_HELPER
+        helper: String = ChrootPaths.CHROOT_HELPER,
+        loginShellFlux: String = "zsh",
+        loginShellRoot: String = "bash"
     ): String {
         val u = if (user == "root") "root" else "flux"
         val workdir = parseInteractiveWorkdir(shellCmd)
@@ -50,11 +65,11 @@ object ChrootCommandBuilder {
         return when {
             isInteractive && u == "root" -> {
                 val wd = workdir?.let { " --workdir ${shellSingleQuote(it)}" } ?: ""
-                "exec sh $helper login --user root --shell bash$wd"
+                "exec sh $helper login --user root --shell $loginShellRoot$wd"
             }
             isInteractive -> {
                 val wd = workdir?.let { " --workdir ${shellSingleQuote(it)}" } ?: ""
-                "exec sh $helper login --user flux --shell zsh$wd"
+                "exec sh $helper login --user flux --shell $loginShellFlux$wd"
             }
             isSimpleGuestCmd(shellCmd) -> {
                 val esc = shellCmd.replace("'", "'\\''")
@@ -70,7 +85,10 @@ object ChrootCommandBuilder {
     }
 
     /** Session env for the outer sh (Android PATH + TERM + guest HOME). */
-    fun buildEnv(user: String = "flux"): HashMap<String, String> {
+    fun buildEnv(
+        user: String = "flux",
+        chrootPath: String = ChrootPaths.CHROOT_PATH
+    ): HashMap<String, String> {
         val u = if (user == "root") "root" else "flux"
         val envMap = HashMap(System.getenv())
         envMap["PATH"] = "/system/bin:/system/xbin:/sbin:" + (envMap["PATH"] ?: "")
@@ -80,6 +98,7 @@ object ChrootCommandBuilder {
         envMap["LC_ALL"] = "en_US.UTF-8"
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
         envMap["TMPDIR"] = "/tmp"
+        envMap["FLUX_CHROOT"] = chrootPath
         return envMap
     }
 

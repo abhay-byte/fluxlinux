@@ -52,7 +52,8 @@ android {
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~"
         // Critical — do not recompress archives; they must stay STORED in the APK
         @Suppress("UnstableApiUsage")
-        noCompress += listOf("xz", "tar")
+        // .minirootfs = Alpine gzip payload under non-.gz name (aapt2 strips *.gz).
+        noCompress += listOf("xz", "tar", "minirootfs")
     }
 
     // Disable dependency metadata block for F-Droid
@@ -153,14 +154,50 @@ val flavorAppIds = mapOf(
 
 val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
     group = "build"
-    description = "Copy the pinned Debian rootfs into app/src/main/assets/rootfs"
+    description =
+        "Copy pinned Debian + Alpine + Fedora + Void + openSUSE rootfs into " +
+            "app/src/main/assets/rootfs (Alpine as .minirootfs so aapt2 does not strip .gz)"
     workingDir = rootProject.projectDir
-    commandLine("bash", "-c",
-        "mkdir -p app/src/main/assets/rootfs && " +
-            "cp -f assets/rootfs/debian_13_rootfs.tar.xz app/src/main/assets/rootfs/debian_13_rootfs.tar.xz")
-    inputs.file(rootProject.file("assets/rootfs/debian_13_rootfs.tar.xz"))
-    outputs.file(file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"))
-    onlyIf { !file("src/main/assets/rootfs/debian_13_rootfs.tar.xz").isFile }
+    // Alpine must not be packaged as *.tar.gz: aapt2 auto-decompresses and
+    // renames to *.tar, breaking SHA + AssetManager.open("….tar.gz").
+    commandLine(
+        "bash", "-c",
+        """
+        set -euo pipefail
+        mkdir -p app/src/main/assets/rootfs
+        if [ ! -f app/src/main/assets/rootfs/debian_13_rootfs.tar.xz ] && \
+           [ -f assets/rootfs/debian_13_rootfs.tar.xz ]; then
+          cp -f assets/rootfs/debian_13_rootfs.tar.xz app/src/main/assets/rootfs/debian_13_rootfs.tar.xz
+        fi
+        if [ -f assets/rootfs/alpine_3.24_rootfs.tar.gz ]; then
+          # Always refresh packaged name (gzip bytes, non-.gz extension).
+          cp -f assets/rootfs/alpine_3.24_rootfs.tar.gz \
+            app/src/main/assets/rootfs/alpine_3.24_rootfs.minirootfs
+          # Remove legacy name so aapt never sees *.tar.gz
+          rm -f app/src/main/assets/rootfs/alpine_3.24_rootfs.tar.gz
+        fi
+        for rf in fedora_43_rootfs.tar.xz void_20250202_rootfs.tar.xz \
+                 opensuse_tumbleweed_rootfs.tar.xz; do
+          if [ -f "assets/rootfs/${'$'}rf" ]; then
+            cp -f "assets/rootfs/${'$'}rf" "app/src/main/assets/rootfs/${'$'}rf"
+          fi
+        done
+        """.trimIndent()
+    )
+    inputs.files(
+        rootProject.file("assets/rootfs/debian_13_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/alpine_3.24_rootfs.tar.gz"),
+        rootProject.file("assets/rootfs/fedora_43_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/void_20250202_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz")
+    )
+    outputs.files(
+        file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/alpine_3.24_rootfs.minirootfs"),
+        file("src/main/assets/rootfs/fedora_43_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/void_20250202_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz")
+    )
 }
 
 for ((flavorName, appId) in flavorAppIds) {

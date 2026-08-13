@@ -50,6 +50,9 @@ import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 
 import com.ivarna.fluxlinux.core.desktop.DesktopLauncher
 import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.ui.components.MethodTab
+import com.ivarna.fluxlinux.ui.components.MethodTabs
+import com.ivarna.fluxlinux.ui.components.isChrootCard
 import com.ivarna.fluxlinux.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
@@ -121,14 +124,11 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
         // Trigger initial refresh on mount
         LaunchedEffect(Unit) {
             refreshKey.value++
         }
-        
+
         // Installed Distros Detection — filesystem truth (plan P4-T13): a stale
         // "installed" pref without a rootfs on disk must show Install, not a broken shell.
         val installedDistros = remember(refreshKey.value) {
@@ -136,25 +136,40 @@ fun HomeScreen(
                 com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id)
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
 
-        
-        // Installed Distros Section
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
             text = "Installed Distros",
-            fontSize = 20.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Show empty state or distro list
+
+        val prootInstalled = installedDistros.filter { !it.isChrootCard() }
+        val chrootInstalled = installedDistros.filter { it.isChrootCard() }
+        var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
+        val visibleDistros = if (methodTab == MethodTab.CHROOT) {
+            chrootInstalled
+        } else {
+            prootInstalled
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        MethodTabs(
+            selected = methodTab,
+            onSelected = { methodTab = it },
+            prootCount = prootInstalled.size,
+            chrootCount = chrootInstalled.size
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         if (installedDistros.isEmpty()) {
-            // Empty state
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -177,9 +192,27 @@ fun HomeScreen(
                     textAlign = TextAlign.Center
                 )
             }
+        } else if (visibleDistros.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (methodTab == MethodTab.CHROOT) {
+                        "No chroot guests installed"
+                    } else {
+                        "No PRoot guests installed"
+                    },
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            }
         } else {
-            // Distro list
-            installedDistros.forEach { distro ->
+            visibleDistros.forEach { distro ->
                 val desktopForThis =
                     desktopUi.distroId == null || desktopUi.distroId == distro.id
                 val isStarting =
@@ -201,7 +234,6 @@ fun HomeScreen(
                     onNavigateToSettings = { onNavigateToSettings(distro) },
                     onNavigateToStart = { distroToLaunch.value = distro },
                     onOpenDisplay = {
-                        // Prefer launcher reopen (singleTop); falls back to EmbeddedX11
                         DesktopLauncher.reopenDisplay(context)
                     },
                     onViewLogs = { showDesktopLogs = true },
@@ -209,7 +241,6 @@ fun HomeScreen(
                         val runningType = StateManager.getGuiRunningType(context, distro.id)
                         try {
                             if (runningType == "kde") {
-                                // KDE still uses legacy intent until fully ported
                                 if (StateManager.canRunCommands(context)) {
                                     val intent = TermuxIntentFactory.buildStopKdeGuiIntent(context, distro.id)
                                     onStartService(intent)
@@ -220,7 +251,6 @@ fun HomeScreen(
                                     permissionState.launchPermissionRequest()
                                 }
                             } else {
-                                // Embedded XFCE stop — no Termux-era canRunCommands gate
                                 DesktopLauncher.stop(context, distro.id) {
                                     refreshKey.value++
                                 }
@@ -232,10 +262,10 @@ fun HomeScreen(
                 )
             }
         }
-    }
 
-    
-    Spacer(modifier = Modifier.height(100.dp))
+        // Keep the last card above the floating bottom nav (72 + 24*2 padding).
+        Spacer(modifier = Modifier.height(128.dp))
+    }
 
     // Launch mode dialog (shell / root / desktop)
     if (distroToLaunch.value != null) {

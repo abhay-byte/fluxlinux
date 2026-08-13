@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.Distro
+import com.ivarna.fluxlinux.core.install.DistroInstallProfile
 import com.ivarna.fluxlinux.core.install.OnboardingInstallRunner
 import com.ivarna.fluxlinux.ui.components.GlassScaffold
 import com.ivarna.fluxlinux.ui.install.InstallProgressPanel
@@ -160,8 +161,8 @@ fun InstallConfigScreen(
                         ),
                         shape = RoundedCornerShape(28.dp)
                     ) {
-                        val cta = when (distro.id) {
-                            "debian13_chroot", "debian_chroot" -> "Install base desktop (Root)"
+                        val cta = when {
+                            distro.id.contains("chroot") -> "Install base desktop (Root)"
                             else -> "Install base desktop"
                         }
                         Text(cta, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -184,9 +185,22 @@ fun InstallConfigScreen(
                     color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Bold
                 )
+                val profile = DistroInstallProfile.forId(distro.id)
+                val rootfsLine = when {
+                    distro.id.startsWith("alpine") ->
+                        "Installs Alpine 3.24 minirootfs, XFCE4 (apk), and Flux customization. "
+                    distro.id.startsWith("fedora") ->
+                        "Installs Fedora 43 rootfs, XFCE4 (dnf), Mesa, and Flux customization. "
+                    distro.id.startsWith("void") ->
+                        "Installs Void Linux rootfs, XFCE4 (xbps), Mesa, and Flux customization. "
+                    distro.id.startsWith("opensuse") ->
+                        "Installs openSUSE Tumbleweed rootfs, XFCE4 (zypper), Mesa, and Flux customization. "
+                    else ->
+                        "Installs ${profile?.displayName ?: distro.name} rootfs, XFCE4, and Flux customization. "
+                }
                 Text(
-                    "Installs Debian rootfs, XFCE4, and Flux customization. " +
-                        "App modules (dev stacks, KDE, etc.) can be added later from Distro Settings.",
+                    rootfsLine +
+                        "App modules can be added later from Distro Settings.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -220,8 +234,32 @@ fun InstallConfigScreen(
                     Column {
                         Text("Includes", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(6.dp))
-                        Text("• Debian 13 rootfs (~0.6 GB+)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            when {
+                                distro.id.startsWith("alpine") ->
+                                    "• Alpine 3.24 minirootfs (~4 MB + apk packages)"
+                                distro.id.startsWith("fedora") ->
+                                    "• Fedora 43 container rootfs"
+                                distro.id.startsWith("void") ->
+                                    "• Void Linux (glibc aarch64) rootfs"
+                                distro.id.startsWith("opensuse") ->
+                                    "• openSUSE Tumbleweed rootfs"
+                                else ->
+                                    "• ${profile?.displayName ?: distro.name} rootfs"
+                            },
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("• XFCE4 desktop", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (distro.id.startsWith("fedora") || distro.id.startsWith("void") ||
+                            distro.id.startsWith("opensuse")
+                        ) {
+                            Text(
+                                "• Mesa / VirGL hardware acceleration",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Text("• Flux theme / wallpapers / fonts", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (distro.id.contains("chroot")) {
                             Text("• Requires root (KernelSU / Magisk)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

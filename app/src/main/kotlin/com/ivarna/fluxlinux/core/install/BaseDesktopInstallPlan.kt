@@ -5,15 +5,16 @@ import android.util.Base64
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.ScriptManager
-import com.ivarna.fluxlinux.core.data.terminalComponentFor
 
 /**
- * Minimal base desktop install: rootfs + XFCE ([setup_debian_family]) +
- * customization ([setup_customization_debian]). No feature modules / hw_accel.
+ * Minimal base desktop install: rootfs + family (XFCE) + customization.
+ * Distro-specific paths come from [DistroInstallProfile].
  */
 object BaseDesktopInstallPlan {
 
+    /** @deprecated Prefer [DistroInstallProfile.familyScript] for the active distro. */
     const val FAMILY_SCRIPT = "debian/common/setup/setup_debian_family.sh"
+    /** @deprecated Prefer [DistroInstallProfile.customizationScript]. */
     const val CUSTOMIZATION_SCRIPT = "debian/common/setup/setup_customization_debian.sh"
 
     data class Phase(val id: String, val label: String, val weight: Int)
@@ -21,50 +22,64 @@ object BaseDesktopInstallPlan {
     fun distroById(id: String): Distro? =
         DistroRepository.supportedDistros.find { it.id == id }
 
-    fun methodFor(distroId: String): String = try {
-        terminalComponentFor(distroId).method
-    } catch (_: Exception) {
-        "proot"
-    }
+    fun methodFor(distroId: String): String = DistroInstallProfile.methodFor(distroId)
 
-    fun phasesFor(method: String): List<Phase> = if (method == "chroot") {
-        listOf(
-            Phase("R0", "Checking root access…", 5),
-            Phase("HOST", "Preparing host environment…", 15),
-            Phase("ROOTFS", "Installing Debian chroot rootfs…", 35),
-            Phase("XFCE", "Installing XFCE desktop…", 25),
-            Phase("CUSTOM", "Applying Flux customization…", 20),
-        )
-    } else {
-        listOf(
-            Phase("HOST", "Preparing host environment…", 20),
-            Phase("ROOTFS", "Installing Debian rootfs + XFCE…", 50),
-            Phase("CUSTOM", "Applying Flux customization…", 30),
-        )
-    }
+    fun profileFor(distroId: String): DistroInstallProfile? =
+        DistroInstallProfile.forId(distroId)
 
-    /**
-     * Guest payload for proot [flux_install.sh] setup_b64: env + XFCE family only.
-     * Customization runs as a separate phase for clearer progress.
-     */
-    fun familySetupPayload(ctx: Context, theme: String): String {
-        val family = ScriptManager(ctx).getScriptContent(FAMILY_SCRIPT)
+    fun phasesFor(method: String, displayName: String = "Debian"): List<Phase> =
+        if (method == "chroot") {
+            listOf(
+                Phase("R0", "Checking root access…", 5),
+                Phase("HOST", "Preparing host environment…", 15),
+                Phase("ROOTFS", "Installing $displayName chroot rootfs…", 35),
+                Phase("XFCE", "Installing XFCE desktop…", 25),
+                Phase("CUSTOM", "Applying Flux customization…", 20),
+            )
+        } else {
+            listOf(
+                Phase("HOST", "Preparing host environment…", 20),
+                Phase("ROOTFS", "Installing $displayName rootfs + XFCE…", 50),
+                Phase("CUSTOM", "Applying Flux customization…", 30),
+            )
+        }
+
+    /** Back-compat overload used by existing tests. */
+    fun phasesFor(method: String): List<Phase> = phasesFor(method, "Debian")
+
+    fun familySetupPayload(ctx: Context, theme: String, distroId: String = "debian"): String {
+        val profile = DistroInstallProfile.forId(distroId)
+            ?: DistroInstallProfile.require("debian")
+        val sm = ScriptManager(ctx)
+        val family = sm.getScriptContent(profile.familyScript)
+        val common = if (profile.familyScript.contains("debian") ||
+            profile.familyScript.contains("alpine")
+        ) {
+            ""
+        } else {
+            runCatching { sm.getScriptContent("common/setup/flux_guest_common.sh") }.getOrDefault("")
+        }
         return buildString {
             append("export FLUX_THEME='").append(theme).append("'\n")
             append("export FLUX_DESKTOP_ENV='xfce'\n")
             append("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n\n")
+            if (common.isNotBlank()) {
+                append(common).append("\n\n")
+            }
             append(family)
         }
     }
 
-    fun familySetupB64(ctx: Context, theme: String): String =
+    fun familySetupB64(ctx: Context, theme: String, distroId: String = "debian"): String =
         Base64.encodeToString(
-            familySetupPayload(ctx, theme).toByteArray(Charsets.UTF_8),
+            familySetupPayload(ctx, theme, distroId).toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP
         )
 
-    fun customizationPayload(ctx: Context, theme: String): String {
-        val body = ScriptManager(ctx).getScriptContent(CUSTOMIZATION_SCRIPT)
+    fun customizationPayload(ctx: Context, theme: String, distroId: String = "debian"): String {
+        val profile = DistroInstallProfile.forId(distroId)
+            ?: DistroInstallProfile.require("debian")
+        val body = ScriptManager(ctx).getScriptContent(profile.customizationScript)
         return buildString {
             append("export FLUX_THEME='").append(theme).append("'\n")
             append("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n\n")

@@ -77,104 +77,136 @@ object DesktopLauncher {
             HostScriptDeployer.deployScripts(app)
 
             val method = methodFor(distroId)
-            if (method == "chroot" && !TerminalLauncher.isDebianChrootInstalled()) {
-                toast(app, "Chroot not installed. Install Debian (Rooted) first.")
-                finishStart(app, distroId, false, "Chroot not installed", onResult)
-                return@prepareHost
-            }
-            if (method != "chroot" && !TerminalLauncher.isDebianProotInstalled(app)) {
-                toast(app, "Debian not installed. Complete onboarding first.")
-                finishStart(app, distroId, false, "Debian not installed", onResult)
-                return@prepareHost
-            }
-
-            val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
-            val script = File(TermuxHostPaths.HOME, scriptName)
-            if (!script.isFile) {
-                GuiDesktopLog.header(app, "START", scriptName, method)
-                GuiDesktopLog.append(app, "ERROR: missing host script ${script.absolutePath}")
-                pushLog(app, forceShow = true)
-                toast(app, "Desktop scripts missing — re-run host initialize")
-                finishStart(app, distroId, false, "Missing $scriptName", onResult)
-                return@prepareHost
-            }
+            val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+            // Chroot FS probe may need root (SELinux hides /data/local/tmp from app uid).
+            // Never call isChrootInstalled on the main thread without a warm cache.
             if (method == "chroot") {
-                val guest = File(TermuxHostPaths.HOME, "start_debian13_gui.sh")
-                if (!guest.isFile) {
-                    toast(app, "Chroot desktop launcher missing — re-run host initialize")
-                    finishStart(app, distroId, false, "Missing start_debian13_gui.sh", onResult)
+                val path = profile?.chrootPath
+                    ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
+                Thread {
+                    val installed = TerminalLauncher.isChrootInstalled(path)
+                    main.post {
+                        if (!installed) {
+                            toast(app, "Chroot not installed. Complete install first.")
+                            finishStart(app, distroId, false, "Chroot not installed", onResult)
+                        } else {
+                            continueStart(app, distroId, method, profile, onResult)
+                        }
+                    }
+                }.start()
+                return@prepareHost
+            } else {
+                val prootName = profile?.prootName ?: "debian"
+                if (!TerminalLauncher.isProotInstalled(app, prootName)) {
+                    toast(app, "Distro not installed. Complete onboarding first.")
+                    finishStart(app, distroId, false, "Distro not installed", onResult)
                     return@prepareHost
                 }
             }
 
-            guiShellJob?.cancel()
-            guiUserStopping = false
-            guiX11Launched = false
-            healthyLineSeen.set(false)
-            startResultDelivered.set(false)
+            continueStart(app, distroId, method, profile, onResult)
+        }
+    }
 
-            GuiDesktopLog.clear(app)
+    private fun continueStart(
+        app: Context,
+        distroId: String,
+        method: String,
+        profile: com.ivarna.fluxlinux.core.install.DistroInstallProfile?,
+        onResult: ((Boolean) -> Unit)?
+    ) {
+        val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
+        val script = File(TermuxHostPaths.HOME, scriptName)
+        if (!script.isFile) {
             GuiDesktopLog.header(app, "START", scriptName, method)
-            val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
-            if (!supportLib.isFile) {
-                GuiDesktopLog.append(
-                    app,
-                    "WARN: missing ${supportLib.absolutePath} — libbash may fail to link"
-                )
+            GuiDesktopLog.append(app, "ERROR: missing host script ${script.absolutePath}")
+            pushLog(app, forceShow = true)
+            toast(app, "Desktop scripts missing — re-run host initialize")
+            finishStart(app, distroId, false, "Missing $scriptName", onResult)
+            return
+        }
+        if (method == "chroot") {
+            val guestName = profile?.chrootStartGuiScript ?: "start_debian13_gui.sh"
+            val guest = File(TermuxHostPaths.HOME, guestName)
+            if (!guest.isFile) {
+                toast(app, "Chroot desktop launcher missing — re-run host initialize")
+                finishStart(app, distroId, false, "Missing $guestName", onResult)
+                return
             }
+        }
 
-            _ui.update {
-                it.copy(
-                    phase = Phase.Starting,
-                    distroId = distroId,
-                    logText = GuiDesktopLog.read(app),
-                    logsAvailable = true,
-                    displayReady = false,
-                    lastError = null,
-                    autoShowLogsTick = it.autoShowLogsTick + 1
-                )
-            }
+        guiShellJob?.cancel()
+        guiUserStopping = false
+        guiX11Launched = false
+        healthyLineSeen.set(false)
+        startResultDelivered.set(false)
 
-            startFgs(app)
-            toast(app, "Starting desktop…")
-            Log.i(TAG, "startGui method=$method script=${script.absolutePath}")
-
-            val bash = TermuxHostPaths.libBash(app).absolutePath
-            val args = arrayOf(bash, script.absolutePath, "debian")
-
-            guiShellJob = ShellCommandRunner.runStreamedCancelable(
+        GuiDesktopLog.clear(app)
+        GuiDesktopLog.header(app, "START", scriptName, method)
+        val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
+        if (!supportLib.isFile) {
+            GuiDesktopLog.append(
                 app,
-                args,
-                onLine = { line ->
-                    GuiDesktopLog.append(app, line)
-                    appendLive(line)
-                    if (isDesktopReadyLine(line)) {
-                        onHealthyLine(app, distroId, onResult)
-                    }
-                },
-                onDone = { code ->
-                    GuiDesktopLog.append(app, "[exit $code]")
-                    appendLive("[exit $code]")
-                    when {
-                        code == -1 || guiUserStopping -> {
-                            // User stop owns flip to idle
-                        }
-                        code != 0 -> {
-                            Log.w(TAG, "Desktop start failed exit=$code")
-                            toast(app, "Desktop start failed (exit $code) — see logs")
-                            revertToIdle(app, distroId, "exit $code", showLogs = true)
-                            // Only report failure if readiness never delivered success
-                            deliverStartResult(onResult, false)
-                        }
-                        else -> {
-                            // Clean desktop exit (session ended)
-                            Log.i(TAG, "Desktop session ended cleanly")
-                            revertToIdle(app, distroId, null, showLogs = false)
-                        }
-                    }
-                }
+                "WARN: missing ${supportLib.absolutePath} — libbash may fail to link"
             )
         }
+
+        _ui.update {
+            it.copy(
+                phase = Phase.Starting,
+                distroId = distroId,
+                logText = GuiDesktopLog.read(app),
+                logsAvailable = true,
+                displayReady = false,
+                lastError = null,
+                autoShowLogsTick = it.autoShowLogsTick + 1
+            )
+        }
+
+        startFgs(app)
+        toast(app, "Starting desktop…")
+        Log.i(TAG, "startGui method=$method script=${script.absolutePath}")
+
+        val bash = TermuxHostPaths.libBash(app).absolutePath
+        // proot: container name; chroot: distro id for path resolution in start_gui_chroot
+        val scriptArg = when {
+            method == "chroot" -> distroId
+            else -> profile?.prootName ?: "debian"
+        }
+        val args = arrayOf(bash, script.absolutePath, scriptArg)
+
+        guiShellJob = ShellCommandRunner.runStreamedCancelable(
+            app,
+            args,
+            onLine = { line ->
+                GuiDesktopLog.append(app, line)
+                appendLive(line)
+                if (isDesktopReadyLine(line)) {
+                    onHealthyLine(app, distroId, onResult)
+                }
+            },
+            onDone = { code ->
+                GuiDesktopLog.append(app, "[exit $code]")
+                appendLive("[exit $code]")
+                when {
+                    code == -1 || guiUserStopping -> {
+                        // User stop owns flip to idle
+                    }
+                    code != 0 -> {
+                        Log.w(TAG, "Desktop start failed exit=$code")
+                        toast(app, "Desktop start failed (exit $code) — see logs")
+                        revertToIdle(app, distroId, "exit $code", showLogs = true)
+                        // Only report failure if readiness never delivered success
+                        deliverStartResult(onResult, false)
+                    }
+                    else -> {
+                        // Clean desktop exit (session ended)
+                        Log.i(TAG, "Desktop session ended cleanly")
+                        revertToIdle(app, distroId, null, showLogs = false)
+                    }
+                }
+            }
+        )
     }
 
     fun stop(ctx: Context, distroId: String, onDone: (() -> Unit)? = null) {
@@ -219,10 +251,15 @@ object DesktopLauncher {
         }
 
         val bash = TermuxHostPaths.libBash(app).absolutePath
+        val stopArg = when {
+            method == "chroot" -> distroId
+            else -> com.ivarna.fluxlinux.core.install.DistroInstallProfile
+                .forId(distroId)?.prootName ?: "debian"
+        }
         toast(app, "Stopping desktop…")
         guiShellJob = ShellCommandRunner.runStreamedCancelable(
             app,
-            arrayOf(bash, script.absolutePath, "debian"),
+            arrayOf(bash, script.absolutePath, stopArg),
             onLine = { line ->
                 GuiDesktopLog.append(app, line)
                 appendLive(line)

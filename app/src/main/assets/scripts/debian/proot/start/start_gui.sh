@@ -17,7 +17,10 @@ TERMUX_PREFIX="${TERMUX__PREFIX:-/data/data/$PKG/files/usr}"
 TERMUX_HOME="${TERMUX__HOME:-/data/data/$PKG/files/home}"
 export HOME="$TERMUX_HOME"
 export TMPDIR="${TMPDIR:-$TERMUX_PREFIX/tmp}"
-export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TMPDIR}"
+export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$(dirname "$TERMUX_PREFIX")/proot-tmp}"
+mkdir -p "$TMPDIR" "$PROOT_TMP_DIR" 2>/dev/null || true
+chmod 1777 "$TMPDIR" 2>/dev/null || true
+chmod 700 "$PROOT_TMP_DIR" 2>/dev/null || true
 export PATH="$TERMUX_PREFIX/bin:$TERMUX_PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
 export LD_LIBRARY_PATH="$TERMUX_PREFIX/lib:$TERMUX_PREFIX/opt/virglrenderer-android/lib"
 export TERMUX_APP__PACKAGE_NAME="$PKG"
@@ -37,6 +40,11 @@ pkill -f pulseaudio 2>/dev/null || true
 pkill -f termux-x11 2>/dev/null || true
 pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 2
+# Stale UNIX sockets make Loader fail with "server already running"
+rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" \
+  "$TMPDIR/.X11-unix/X0" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
+mkdir -p "$TMPDIR/.X11-unix"
+chmod 1777 "$TMPDIR" "$TMPDIR/.X11-unix" 2>/dev/null || true
 
 # Start PulseAudio over TCP
 if $IS_ROOT; then
@@ -82,10 +90,11 @@ fi
 # Resolve our installed APK path so Loader can dlopen CmdEntryPoint classes
 # tr -d '\r' strips Windows carriage returns from pm path output
 if [ -z "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
+  # /system/bin/pm — termux-exec rewrites bare "pm" to $PREFIX/bin/pm (missing).
+  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
 fi
 if [ -z "$TERMUX_X11_APK_PATH" ] || [ ! -f "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
+  TERMUX_X11_APK_PATH=$(/system/bin/find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
 fi
 export TERMUX_X11_APK_PATH
 echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
@@ -132,7 +141,7 @@ sleep 1
 
 # Verify guest setup
 ROOTFS="$TERMUX_PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
-if [ ! -f "$ROOTFS/usr/bin/startxfce4" ]; then
+if [ ! -e "$ROOTFS/usr/bin/startxfce4" ] && [ ! -e "$ROOTFS/usr/sbin/startxfce4" ]; then
   echo "FluxLinux: XFCE setup incomplete. Re-run environment setup."
   exit 1
 fi
@@ -160,12 +169,69 @@ if [ "$DISTRO" = "termux" ]; then
   env DISPLAY=:0 startxfce4
   GUEST_RC=$?
 else
-  # Single guest script: read mode file inside rootfs (no host quote hell)
-  python "$TERMUX_PREFIX/bin/proot-distro" login "$DISTRO" --shared-tmp -- /bin/bash -c '
+  # Single guest script: read mode file inside rootfs (no host quote hell).
+  # Prefer bash when present (Debian + Alpine post-family); else sh.
+  GUEST_SHELL=/bin/bash
+  if [ ! -x "$ROOTFS/bin/bash" ] && [ ! -x "$ROOTFS/usr/bin/bash" ]; then
+    GUEST_SHELL=/bin/sh
+  fi
+  python "$TERMUX_PREFIX/bin/proot-distro" login "$DISTRO" --shared-tmp -- $GUEST_SHELL -c '
+    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    unset PROOT_TMP_DIR
+    export TMPDIR=/tmp
     export DISPLAY=:0
     export PULSE_SERVER=tcp:127.0.0.1
-    export XDG_RUNTIME_DIR=/tmp
     export VTEST_SOCKET_NAME=/tmp/.virgl_test
+    # Alpine glycin SVG loaders use bwrap — fails under proot and aborts GTK.
+    export GLYCIN_DISABLE_SANDBOX=1
+    # Fedora 43 / TW are glycin-only; no-glycin then cannot load PNG/SVG.
+    if ls /usr/lib64/gdk-pixbuf-2.0/*/loaders/*png* /usr/lib/gdk-pixbuf-2.0/*/loaders/*png* >/dev/null 2>&1; then
+      export GDK_DEBUG=no-glycin
+    fi
+    export GSK_RENDERER=cairo
+
+    # Host/Termux may leak a bad session bus or XDG_CONFIG_DIRS without /etc
+    # (xfce4-session failsafe: "XDG_CONFIG_DIRS must include /etc").
+    unset DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID DBUS_SESSION_BUS_WINDOWID
+    export XDG_CONFIG_DIRS=/etc/xdg
+    export XDG_DATA_DIRS=/usr/local/share:/usr/share
+    # Runtime dir mode 700 — world-writable /tmp breaks some dbus/xfconfd stacks.
+    export XDG_RUNTIME_DIR=/tmp/runtime-flux
+    mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+    mkdir -p /tmp/.ICE-unix && chmod 1777 /tmp/.ICE-unix
+
+    # Proot runs as the Android app uid; guest UIDs on disk that differ (e.g.
+    # flux=10302 while host process is 10301) make mode-700 ~/.config unwritable
+    # → xfconfd "Unable to create configuration directory" → failsafe session.
+    # Match /home ownership (app uid). Avoid nested single quotes (this block is
+    # already inside proot-distro login ... -c '...' ).
+    if [ -d /home/flux ]; then
+      _home_uid=$(stat -c %u /home 2>/dev/null || true)
+      _home_gid=$(stat -c %g /home 2>/dev/null || true)
+      if [ -n "$_home_uid" ]; then
+        chown -R "$_home_uid:$_home_gid" /home/flux 2>/dev/null || true
+        if [ "$_home_uid" = "0" ]; then
+          chown -R flux:flux /home/flux 2>/dev/null || true
+        fi
+      fi
+      mkdir -p /home/flux/.config /home/flux/.cache /home/flux/.local/share
+      chmod 755 /home/flux 2>/dev/null || true
+      # Open perms: host uid vs guest flux uid mismatch is common under proot
+      chmod -R 777 /home/flux/.config /home/flux/.cache /home/flux/.local 2>/dev/null || true
+    fi
+    if [ -d "$XDG_RUNTIME_DIR" ]; then
+      chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+      chown flux:flux "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    fi
+    # dbus machine-id (session bus soft-depends on it on some builds)
+    if command -v dbus-uuidgen >/dev/null 2>&1; then
+      dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null || true
+      mkdir -p /var/lib/dbus
+      if [ ! -e /var/lib/dbus/machine-id ]; then
+        ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || \
+          cp -f /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
+      fi
+    fi
 
     GPU_MODE=virgl
     if [ -r /etc/fluxlinux/gpu_mode ]; then
@@ -203,13 +269,57 @@ else
     }
 
     apply_gpu_env
-    # Preserve exported GPU vars across su - (login shell clears some env)
     export GPU_MODE
-    su - flux -c "
+    # Fedora 43 / Tumbleweed GTK+glycin execs bwrap to load PNG/SVG.
+    # Real bubblewrap needs user namespaces (missing under proot) and
+    # "chmod a-x bwrap" becomes "Could not spawn bwrap: Permission denied"
+    # which aborts xfce4-panel. Install Alpine-style shim instead.
+    if [ ! -f /usr/bin/bwrap ] || ! grep -q "FluxLinux proot" /usr/bin/bwrap 2>/dev/null; then
+      if [ -x /usr/bin/bwrap ] && [ ! -e /usr/bin/bwrap.real ]; then
+        mv /usr/bin/bwrap /usr/bin/bwrap.real 2>/dev/null || true
+      fi
+      cat > /usr/bin/bwrap << "BWRAP_EOF"
+#!/bin/sh
+# FluxLinux: exec the real glycin loader, not an earlier --ro-bind source.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    /usr/libexec/glycin-loaders/*|/usr/lib/glycin-loaders/*|/usr/bin/true|/bin/true)
+      if [ -f "$1" ] && [ -x "$1" ]; then
+        exec "$@"
+      fi
+      ;;
+  esac
+  shift
+done
+echo "bwrap-shim: no command" >&2
+exit 127
+BWRAP_EOF
+    fi
+    chmod 755 /usr/bin/bwrap /usr/bin/bubblewrap 2>/dev/null || true
+    # Use bash login shell for GUI (avoid zshrc noise); fall back to sh.
+    FLUX_SU_SHELL=/bin/bash
+    if [ ! -x /bin/bash ] && [ ! -x /usr/bin/bash ]; then
+      FLUX_SU_SHELL=/bin/sh
+    fi
+    su -s "$FLUX_SU_SHELL" - flux -c "
+      unset DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID DBUS_SESSION_BUS_WINDOWID
       export DISPLAY=:0
       export PULSE_SERVER=tcp:127.0.0.1
-      export XDG_RUNTIME_DIR=/tmp
+      export XDG_CONFIG_DIRS=/etc/xdg
+      export XDG_DATA_DIRS=/usr/local/share:/usr/share
+      export HOME=/home/flux
+      export XDG_CONFIG_HOME=/home/flux/.config
+      export XDG_CACHE_HOME=/home/flux/.cache
+      export XDG_DATA_HOME=/home/flux/.local/share
+      export XDG_RUNTIME_DIR=/tmp/runtime-flux
+      mkdir -p /home/flux/.config /home/flux/.cache /home/flux/.local/share
+      mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\"
       export VTEST_SOCKET_NAME=/tmp/.virgl_test
+      export GLYCIN_DISABLE_SANDBOX=i-know-the-risks
+      if ls /usr/lib64/gdk-pixbuf-2.0/*/loaders/*png* /usr/lib/gdk-pixbuf-2.0/*/loaders/*png* >/dev/null 2>&1; then
+        export GDK_DEBUG=no-glycin
+      fi
+      export GSK_RENDERER=cairo
       export GPU_MODE=$GPU_MODE
       if [ \"\$GPU_MODE\" = turnip ]; then
         export MESA_LOADER_DRIVER_OVERRIDE=zink
@@ -224,8 +334,11 @@ else
         export LIBGL_ALWAYS_SOFTWARE=1
         export GALLIUM_DRIVER=llvmpipe
       fi
-      xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null
-      exec dbus-launch --exit-with-session startxfce4
+      if command -v dbus-run-session >/dev/null 2>&1; then
+        exec dbus-run-session -- startxfce4
+      else
+        exec dbus-launch --exit-with-session startxfce4
+      fi
     "
   '
   GUEST_RC=$?

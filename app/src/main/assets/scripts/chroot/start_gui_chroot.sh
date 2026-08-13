@@ -1,7 +1,10 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
-# start_gui_chroot.sh — Launch XFCE4 in Debian chroot (app-uid host + root guest)
-# Host stack mirrors start_gui.sh (Pulse/VirGL/embedded X11). Guest via start_debian13_gui.sh.
+# start_gui_chroot.sh — Launch XFCE4 in chroot (app-uid host + root guest)
+# Host stack mirrors start_gui.sh (Pulse/VirGL/embedded X11).
+# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot.
 # NEVER am force-stop own package.
+
+DISTRO_HINT="${1:-${FLUX_CHROOT_DISTRO:-debian13_chroot}}"
 
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
 _HOST_ENV="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}/etc/fluxlinux-host.env"
@@ -20,26 +23,50 @@ export TERMUX__PREFIX="$TERMUX_PREFIX"
 export TERMUX__HOME="$TERMUX_HOME"
 export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/X11/xkb"
 
-CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootDebian13}"
-ROOT_GUI_SCRIPT="$TERMUX_HOME/start_debian13_gui.sh"
-ROOT_GUI_TMP="/data/local/tmp/start_debian13_gui.sh"
-# Optional SSOT helper used by start_debian13_gui.sh for mounts
+# Resolve chroot path + guest launcher from distro hint (env overrides win)
+case "$DISTRO_HINT" in
+  alpine|alpine_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootAlpine}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_alpine_gui.sh}"
+    ;;
+  fedora|fedora_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootFedora}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  void|void_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootVoid}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  opensuse|opensuse_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootOpenSUSE}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  *)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootDebian13}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_debian13_gui.sh}"
+    ;;
+esac
+ROOT_GUI_SCRIPT="$TERMUX_HOME/$ROOT_GUI_NAME"
+ROOT_GUI_TMP="/data/local/tmp/$ROOT_GUI_NAME"
 HELPER_SRC="$TERMUX_HOME/fluxlinux_chroot.sh"
 HELPER_TMP="/data/local/tmp/fluxlinux_chroot.sh"
 
 echo "========================================"
 echo "FluxLinux: START XFCE (chroot mode)"
+echo "  distro=$DISTRO_HINT path=$CHROOT_PATH"
 echo "========================================"
 
 # Preflight chroot
 if [ ! -d "$CHROOT_PATH" ]; then
   echo "FluxLinux: ERROR — chroot not found at $CHROOT_PATH"
-  echo "Install Debian Rooted from onboarding or Distros."
+  echo "Install rooted distro from onboarding or Distros."
   exit 1
 fi
-if [ ! -f "$CHROOT_PATH/.flux_configured" ] && [ ! -f "$CHROOT_PATH/usr/bin/startxfce4" ]; then
+if [ ! -f "$CHROOT_PATH/.flux_configured" ] && \
+   [ ! -e "$CHROOT_PATH/usr/bin/startxfce4" ] && \
+   [ ! -e "$CHROOT_PATH/usr/sbin/startxfce4" ]; then
   echo "FluxLinux: ERROR — chroot incomplete (no .flux_configured / startxfce4)."
-  echo "Re-run base desktop install for Debian Rooted."
+  echo "Re-run base desktop install for the rooted distro."
   exit 1
 fi
 if [ ! -f "$ROOT_GUI_SCRIPT" ]; then
@@ -94,10 +121,11 @@ if [ -L "$TERMUX_PREFIX/share/X11/xkb" ] && [ ! -e "$TERMUX_PREFIX/share/X11/xkb
 fi
 
 if [ -z "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
+  # /system/bin/pm — termux-exec rewrites bare "pm" to $PREFIX/bin/pm (missing).
+  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
 fi
 if [ -z "$TERMUX_X11_APK_PATH" ] || [ ! -f "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
+  TERMUX_X11_APK_PATH=$(/system/bin/find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
 fi
 export TERMUX_X11_APK_PATH
 echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
@@ -152,15 +180,19 @@ if [ -z "$SU_BIN" ]; then
   SU_BIN=su
 fi
 
-# Pass HELPER so start_debian13_gui prefers fluxlinux_chroot SSOT mounts
+# Pass HELPER + path env so guest GUI scripts use SSOT mounts
+# DEBIANPATH = legacy name used by start_debian13_gui.sh
+# CHROOT_ROOT  = name used by start_alpine_gui.sh
 if [ -f "$ROOT_GUI_TMP" ] || cp -f "$ROOT_GUI_SCRIPT" "$ROOT_GUI_TMP" 2>/dev/null; then
   "$SU_BIN" -c "cp -f '$ROOT_GUI_SCRIPT' '$ROOT_GUI_TMP' 2>/dev/null; \
     [ -f '$HELPER_SRC' ] && cp -f '$HELPER_SRC' '$HELPER_TMP' 2>/dev/null; \
     chmod 755 '$ROOT_GUI_TMP' '$HELPER_TMP' 2>/dev/null; \
-    DEBIANPATH='$CHROOT_PATH' TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
+    DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
+    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
 else
   "$SU_BIN" -c "cp -f '$ROOT_GUI_SCRIPT' '$ROOT_GUI_TMP' && chmod 755 '$ROOT_GUI_TMP' && \
-    DEBIANPATH='$CHROOT_PATH' TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
+    DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
+    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
 fi
 rc=$?
 echo "FluxLinux: chroot GUI exit=$rc"

@@ -21,6 +21,8 @@ import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.utils.InstallationQueueManager
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.components.DistroCard
+import com.ivarna.fluxlinux.ui.components.MethodTab
+import com.ivarna.fluxlinux.ui.components.MethodTabs
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 import com.ivarna.fluxlinux.ui.theme.GlassWhiteMedium
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -58,19 +60,20 @@ fun DistroScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Available Distros",
             color = MaterialTheme.colorScheme.secondary,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         )
         
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         
         // Distro List — installed state = filesystem truth (plan P4-T13); stale
         // prefs without a rootfs on disk keep the card available for Install.
@@ -84,8 +87,24 @@ fun DistroScreen(
         val availableDistros = DistroRepository.supportedDistros.filter { 
             !installedDistroIds.contains(it.id)
         }.sortedWith(compareBy<Distro> { it.comingSoon }.thenBy { it.name })
+
+        var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
+        val visibleDistros = availableDistros.filter { distro ->
+            if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
+        }
+        val prootCount = availableDistros.count { it.prootSupported }
+        val chrootCount = availableDistros.count { it.chrootSupported }
+
+        MethodTabs(
+            selected = methodTab,
+            onSelected = { methodTab = it },
+            prootCount = prootCount,
+            chrootCount = chrootCount
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
         
-        if (availableDistros.isEmpty()) {
+        if (visibleDistros.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -93,13 +112,19 @@ fun DistroScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "All available distros are installed!",
+                    text = if (availableDistros.isEmpty()) {
+                        "All available distros are installed!"
+                    } else if (methodTab == MethodTab.CHROOT) {
+                        "No chroot distros left to install"
+                    } else {
+                        "No PRoot distros left to install"
+                    },
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
         } else {
-            availableDistros.forEach { distro ->
+            visibleDistros.forEach { distro ->
                 if (distro.comingSoon) {
                     // Use compact card for coming soon distros
                     com.ivarna.fluxlinux.ui.components.CompactDistroCard(
@@ -128,6 +153,6 @@ fun DistroScreen(
             }
         }
         
-        Spacer(modifier = Modifier.height(100.dp)) // Spacing for Bottom Nav
+        Spacer(modifier = Modifier.height(128.dp))
     }
 }

@@ -36,7 +36,9 @@ object HostCommandBuilder {
         env["PREFIX"] = TermuxHostPaths.PREFIX
         env["HOME"] = TermuxHostPaths.HOME
         env["TMPDIR"] = TermuxHostPaths.TMPDIR
-        env["PROOT_TMP_DIR"] = TermuxHostPaths.TMPDIR
+        // Private glue dir — never the --shared-tmp bind (guest chmod breaks proot).
+        env["PROOT_TMP_DIR"] = TermuxHostPaths.PROOT_TMP
+        TermuxHostPaths.ensureHostTmpDirs()
         env["TERMUX_APP__PACKAGE_NAME"] = TermuxHostPaths.PACKAGE
         env["TERMUX_VERSION"] = TermuxHostPaths.TERMUX_VERSION
         env["TERMUX_X11_APK_PATH"] = ctx.applicationInfo.sourceDir

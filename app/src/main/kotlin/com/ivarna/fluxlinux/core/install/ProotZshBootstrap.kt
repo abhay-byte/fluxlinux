@@ -33,9 +33,13 @@ object ProotZshBootstrap {
     /**
      * @return true when [oh-my-zsh.sh] is present after this call.
      */
-    fun install(ctx: Context, onLog: (String) -> Unit = {}): Boolean {
+    fun install(
+        ctx: Context,
+        prootName: String = "debian",
+        onLog: (String) -> Unit = {}
+    ): Boolean {
         val app = ctx.applicationContext
-        val rootfs = ProotXfceAssetInstaller.prootRootfs(app)
+        val rootfs = ProotXfceAssetInstaller.prootRootfs(app, prootName)
         if (!rootfs.isDirectory) {
             onLog("Proot rootfs missing — skip host Oh My Zsh")
             return false

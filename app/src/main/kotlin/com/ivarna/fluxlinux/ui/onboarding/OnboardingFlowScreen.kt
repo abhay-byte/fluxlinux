@@ -387,7 +387,18 @@ private fun OptionsPage(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "${distro?.name ?: distroId}: Debian rootfs, XFCE desktop, and Flux themes. Feature modules can be added later in Distro Settings.",
+            when {
+                distroId.startsWith("alpine") ->
+                    "${distro?.name ?: distroId}: Alpine minirootfs, XFCE desktop (apk), and Flux themes. Feature modules can be added later in Distro Settings."
+                distroId.startsWith("fedora") ->
+                    "${distro?.name ?: distroId}: Fedora 43 rootfs, XFCE desktop (dnf), Mesa, and Flux themes."
+                distroId.startsWith("void") ->
+                    "${distro?.name ?: distroId}: Void Linux rootfs, XFCE desktop (xbps), Mesa, and Flux themes."
+                distroId.startsWith("opensuse") ->
+                    "${distro?.name ?: distroId}: openSUSE Tumbleweed rootfs, XFCE desktop (zypper), Mesa, and Flux themes."
+                else ->
+                    "${distro?.name ?: distroId}: Debian rootfs, XFCE desktop, and Flux themes. Feature modules can be added later in Distro Settings."
+            },
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             fontSize = 14.sp
         )
@@ -422,8 +433,27 @@ private fun OptionsPage(
             Column {
                 Text("Includes", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(6.dp))
-                Text("• Debian 13 rootfs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Text(
+                    when {
+                        distroId.startsWith("alpine") -> "• Alpine 3.24 minirootfs"
+                        distroId.startsWith("fedora") -> "• Fedora 43 container rootfs"
+                        distroId.startsWith("void") -> "• Void Linux (glibc aarch64) rootfs"
+                        distroId.startsWith("opensuse") -> "• openSUSE Tumbleweed rootfs"
+                        else -> "• Debian 13 rootfs"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
+                )
                 Text("• XFCE4 desktop", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                if (distroId.startsWith("fedora") || distroId.startsWith("void") ||
+                    distroId.startsWith("opensuse")
+                ) {
+                    Text(
+                        "• Mesa / VirGL hardware acceleration",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
                 Text("• Flux theme, wallpapers, fonts", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Text("• Embedded terminal + X11 display", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             }

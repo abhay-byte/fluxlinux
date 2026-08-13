@@ -59,6 +59,7 @@ object FluxTerminalSessionManager {
         title: String = type,
         shellCmd: String = "exec zsh",
         method: String,
+        distroId: String? = null,
         onResult: (SessionOpenResult) -> Unit = {}
     ) {
         if (!SessionRegistry.hasFreeTab()) {
@@ -71,7 +72,10 @@ object FluxTerminalSessionManager {
                 return@prepareHost
             }
             onResult(
-                if (GuestSessionFactory.openSession(ctx, type, title, shellCmd, method)) {
+                if (GuestSessionFactory.openSession(
+                        ctx, type, title, shellCmd, method, distroId
+                    )
+                ) {
                     SessionOpenResult.OPENED
                 } else {
                     SessionOpenResult.OPEN_FAILED

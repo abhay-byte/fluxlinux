@@ -9,18 +9,48 @@ set -u
 DISTRO="${1:-debian}"
 SETUP_B64="${2:-}"
 
-# Pinned rootfs (packaged as assets/rootfs/, deployed to $HOME)
-ROOTFS_NAME="debian_13_rootfs.tar.xz"
-ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"
-ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803}"
+# Per-distro pinned rootfs (packaged as assets/rootfs/, deployed to $HOME)
+# Env FLUX_ROOTFS_* overrides always win (Kotlin HostScriptDeployer / onboarding).
+case "$DISTRO" in
+    alpine)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-alpine_3.24_rootfs.tar.gz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/alpine_3.24_rootfs.tar.gz}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259}"
+        FAMILY_SCRIPT_NAME="setup_alpine_family.sh"
+        ;;
+    fedora)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-fedora_43_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-baade82fcea89be5986ee6e0dd3cd8ff04125bf7995c0e9fc3db5020fb0722fd}"
+        FAMILY_SCRIPT_NAME="setup_fedora_family.sh"
+        ;;
+    void)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-void_20250202_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-01a30f17ae06d4d5b322cd579ca971bc479e02cc284ec1e5a4255bea6bac3ce6}"
+        FAMILY_SCRIPT_NAME="setup_void_family.sh"
+        ;;
+    opensuse)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-opensuse_tumbleweed_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a}"
+        FAMILY_SCRIPT_NAME="setup_opensuse_family.sh"
+        ;;
+    *)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-debian_13_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803}"
+        FAMILY_SCRIPT_NAME="setup_debian_family.sh"
+        ;;
+esac
 
 # Resolve script directory (deployed to $HOME or $HOME/scripts)
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 DEFAULT_SETUP=""
 for candidate in \
-    "${SCRIPT_DIR}/setup_debian_family.sh" \
-    "${HOME:-}/setup_debian_family.sh" \
-    "${HOME:-}/scripts/setup_debian_family.sh"
+    "${SCRIPT_DIR}/${FAMILY_SCRIPT_NAME}" \
+    "${HOME:-}/${FAMILY_SCRIPT_NAME}" \
+    "${HOME:-}/scripts/${FAMILY_SCRIPT_NAME}"
 do
     if [ -n "$candidate" ] && [ -f "$candidate" ]; then
         DEFAULT_SETUP="$candidate"
@@ -44,7 +74,7 @@ export TERMUX__HOME="${TERMUX__HOME:-/data/data/${TERMUX_APP__PACKAGE_NAME}/file
 export PREFIX="${PREFIX:-$TERMUX__PREFIX}"
 export HOME="${HOME:-$TERMUX__HOME}"
 export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
-export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TMPDIR}"
+export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$(dirname "$PREFIX")/proot-tmp}"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-$PREFIX/lib}"
 export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
 
@@ -64,7 +94,7 @@ if [ -r "$PREFIX/etc/profile" ]; then
     export PREFIX
     export HOME
     export TMPDIR="$PREFIX/tmp"
-    export PROOT_TMP_DIR="$TMPDIR"
+    export PROOT_TMP_DIR="$(dirname "$PREFIX")/proot-tmp"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-$PREFIX/lib}"
     export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
 fi
@@ -80,7 +110,9 @@ if [ -n "$_SAVED_PROOT_LOADER_32" ]; then
     export PROOT_LOADER_32="$_SAVED_PROOT_LOADER_32"
 fi
 
-mkdir -p "$TMPDIR" 2>/dev/null || true
+mkdir -p "$TMPDIR" "$PROOT_TMP_DIR" 2>/dev/null || true
+chmod 1777 "$TMPDIR" 2>/dev/null || true
+chmod 700 "$PROOT_TMP_DIR" 2>/dev/null || true
 
 PYTHON="${PREFIX}/bin/python"
 PROOT_DISTRO="${PREFIX}/bin/proot-distro"
@@ -137,8 +169,10 @@ resolve_rootfs_archive() {
         "$PREFIX/var/lib/proot-distro/cache/rootfs/$ROOTFS_NAME" \
         "/sdcard/Download/$ROOTFS_NAME" \
         "/sdcard/Download/rootfs.tar.xz" \
+        "/sdcard/Download/rootfs.tar.gz" \
         "/storage/emulated/0/Download/$ROOTFS_NAME" \
-        "/storage/emulated/0/Download/rootfs.tar.xz"
+        "/storage/emulated/0/Download/rootfs.tar.xz" \
+        "/storage/emulated/0/Download/rootfs.tar.gz"
     do
         if [ -f "$candidate" ] && [ -s "$candidate" ]; then
             ROOTFS_ARCHIVE="$candidate"
@@ -195,13 +229,24 @@ verify_rootfs_sha() {
 
 echo "FluxLinux: Installing $DISTRO..."
 
+# Alpine minirootfs: bin/sh -> /bin/busybox (absolute). Host-side test -e follows
+# the link into Android /bin/busybox (missing) and false-negatives. Prefer -L or
+# real guest binaries (busybox/apk/bash).
+rootfs_has_shell() {
+    _r="$1"
+    [ -d "$_r" ] || return 1
+    [ -L "$_r/bin/sh" ] || [ -e "$_r/bin/sh" ] || \
+        [ -x "$_r/bin/busybox" ] || [ -f "$_r/sbin/apk" ] || \
+        [ -x "$_r/usr/bin/bash" ] || [ -L "$_r/bin/ash" ]
+}
+
 if [ "$DISTRO" = "termux" ]; then
     echo "FluxLinux: Native Termux Mode"
     EXIT_CODE=0
 else
     DISTRO_ROOTFS="$PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
 
-    if [ -d "$DISTRO_ROOTFS" ] && [ -e "$DISTRO_ROOTFS/bin/sh" ]; then
+    if rootfs_has_shell "$DISTRO_ROOTFS"; then
         echo "FluxLinux: $DISTRO already installed with valid rootfs. Skipping base installation."
         EXIT_CODE=0
     else
@@ -229,8 +274,8 @@ else
             rm -rf "$PREFIX/var/lib/proot-distro/containers/$DISTRO"
             "$PYTHON" "$PROOT_DISTRO" install "$ROOTFS_ARCHIVE" --name "$DISTRO"
             EXIT_CODE=$?
-            if [ "$EXIT_CODE" -eq 0 ] && [ ! -e "$DISTRO_ROOTFS/bin/sh" ]; then
-                echo "FluxLinux: install reported OK but $DISTRO_ROOTFS/bin/sh missing"
+            if [ "$EXIT_CODE" -eq 0 ] && ! rootfs_has_shell "$DISTRO_ROOTFS"; then
+                echo "FluxLinux: install reported OK but no shell/busybox under $DISTRO_ROOTFS"
                 EXIT_CODE=1
             fi
         fi
@@ -244,26 +289,89 @@ fi
 
 echo "FluxLinux: Install Successful!"
 
+# openSUSE: keep a copy of libcurl-mini. Family setup must never replace it
+# with full libcurl4+libldap (EVP_md2 vs OpenSSL 3.5.3 breaks zypper).
+if [ "$DISTRO" = "opensuse" ] && [ -n "${DISTRO_ROOTFS:-}" ]; then
+    _curl=""
+    for _c in \
+        "$DISTRO_ROOTFS/usr/lib64/libcurl.so.4.8.0" \
+        "$DISTRO_ROOTFS/usr/lib64/libcurl.so.4"
+    do
+        if [ -f "$_c" ] && [ ! -L "$_c" ]; then
+            _curl="$_c"
+            break
+        fi
+    done
+    if [ -n "$_curl" ] && [ ! -f "${_curl}.flux-mini" ]; then
+        cp -f "$_curl" "${_curl}.flux-mini" 2>/dev/null || true
+        echo "FluxLinux: stashed libcurl-mini → ${_curl}.flux-mini"
+    fi
+    # Stage EVP_md2 stub into guest /tmp (shared-tmp) and /usr/lib64.
+    for _stub in \
+        "${HOME:-}/libevp_md2.so" \
+        "${SCRIPT_DIR}/libevp_md2.so" \
+        "$TMPDIR/libevp_md2.so"
+    do
+        if [ -f "$_stub" ]; then
+            cp -f "$_stub" "$TMPDIR/libevp_md2.so" 2>/dev/null || true
+            mkdir -p "$DISTRO_ROOTFS/usr/lib64"
+            cp -f "$_stub" "$DISTRO_ROOTFS/usr/lib64/libevp_md2.so" 2>/dev/null || true
+            echo "FluxLinux: staged EVP_md2 stub"
+            break
+        fi
+    done
+fi
+
 # Resolve setup script: base64 payload (onboarding) OR local setup_debian_family.sh (one-click)
-SETUP_HOST_PATH="$TMPDIR/flux_setup_temp.sh"
+# Write via $HOME first — $PREFIX/tmp may contain root-owned leftovers from
+# earlier chroot/GUI sessions (sticky tmp + W^X-safe decode).
+_decode_b64() {
+    _in="$1"
+    _out="$2"
+    if [ -x /system/bin/base64 ]; then
+        printf '%s' "$_in" | /system/bin/base64 -d > "$_out"
+    elif command -v python >/dev/null 2>&1; then
+        printf '%s' "$_in" | python -c 'import sys,base64; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$_out"
+    else
+        printf '%s' "$_in" | base64 -d > "$_out"
+    fi
+}
+
+mkdir -p "$HOME" "$TMPDIR" 2>/dev/null || true
+chmod 1777 "$TMPDIR" 2>/dev/null || true
+SETUP_HOST_PATH="$HOME/.flux_setup_${DISTRO}.sh"
+SETUP_GUEST_NAME="flux_setup_${DISTRO}.sh"
+rm -f "$SETUP_HOST_PATH" "$TMPDIR/flux_setup_temp.sh" "$TMPDIR/$SETUP_GUEST_NAME"
 SETUP_MODE=""
 
 if [ -n "$SETUP_B64" ] && [ "$SETUP_B64" != "null" ]; then
     echo "FluxLinux: Configuring from base64 payload..."
-    if ! echo "$SETUP_B64" | base64 -d > "$SETUP_HOST_PATH"; then
+    if ! _decode_b64 "$SETUP_B64" "$SETUP_HOST_PATH"; then
         echo "FluxLinux: base64 decode failed"
         exit 1
     fi
     SETUP_MODE="b64"
 elif [ -n "$DEFAULT_SETUP" ]; then
     echo "FluxLinux: Configuring from local setup: $DEFAULT_SETUP"
-    cp "$DEFAULT_SETUP" "$SETUP_HOST_PATH" || {
+    : > "$SETUP_HOST_PATH"
+    for _common in \
+        "${HOME:-}/flux_guest_common.sh" \
+        "${SCRIPT_DIR}/flux_guest_common.sh"
+    do
+        if [ -f "$_common" ] && [ "$FAMILY_SCRIPT_NAME" != "setup_debian_family.sh" ] \
+            && [ "$FAMILY_SCRIPT_NAME" != "setup_alpine_family.sh" ]; then
+            cat "$_common" >> "$SETUP_HOST_PATH"
+            echo "" >> "$SETUP_HOST_PATH"
+            break
+        fi
+    done
+    cat "$DEFAULT_SETUP" >> "$SETUP_HOST_PATH" || {
         echo "FluxLinux: failed to copy $DEFAULT_SETUP"
         exit 1
     }
     SETUP_MODE="local"
 else
-    echo "FluxLinux: No setup payload and no setup_debian_family.sh found — install only."
+    echo "FluxLinux: No setup payload and no ${FAMILY_SCRIPT_NAME} found — install only."
     SETUP_MODE=""
 fi
 
@@ -275,17 +383,25 @@ if [ -n "$SETUP_MODE" ]; then
         SETUP_EXIT=$?
     else
         # Ensure shared tmp exists and is writable before proot binds it as guest /tmp
-        mkdir -p "$TMPDIR" 2>/dev/null || true
-        # --shared-tmp: host $PREFIX/tmp → guest /tmp (setup script lands at /tmp/flux_setup_temp.sh)
-        # Explicit /bin/bash in guest avoids PATH issues inside a fresh rootfs.
+        mkdir -p "$TMPDIR" "$PROOT_TMP_DIR" 2>/dev/null || true
+        chmod 1777 "$TMPDIR" 2>/dev/null || true
+        chmod 700 "$PROOT_TMP_DIR" 2>/dev/null || true
+        # --shared-tmp: host $PREFIX/tmp → guest /tmp
+        if ! cp -f "$SETUP_HOST_PATH" "$TMPDIR/$SETUP_GUEST_NAME"; then
+            echo "FluxLinux: failed to stage setup script into $TMPDIR"
+            exit 1
+        fi
+        chmod 755 "$TMPDIR/$SETUP_GUEST_NAME" 2>/dev/null || true
+        # Alpine minirootfs has only ash until family installs bash — prefer sh then bash.
         echo "FluxLinux: Running setup inside proot (shared-tmp)…"
         echo "FluxLinux: PD_PROOT_BIN=$PD_PROOT_BIN PROOT_LOADER=$PROOT_LOADER"
+        GUEST_RUN='export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; unset LD_LIBRARY_PATH LD_PRELOAD PROOT_TMP_DIR; export TMPDIR=/tmp; if [ -x /bin/bash ]; then exec /bin/bash /tmp/'"$SETUP_GUEST_NAME"' '"$DISTRO"'; else exec /bin/sh /tmp/'"$SETUP_GUEST_NAME"' '"$DISTRO"'; fi'
         "$PYTHON" "$PROOT_DISTRO" login "$DISTRO" --shared-tmp -- \
-            /bin/bash -c "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; bash /tmp/flux_setup_temp.sh $DISTRO"
+            /bin/sh -c "$GUEST_RUN"
         SETUP_EXIT=$?
     fi
 
-    rm -f "$SETUP_HOST_PATH"
+    rm -f "$SETUP_HOST_PATH" "$TMPDIR/$SETUP_GUEST_NAME" "$TMPDIR/flux_setup_temp.sh"
 
     if [ "$SETUP_EXIT" -ne 0 ]; then
         echo "FluxLinux: Configuration/Setup Script Failed! (exit $SETUP_EXIT)"

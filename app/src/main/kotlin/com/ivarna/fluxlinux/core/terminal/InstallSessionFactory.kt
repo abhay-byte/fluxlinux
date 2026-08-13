@@ -3,25 +3,17 @@ package com.ivarna.fluxlinux.core.terminal
 import android.content.Context
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
+import com.ivarna.fluxlinux.core.install.DistroInstallProfile
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.termux.terminal.TerminalSession
 
 /**
  * Builds host + install sessions.
- *  - proot install: `$HOME/flux_install.sh debian [setup_b64]` under libbash —
- *    setupB64 is passed as a RAW argv element (execve contract, never shell-quoted).
- *  - chroot install: staged `setup_debian13_chroot.sh` run as root on the host.
- *  - host scripts/commands: `$HOME/<script>` or `bash -c '<cmd>'`.
+ *  - proot: `$HOME/flux_install.sh <prootName> [setup_b64]` under libbash
+ *  - chroot: staged setup_*_chroot.sh run as root on the host
  */
 object InstallSessionFactory {
 
-    /**
-     * Distro install session.
-     *  - proot (`debian`): host bash runs `$HOME/flux_install.sh debian [setup_b64]`
-     *    (local rootfs archive; no registry pull; no external Termux).
-     *  - chroot (`debian13_chroot`): root TerminalSession runs staged
-     *    `setup_debian13_chroot.sh` on the host (same rootfs asset).
-     */
     fun openInstallSession(
         ctx: Context,
         distro: Distro,
@@ -30,22 +22,19 @@ object InstallSessionFactory {
     ): Boolean {
         val method = terminalComponentFor(distro.id).method
         return when (method) {
-            "chroot" -> openChrootInstall(ctx, onFinished)
-            else -> openProotInstall(ctx, setupB64, onFinished)
+            "chroot" -> openChrootInstall(ctx, distro.id, onFinished)
+            else -> openProotInstall(ctx, distro.id, setupB64, onFinished)
         }
     }
 
-    /**
-     * Host session running a deployed script with libbash.so
-     * (e.g. `flux_install.sh debian` from $HOME). [args] are raw argv.
-     */
     fun openHostScriptSession(
         ctx: Context,
         scriptName: String,
         title: String = scriptName,
         args: Array<String> = emptyArray(),
         forceHostSetup: Boolean = false,
-        onFinished: (() -> Unit)? = null
+        onFinished: (() -> Unit)? = null,
+        extraEnv: Map<String, String> = emptyMap()
     ): Boolean {
         val script = TermuxHostPaths.hostScript(ctx, scriptName)
         val (_, envMap) = HostCommandBuilder.build(
@@ -53,6 +42,7 @@ object InstallSessionFactory {
             script.absolutePath,
             forceHostSetup = forceHostSetup || HostCommandBuilder.shouldForceHostSetup(scriptName)
         )
+        extraEnv.forEach { (k, v) -> envMap[k] = v }
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val argv = arrayOf(shell, script.absolutePath) + args
         val cwd = TermuxHostPaths.homeDir(ctx).absolutePath
@@ -64,10 +54,6 @@ object InstallSessionFactory {
         )
     }
 
-    /**
-     * Host session running an arbitrary host command under libbash.so
-     * (e.g. `proot-distro remove debian` for uninstall). No guest login.
-     */
     fun openHostCommandSession(
         ctx: Context,
         command: String,
@@ -90,31 +76,24 @@ object InstallSessionFactory {
         )
     }
 
-    /**
-     * Root shell session running [scriptPath] on the HOST via discovered su
-     * (mounts + rootfs extraction; guest entry is not required).
-     *
-     * Env is seeded from [HostCommandBuilder.envMap] so host scripts see the
-     * correct package identity under BOTH flavors (B1): `setup_debian13_chroot.sh`
-     * resolves PKG/APP_HOME from `TERMUX_APP__PACKAGE_NAME`/`TERMUX__HOME` —
-     * without this, a zenithblue root install falls back to ivarna paths.
-     * [FLUX_ROOTFS_PATH] pins the deployed rootfs archive.
-     */
     fun openRootScriptSession(
         ctx: Context,
         scriptPath: String,
         title: String = "Root Shell",
-        onFinished: (() -> Unit)? = null
+        onFinished: (() -> Unit)? = null,
+        rootfsFileName: String = DistroInstallProfile.DEBIAN_ROOTFS_NAME,
+        chrootPath: String? = null
     ): Boolean {
         val rootInner = RootShell.shellRootCommand("sh '$scriptPath'")
         val winchCmd =
             "trap 'kill -WINCH -\$\$ 2>/dev/null; kill -WINCH 0 2>/dev/null' WINCH; $rootInner"
-        // Host SSOT env (package identity, PREFIX/HOME/TMPDIR, LD_LIBRARY_PATH) —
-        // the outer /system/bin/sh still needs system tools, so PATH keeps them first.
         val env = HostCommandBuilder.envMap(ctx, includeTerm = false)
         env["PATH"] = "/system/bin:/system/xbin:/sbin:" + (env["PATH"] ?: "")
         env["TERM"] = "xterm-256color"
-        env["FLUX_ROOTFS_PATH"] = "${TermuxHostPaths.HOME}/debian_13_rootfs.tar.xz"
+        env["FLUX_ROOTFS_PATH"] = "${TermuxHostPaths.HOME}/$rootfsFileName"
+        if (chrootPath != null) {
+            env["FLUX_CHROOT"] = chrootPath
+        }
         val session = TerminalSession(
             com.ivarna.fluxlinux.core.root.ChrootPaths.SESSION_EXEC,
             "/",
@@ -131,40 +110,50 @@ object InstallSessionFactory {
 
     private fun openProotInstall(
         ctx: Context,
+        distroId: String,
         setupB64: String?,
         onFinished: (() -> Unit)?
     ): Boolean {
+        val profile = DistroInstallProfile.require(distroId)
         val args = if (setupB64.isNullOrEmpty() || setupB64 == "null") {
-            arrayOf("debian")
+            arrayOf(profile.prootName)
         } else {
-            // RAW argv — TerminalSession is execve-style; quoting would become part of $2.
-            arrayOf("debian", setupB64)
+            arrayOf(profile.prootName, setupB64)
         }
         return openHostScriptSession(
             ctx,
             "flux_install.sh",
-            title = "Debian Install (Flux Terminal)",
+            title = "${profile.displayName} Install (Flux Terminal)",
             args = args,
-            onFinished = onFinished
+            onFinished = onFinished,
+            extraEnv = mapOf(
+                "FLUX_ROOTFS_PATH" to "${TermuxHostPaths.HOME}/${profile.rootfsFileName}",
+                "FLUX_ROOTFS_NAME" to profile.rootfsFileName,
+                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256
+            )
         )
     }
 
     private fun openChrootInstall(
         ctx: Context,
+        distroId: String,
         onFinished: (() -> Unit)?
     ): Boolean {
-        val staged = RootShell.stageAsset(ctx, "scripts/chroot/setup_debian13_chroot.sh")
-            ?: return openRootScriptSession(
-                ctx,
-                TermuxHostPaths.hostScript(ctx, "setup_debian13_chroot.sh").absolutePath,
-                title = "Debian Rooted Install (Root Shell)",
-                onFinished = onFinished
-            )
+        val profile = DistroInstallProfile.require(distroId)
+        val asset = profile.chrootSetupAsset
+            ?: return false
+        val staged = RootShell.stageAsset(ctx, asset)
+            ?: TermuxHostPaths.hostScript(ctx, FileName(asset)).absolutePath
         return openRootScriptSession(
             ctx,
             staged,
-            title = "Debian Rooted Install (Root Shell)",
-            onFinished = onFinished
+            title = "${profile.displayName} Install",
+            onFinished = onFinished,
+            rootfsFileName = profile.rootfsFileName,
+            chrootPath = profile.chrootPath
         )
     }
+
+    private fun FileName(assetPath: String): String =
+        assetPath.substringAfterLast('/')
 }

@@ -25,6 +25,12 @@ object TermuxHostPaths {
     val PREFIX: String get() = "$FILES/usr"
     val HOME: String get() = "$FILES/home"
     val TMPDIR: String get() = "$PREFIX/tmp"
+    /**
+     * Host-only proot glue/f2fs probe dir. Must **not** be the `--shared-tmp`
+     * bind (`$PREFIX/tmp`): guest/root `chmod`/`chown` there makes glue fail
+     * with `can't create temporary directory: Permission denied`.
+     */
+    val PROOT_TMP: String get() = "$FILES/proot-tmp"
     val BIN: String get() = "$PREFIX/bin"
     val LIB: String get() = "$PREFIX/lib"
     val SSL_CERT: String get() = "$PREFIX/etc/tls/cert.pem"
@@ -104,7 +110,7 @@ object TermuxHostPaths {
             |export PREFIX="$PREFIX"
             |export HOME="$HOME"
             |export TMPDIR="$TMPDIR"
-            |export PROOT_TMP_DIR="$TMPDIR"
+            |export PROOT_TMP_DIR="$PROOT_TMP"
             |export TERMUX_VERSION="$TERMUX_VERSION"
             |export SSL_CERT_FILE="$SSL_CERT"
             |export CURL_CA_BUNDLE="$SSL_CERT"
@@ -117,14 +123,17 @@ object TermuxHostPaths {
     }
 
     /**
-     * Patch proot-distro so `PROOT_LOADER` / `PROOT_LOADER_32` are passed through
-     * to the proot process. Stock only allows `PROOT_NO_SECCOMP` / `PROOT_VERBOSE`;
-     * without the loader env, proot falls back to `$PREFIX/libexec/proot/loader`
+     * Patch proot-distro so `PROOT_LOADER` / `PROOT_LOADER_32` / `PROOT_TMP_DIR`
+     * are passed through to the **host** proot process.
+     *
+     * Stock only allows `PROOT_NO_SECCOMP` / `PROOT_VERBOSE`.
+     * Without the loader env, proot falls back to `$PREFIX/libexec/proot/loader`
      * which is not executable under targetSdk 36 W^X →
      * `proot error: execve("/usr/bin/bash"): Permission denied`.
+     * Without `PROOT_TMP_DIR`, glue/f2fs temp dirs go to an unwritable default →
+     * `can't create temporary directory` / `can't create glue rootfs`.
      *
      * Idempotent — safe to call on every host prepare.
-     * Mirrors termux-lib OnboardingActivity post-extract patch.
      *
      * @return true when the file was patched (or already patched)
      */
@@ -136,34 +145,37 @@ object TermuxHostPaths {
         }
         return try {
             var content = loginInit.readText(Charsets.UTF_8)
-            val stock = "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\""
-            val patched = "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_LOADER_32\""
+            val full =
+                "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_LOADER_32\", \"PROOT_TMP_DIR\""
             // Already fully patched
-            if (content.contains("\"PROOT_LOADER\"") && content.contains("\"PROOT_LOADER_32\"")) {
-                return true
-            }
-            // Partial (termux-lib style PROOT_LOADER only) → upgrade to include _32
-            if (content.contains("\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\"") &&
-                !content.contains("\"PROOT_LOADER_32\"")
+            if (content.contains("\"PROOT_LOADER\"") &&
+                content.contains("\"PROOT_LOADER_32\"") &&
+                content.contains("\"PROOT_TMP_DIR\"")
             ) {
-                content = content.replace(
-                    "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\"",
-                    patched
-                )
-                loginInit.writeText(content, Charsets.UTF_8)
-                Log.i(TAG, "upgraded proot-distro PROOT_LOADER pass-through (+PROOT_LOADER_32)")
                 return true
             }
-            if (!content.contains(stock)) {
-                Log.w(TAG, "proot-distro allowlist pattern not found; cannot patch PROOT_LOADER")
+            val replacements = listOf(
+                "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_LOADER_32\"" to full,
+                "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\"" to full,
+                "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\"" to full,
+            )
+            var replaced = false
+            for ((from, to) in replacements) {
+                if (content.contains(from)) {
+                    content = content.replace(from, to)
+                    replaced = true
+                    break
+                }
+            }
+            if (!replaced) {
+                Log.w(TAG, "proot-distro allowlist pattern not found; cannot patch PROOT_*")
                 return false
             }
-            content = content.replace(stock, patched)
             loginInit.writeText(content, Charsets.UTF_8)
-            Log.i(TAG, "patched proot-distro to pass PROOT_LOADER / PROOT_LOADER_32")
+            Log.i(TAG, "patched proot-distro to pass PROOT_LOADER / PROOT_LOADER_32 / PROOT_TMP_DIR")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "failed to patch proot-distro PROOT_LOADER pass-through", e)
+            Log.e(TAG, "failed to patch proot-distro PROOT_* pass-through", e)
             false
         }
     }
@@ -210,11 +222,26 @@ object TermuxHostPaths {
         // W^X: must run after any rewrite of proot_distro tree (and every prepareHost).
         patchProotDistroLoaderPassThrough(filesDir)
         writeHostEnvFile(filesDir, ctx)
-        // Ensure proot temp dir exists (proot fails with chmod ENOENT if missing).
-        File(filesDir, "usr/tmp").mkdirs()
+        ensureHostTmpDirs(filesDir)
         if (rewritten > 0) {
             Log.i(TAG, "rewrote $rewritten file(s): $STOCK_DATA_ROOT → $DATA_ROOT")
         }
         return rewritten
+    }
+
+    /**
+     * Create host tmp dirs used by proot + X11.
+     * [PROOT_TMP] is private (0700). Shared [TMPDIR] is 0777 so guest uid 1000
+     * can write `/tmp` under `--shared-tmp` even without uid mapping.
+     */
+    fun ensureHostTmpDirs(filesDir: File = File(FILES)) {
+        val shared = File(filesDir, "usr/tmp").also { it.mkdirs() }
+        val glue = File(filesDir, "proot-tmp").also { it.mkdirs() }
+        shared.setReadable(true, false)
+        shared.setWritable(true, false)
+        shared.setExecutable(true, false)
+        glue.setReadable(true, true)
+        glue.setWritable(true, true)
+        glue.setExecutable(true, true)
     }
 }

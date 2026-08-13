@@ -61,8 +61,8 @@ object ProotXfceAssetInstaller {
             )
         }
 
-    fun prootRootfs(ctx: Context): File =
-        File(ctx.filesDir, "usr/var/lib/proot-distro/containers/debian/rootfs")
+    fun prootRootfs(ctx: Context, prootName: String = "debian"): File =
+        File(ctx.filesDir, "usr/var/lib/proot-distro/containers/$prootName/rootfs")
 
     fun isThemeInstalled(rootfs: File, themeName: String): Boolean {
         val dir = File(rootfs, "usr/share/themes/$themeName")
@@ -98,9 +98,14 @@ object ProotXfceAssetInstaller {
      * @return true if selected theme/icons/cursors are present after this call
      *   (already were, or host extract succeeded).
      */
-    fun install(ctx: Context, theme: String, onLog: (String) -> Unit = {}): Boolean {
+    fun install(
+        ctx: Context,
+        theme: String,
+        prootName: String = "debian",
+        onLog: (String) -> Unit = {}
+    ): Boolean {
         val app = ctx.applicationContext
-        val rootfs = prootRootfs(app)
+        val rootfs = prootRootfs(app, prootName)
         if (!rootfs.isDirectory) {
             onLog("Proot rootfs missing — skip host theme extract")
             return false

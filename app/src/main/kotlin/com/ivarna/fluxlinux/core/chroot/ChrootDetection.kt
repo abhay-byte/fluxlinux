@@ -6,25 +6,25 @@ import android.util.Log
 import com.ivarna.fluxlinux.core.root.ChrootPaths
 import com.ivarna.fluxlinux.core.root.RootShell
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Auto-detection for Debian chroot at [ChrootPaths.CHROOT_PATH].
+ * Auto-detection for chroot rootfs at a given path (Debian + Alpine).
  *
  * App SELinux often cannot read `/data/local/tmp` (`shell_data_file`), so bare
  * [File.exists] is a false negative. Detection order:
  * 1. Direct file probe (when policy allows)
  * 2. Root `test -e` probe (SSOT for install/settings)
- * 3. Short TTL cache for UI
- *
- * Ported from termux-lib [ProjectPathResolver] + FluxLinux install probe.
+ * 3. Short TTL cache per path for UI
  */
 object ChrootDetection {
 
     private const val TAG = "ChrootDetection"
     private const val CACHE_TTL_MS = 30_000L
 
-    @Volatile private var installedCache: Boolean? = null
-    @Volatile private var cacheAtMs: Long = 0L
+    private data class CacheEntry(val installed: Boolean, val atMs: Long)
+
+    private val cache = ConcurrentHashMap<String, CacheEntry>()
 
     data class Snapshot(
         val installed: Boolean,
@@ -36,71 +36,67 @@ object ChrootDetection {
 
     fun chrootPath(): String = ChrootPaths.CHROOT_PATH
 
-    fun rootfsDir(): File = File(ChrootPaths.CHROOT_PATH)
+    fun rootfsDir(path: String = ChrootPaths.CHROOT_PATH): File = File(path)
 
-    /** Marker file written by setup_debian13_chroot. */
-    fun markerFile(): File = File(ChrootPaths.CHROOT_PATH, ".flux_configured")
+    fun markerFile(path: String = ChrootPaths.CHROOT_PATH): File =
+        File(path, ".flux_configured")
 
-    /** Fast app-visible check (may be false under SELinux even when installed). */
-    fun isVisibleToApp(): Boolean {
-        val root = ChrootPaths.CHROOT_PATH
-        return File("$root/.flux_configured").exists() ||
-            File("$root/bin/sh").exists() ||
-            File("$root/usr/bin/bash").exists() ||
-            File("$root/usr/bin/sh").exists() ||
-            File(root).isDirectory
+    fun isVisibleToApp(path: String = ChrootPaths.CHROOT_PATH): Boolean {
+        return File("$path/.flux_configured").exists() ||
+            shellPresentToApp(path) ||
+            File(path).isDirectory
     }
 
-    fun isMarkerVisibleToApp(): Boolean = markerFile().exists()
+    fun isMarkerVisibleToApp(path: String = ChrootPaths.CHROOT_PATH): Boolean =
+        markerFile(path).exists()
 
-    fun isDirVisibleToApp(): Boolean = rootfsDir().isDirectory
+    fun isDirVisibleToApp(path: String = ChrootPaths.CHROOT_PATH): Boolean =
+        rootfsDir(path).isDirectory
 
     /**
-     * True when chroot looks installed. Uses cache; call [invalidate] after
-     * install/uninstall.
+     * True when chroot looks installed. Uses per-path cache; call [invalidate]
+     * after install/uninstall.
      *
      * Main thread: app-visible + TTL cache only (never blocks on su).
      * Background: may root-probe when cache is cold.
      */
-    fun isInstalled(): Boolean {
-        if (isVisibleToApp() && (isMarkerVisibleToApp() || shellPresentToApp())) {
-            installedCache = true
-            cacheAtMs = SystemClock.elapsedRealtime()
+    fun isInstalled(path: String = ChrootPaths.CHROOT_PATH): Boolean {
+        if (isVisibleToApp(path) && (isMarkerVisibleToApp(path) || shellPresentToApp(path))) {
+            putCache(path, true)
             return true
         }
         val now = SystemClock.elapsedRealtime()
-        val cached = installedCache
-        if (cached != null && now - cacheAtMs < CACHE_TTL_MS) return cached
+        val cached = cache[path]
+        if (cached != null && now - cached.atMs < CACHE_TTL_MS) {
+            return cached.installed
+        }
 
         // Never block the UI thread on su discovery / probes.
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return cached ?: false
+            return cached?.installed ?: false
         }
 
-        val snap = probe(forceRoot = true)
-        installedCache = snap.installed
-        cacheAtMs = now
+        val snap = probe(forceRoot = true, path = path)
+        putCache(path, snap.installed)
         return snap.installed
     }
 
     fun invalidate() {
-        installedCache = null
-        cacheAtMs = 0L
+        cache.clear()
     }
 
-    /**
-     * Full probe for settings UI.
-     *
-     * When [forceRoot] is false: app-visible files only — never calls su
-     * (safe on the main thread / Compose remember).
-     * When [forceRoot] is true: may block on root; call from a background thread.
-     */
-    fun probe(forceRoot: Boolean = true): Snapshot {
-        val markerApp = isMarkerVisibleToApp()
-        val dirApp = isDirVisibleToApp()
-        val shellApp = shellPresentToApp()
+    fun invalidate(path: String) {
+        cache.remove(path)
+    }
 
-        // App-only snapshot: no su, no ANR risk.
+    fun probe(
+        forceRoot: Boolean = true,
+        path: String = ChrootPaths.CHROOT_PATH
+    ): Snapshot {
+        val markerApp = isMarkerVisibleToApp(path)
+        val dirApp = isDirVisibleToApp(path)
+        val shellApp = shellPresentToApp(path)
+
         if (!forceRoot) {
             return Snapshot(
                 installed = markerApp || shellApp || dirApp,
@@ -122,13 +118,16 @@ object ChrootDetection {
             )
         }
 
-        val root = ChrootPaths.CHROOT_PATH
+        val root = path
         val out = try {
             RootShell.capture(
                 "M=0; D=0; S=0; " +
                     "[ -e '$root/.flux_configured' ] && M=1; " +
                     "[ -d '$root' ] && D=1; " +
-                    "{ [ -e '$root/bin/sh' ] || [ -e '$root/usr/bin/bash' ] || [ -e '$root/usr/bin/sh' ]; } && S=1; " +
+                    // Alpine: bin/sh -> /bin/busybox (absolute); -e fails on host.
+                    "{ [ -L '$root/bin/sh' ] || [ -e '$root/bin/sh' ] || " +
+                    "[ -x '$root/bin/busybox' ] || [ -e '$root/usr/bin/bash' ] || " +
+                    "[ -e '$root/usr/bin/sh' ] || [ -e '$root/sbin/apk' ]; } && S=1; " +
                     "echo MARKER=\$M DIR=\$D SHELL=\$S",
                 timeoutMs = 8_000L
             )
@@ -149,7 +148,6 @@ object ChrootDetection {
         for (line in out.lineSequence()) {
             val t = line.trim()
             if (!t.contains("MARKER=")) continue
-            // MARKER=1 DIR=1 SHELL=1
             t.split(Regex("\\s+")).forEach { tok ->
                 when {
                     tok.startsWith("MARKER=") ->
@@ -163,8 +161,7 @@ object ChrootDetection {
         }
 
         val installed = marker || shell || dir
-        installedCache = installed
-        cacheAtMs = SystemClock.elapsedRealtime()
+        putCache(path, installed)
         return Snapshot(
             installed = installed,
             markerOk = marker,
@@ -174,13 +171,16 @@ object ChrootDetection {
         )
     }
 
-    fun isXfceInstalled(): Boolean {
-        val path = "${ChrootPaths.CHROOT_PATH}/usr/bin/startxfce4"
-        if (File(path).exists()) return true
+    fun isXfceInstalled(chrootPath: String = ChrootPaths.CHROOT_PATH): Boolean {
+        val xfce = "$chrootPath/usr/bin/startxfce4"
+        val xfceSbin = "$chrootPath/usr/sbin/startxfce4"
+        if (File(xfce).exists() || File(xfceSbin).exists()) return true
         if (!RootShell.isRootAvailable()) return false
+        // Avoid blocking main thread
+        if (Looper.myLooper() == Looper.getMainLooper()) return false
         return try {
             RootShell.capture(
-                "if [ -e '$path' ]; then echo YES; else echo NO; fi",
+                "if [ -e '$xfce' ] || [ -e '$xfceSbin' ]; then echo YES; else echo NO; fi",
                 timeoutMs = 8_000L
             ).contains("YES")
         } catch (_: Exception) {
@@ -188,10 +188,21 @@ object ChrootDetection {
         }
     }
 
-    private fun shellPresentToApp(): Boolean {
-        val root = ChrootPaths.CHROOT_PATH
-        return File("$root/bin/sh").exists() ||
-            File("$root/usr/bin/bash").exists() ||
-            File("$root/usr/bin/sh").exists()
+    private fun shellPresentToApp(path: String = ChrootPaths.CHROOT_PATH): Boolean {
+        // Mirror TerminalLauncher.guestRootfsHasShell for Alpine absolute symlinks.
+        val sh = File("$path/bin/sh")
+        if (sh.exists()) return true
+        try {
+            if (java.nio.file.Files.isSymbolicLink(sh.toPath())) return true
+        } catch (_: Exception) {
+        }
+        return File("$path/bin/busybox").isFile ||
+            File("$path/usr/bin/bash").exists() ||
+            File("$path/usr/bin/sh").exists() ||
+            File("$path/sbin/apk").isFile
+    }
+
+    private fun putCache(path: String, installed: Boolean) {
+        cache[path] = CacheEntry(installed, SystemClock.elapsedRealtime())
     }
 }

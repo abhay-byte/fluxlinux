@@ -2,23 +2,23 @@ package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
 import com.ivarna.fluxlinux.R
+import com.ivarna.fluxlinux.core.root.ChrootPaths
 
 /**
  * SSOT for Terminal page shell cards (nativecode `ToolLauncherCatalog` parity).
  *
- * Flux v1 ships **system shells only** (proot / chroot / optional host) — no AI CLI
- * marketplace. Each card carries an explicit `method` so session-open paths never
- * fall back to the deprecated ambient `LinuxCommandBuilder.currentMethod`
- * (plan §2.6). Icons reuse the app's full-color distro artwork
- * (`distro_debian.webp` / `distro_termux.webp`) — displayed WITHOUT tinting so the
- * color PNGs keep their original branding (nativecode cli PNG parity).
+ * Flux ships **system shells** per installed guest (Debian + Alpine, proot/chroot)
+ * plus optional host. Each card carries explicit `method` + `distroId` so session
+ * open never falls back to ambient method or wrong container/chroot path.
  */
 data class TerminalShellDef(
-    val type: String,      // "shell" | "shell-root" | "host"
+    val type: String, // "shell" | "shell-root" | "host"
     val label: String,
     val desc: String,
-    val method: String,    // "proot" | "chroot" | "host"
-    val iconRes: Int       // full-color drawable (no tint)
+    val method: String, // "proot" | "chroot" | "host"
+    val iconRes: Int,
+    /** Distro card id for proot name / chroot path (`debian`, `alpine`, …). */
+    val distroId: String? = null
 )
 
 /** Render-ready card: definition + availability (enabled + disabled reason). */
@@ -37,27 +37,111 @@ data class TerminalShellSection(
 
 /**
  * Filesystem / runtime availability snapshot for the selector grid.
- *  - [prootInstalled]: Debian rootfs exists under the embedded host prefix.
- *  - [chrootInstalled]: Debian 13 chroot rootfs exists under /data/local/tmp.
- *  - [rootAvailable]: working KernelSU / Magisk su (probe is async in UI).
  */
 data class TerminalShellAvailability(
-    val prootInstalled: Boolean,
-    val chrootInstalled: Boolean,
+    val debianProot: Boolean,
+    val alpineProot: Boolean,
+    val fedoraProot: Boolean = false,
+    val voidProot: Boolean = false,
+    val opensuseProot: Boolean = false,
+    val debianChroot: Boolean,
+    val alpineChroot: Boolean,
+    val fedoraChroot: Boolean = false,
+    val voidChroot: Boolean = false,
+    val opensuseChroot: Boolean = false,
     val rootAvailable: Boolean
-)
+) {
+    /** Back-compat aliases used by older tests / call sites. */
+    val prootInstalled: Boolean get() = debianProot
+    val chrootInstalled: Boolean get() = debianChroot
+
+    fun prootInstalled(id: String): Boolean = when (id) {
+        "debian" -> debianProot
+        "alpine" -> alpineProot
+        "fedora" -> fedoraProot
+        "void" -> voidProot
+        "opensuse" -> opensuseProot
+        else -> false
+    }
+
+    fun chrootInstalled(id: String): Boolean = when (id) {
+        "debian13_chroot", "debian_chroot" -> debianChroot
+        "alpine_chroot" -> alpineChroot
+        "fedora_chroot" -> fedoraChroot
+        "void_chroot" -> voidChroot
+        "opensuse_chroot" -> opensuseChroot
+        else -> false
+    }
+}
 
 object TerminalShellCatalog {
 
-    fun prootDefs(): List<TerminalShellDef> = listOf(
-        TerminalShellDef("shell", "Debian Shell", "User: flux", "proot", R.drawable.distro_debian),
-        TerminalShellDef("shell-root", "Debian Shell Rooted", "User: root", "proot", R.drawable.distro_debian)
-    )
+    fun prootDefs(distroId: String = "debian"): List<TerminalShellDef> {
+        val (label, icon) = when (distroId) {
+            "alpine" -> "Alpine" to R.drawable.distro_alpine
+            "fedora" -> "Fedora" to R.drawable.distro_fedora
+            "void" -> "Void" to R.drawable.distro_void
+            "opensuse" -> "openSUSE" to R.drawable.distro_opensuse
+            else -> "Debian" to R.drawable.distro_debian
+        }
+        return listOf(
+            TerminalShellDef(
+                "shell",
+                "$label Shell",
+                "User: flux",
+                "proot",
+                icon,
+                distroId
+            ),
+            TerminalShellDef(
+                "shell-root",
+                "$label Shell Rooted",
+                "User: root",
+                "proot",
+                icon,
+                distroId
+            )
+        )
+    }
 
-    fun chrootDefs(): List<TerminalShellDef> = listOf(
-        TerminalShellDef("shell", "Debian Chroot Shell", "User: flux", "chroot", R.drawable.distro_debian),
-        TerminalShellDef("shell-root", "Debian Chroot Rooted", "User: root", "chroot", R.drawable.distro_debian)
-    )
+    fun chrootDefs(distroId: String = "debian13_chroot"): List<TerminalShellDef> {
+        val (label, icon, id) = when (distroId) {
+            "alpine_chroot", "alpine" ->
+                Triple("Alpine Chroot", R.drawable.distro_alpine, "alpine_chroot")
+            "fedora_chroot", "fedora" ->
+                Triple("Fedora Chroot", R.drawable.distro_fedora, "fedora_chroot")
+            "void_chroot", "void" ->
+                Triple("Void Chroot", R.drawable.distro_void, "void_chroot")
+            "opensuse_chroot", "opensuse" ->
+                Triple("openSUSE Chroot", R.drawable.distro_opensuse, "opensuse_chroot")
+            else ->
+                Triple("Debian Chroot", R.drawable.distro_debian, "debian13_chroot")
+        }
+        return listOf(
+            TerminalShellDef(
+                "shell",
+                "$label Shell",
+                "User: flux",
+                "chroot",
+                icon,
+                id
+            ),
+            TerminalShellDef(
+                "shell-root",
+                "$label Rooted",
+                "User: root",
+                "chroot",
+                icon,
+                id
+            )
+        )
+    }
+
+    /** @deprecated Prefer [prootDefs] with explicit distro. */
+    fun prootDefs(): List<TerminalShellDef> = prootDefs("debian")
+
+    /** @deprecated Prefer [chrootDefs] with explicit distro. */
+    fun chrootDefs(): List<TerminalShellDef> = chrootDefs("debian13_chroot")
 
     fun hostDef(): TerminalShellDef =
         TerminalShellDef("host", "Host Shell", "libbash", "host", R.drawable.distro_termux)
@@ -65,54 +149,77 @@ object TerminalShellCatalog {
     /** Synchronous filesystem availability (no su probe — caller supplies that). */
     fun availability(ctx: Context, rootAvailable: Boolean = false): TerminalShellAvailability =
         TerminalShellAvailability(
-            prootInstalled = TerminalLauncher.isDebianProotInstalled(ctx),
-            chrootInstalled = TerminalLauncher.isDebianChrootInstalled(),
+            debianProot = TerminalLauncher.isProotInstalled(ctx, "debian"),
+            alpineProot = TerminalLauncher.isProotInstalled(ctx, "alpine"),
+            fedoraProot = TerminalLauncher.isProotInstalled(ctx, "fedora"),
+            voidProot = TerminalLauncher.isProotInstalled(ctx, "void"),
+            opensuseProot = TerminalLauncher.isProotInstalled(ctx, "opensuse"),
+            debianChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.DEBIAN_CHROOT_PATH),
+            alpineChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.ALPINE_CHROOT_PATH),
+            fedoraChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.FEDORA_CHROOT_PATH),
+            voidChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.VOID_CHROOT_PATH),
+            opensuseChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.OPENSUSE_CHROOT_PATH),
             rootAvailable = rootAvailable
         )
 
     /**
      * Build grid sections for the current availability. Proot / chroot cards stay
-     * visible but are disabled (grayed) with a reason when the guest is missing.
-     * Chroot sessions always run via su (`RootShell.shellRootCommand`), so ALL
-     * chroot cards additionally require device root — no root, no chroot card
-     * (R1: previously only shell-root was gated and Chroot Shell (flux) looked
-     * openable without su).
+     * visible but are disabled with a reason when the guest is missing.
+     * Chroot sessions always require device root.
      */
     fun sections(ctx: Context, avail: TerminalShellAvailability): List<TerminalShellSection> {
-        val prootCards = prootDefs().map { def ->
-            val enabled = avail.prootInstalled
-            TerminalShellCardUi(
-                def = def,
-                enabled = enabled,
-                disabledReason = if (enabled) null else "Install Debian in Distros"
+        fun prootSection(title: String, distroId: String, installed: Boolean): TerminalShellSection {
+            val cards = prootDefs(distroId).map { def ->
+                TerminalShellCardUi(
+                    def = def,
+                    enabled = installed,
+                    disabledReason = if (installed) null else "Install $title in Distros"
+                )
+            }
+            return TerminalShellSection(
+                title = "$title SHELL",
+                subtitle = "PROOT",
+                cards = cards
             )
         }
-        val chrootCards = chrootDefs().map { def ->
-            val enabled = avail.chrootInstalled && avail.rootAvailable
-            TerminalShellCardUi(
-                def = def,
-                enabled = enabled,
-                // Fail-closed: reason only when disabled (enabled cards must be null).
-                disabledReason = when {
-                    enabled -> null
-                    !avail.chrootInstalled -> "Chroot not installed"
-                    else -> "Root required"
-                }
+
+        fun chrootSection(
+            title: String,
+            distroId: String,
+            installed: Boolean
+        ): TerminalShellSection {
+            val cards = chrootDefs(distroId).map { def ->
+                val enabled = installed && avail.rootAvailable
+                TerminalShellCardUi(
+                    def = def,
+                    enabled = enabled,
+                    disabledReason = when {
+                        enabled -> null
+                        !installed -> "Chroot not installed"
+                        else -> "Root required"
+                    }
+                )
+            }
+            return TerminalShellSection(
+                title = "$title SHELL",
+                subtitle = "CHROOT",
+                cards = cards
             )
         }
+
         val hostCard = TerminalShellCardUi(def = hostDef(), enabled = true, disabledReason = null)
 
         return listOf(
-            TerminalShellSection(
-                title = "DEBIAN SHELL",
-                subtitle = "PROOT",
-                cards = prootCards
-            ),
-            TerminalShellSection(
-                title = "DEBIAN SHELL",
-                subtitle = "CHROOT",
-                cards = chrootCards
-            ),
+            prootSection("DEBIAN", "debian", avail.prootInstalled("debian")),
+            prootSection("ALPINE", "alpine", avail.prootInstalled("alpine")),
+            prootSection("FEDORA", "fedora", avail.prootInstalled("fedora")),
+            prootSection("VOID", "void", avail.prootInstalled("void")),
+            prootSection("OPENSUSE", "opensuse", avail.prootInstalled("opensuse")),
+            chrootSection("DEBIAN", "debian13_chroot", avail.chrootInstalled("debian13_chroot")),
+            chrootSection("ALPINE", "alpine_chroot", avail.chrootInstalled("alpine_chroot")),
+            chrootSection("FEDORA", "fedora_chroot", avail.chrootInstalled("fedora_chroot")),
+            chrootSection("VOID", "void_chroot", avail.chrootInstalled("void_chroot")),
+            chrootSection("OPENSUSE", "opensuse_chroot", avail.chrootInstalled("opensuse_chroot")),
             TerminalShellSection(
                 title = "HOST",
                 subtitle = "OPTIONAL",

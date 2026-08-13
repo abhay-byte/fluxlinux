@@ -11,7 +11,8 @@ export TERMUX_APP__PACKAGE_NAME="${TERMUX_APP__PACKAGE_NAME:-$PKG}"
 export TERMUX__PREFIX="${TERMUX__PREFIX:-/data/data/${TERMUX_APP__PACKAGE_NAME}/files/usr}"
 export TERMUX__HOME="${TERMUX__HOME:-/data/data/${TERMUX_APP__PACKAGE_NAME}/files/home}"
 export HOME="${HOME:-$TERMUX__HOME}"
-export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TERMUX__PREFIX/tmp}"
+export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$(dirname "${TERMUX__PREFIX:-/data/data/com.ivarna.fluxlinux/files/usr}")/proot-tmp}"
+mkdir -p "$PROOT_TMP_DIR" 2>/dev/null || true
 PKG="$TERMUX_APP__PACKAGE_NAME"
 
 echo "========================================"

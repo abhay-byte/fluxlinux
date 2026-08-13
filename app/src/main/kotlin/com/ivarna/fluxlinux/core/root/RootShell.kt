@@ -438,10 +438,12 @@ object RootShell {
         val hostTmp = "$prefix/tmp"
         // Always pin package paths so zenithblue (and future flavors) do not fall
         // back to the script's ivarna defaults when FLUX_* is unset.
-        val envPrefix =
-            "FLUX_PACKAGE='$pkg' FLUX_PREFIX='$prefix' FLUX_HOST_TMP='$hostTmp' " +
-                "FLUX_CHROOT='$chrootPath' "
-        return envPrefix +
+        //
+        // Android /system/bin/sh rejects `VAR=val if …; then` (assignment before
+        // compound command → "syntax error: unexpected 'then'"). Use export +
+        // semicolons so the if-list is a normal compound statement.
+        return "export FLUX_PACKAGE='$pkg' FLUX_PREFIX='$prefix' " +
+            "FLUX_HOST_TMP='$hostTmp' FLUX_CHROOT='$chrootPath'; " +
             "if [ ! -f $helper ]; then " +
             "for _s in " +
             "/data/data/$pkg/files/home/fluxlinux_chroot.sh " +

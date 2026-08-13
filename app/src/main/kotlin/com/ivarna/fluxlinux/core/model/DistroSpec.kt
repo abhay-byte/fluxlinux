@@ -73,5 +73,33 @@ enum class SupportedDistro(
         family = DistroFamily.ARCH,
         packageManager = PackageManager.PACMAN,
         releaseType = ReleaseType.ROLLING
+    ),
+
+    ALPINE(
+        id = "alpine",
+        family = DistroFamily.ALPINE,
+        packageManager = PackageManager.APK,
+        releaseType = ReleaseType.FIXED
+    ),
+
+    FEDORA(
+        id = "fedora",
+        family = DistroFamily.FEDORA,
+        packageManager = PackageManager.DNF,
+        releaseType = ReleaseType.SEMI_ROLLING
+    ),
+
+    VOID(
+        id = "void",
+        family = DistroFamily.VOID,
+        packageManager = PackageManager.XBPS,
+        releaseType = ReleaseType.ROLLING
+    ),
+
+    OPENSUSE(
+        id = "opensuse",
+        family = DistroFamily.SUSE,
+        packageManager = PackageManager.ZYPPER,
+        releaseType = ReleaseType.ROLLING
     )
 }

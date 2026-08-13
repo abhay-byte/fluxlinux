@@ -32,11 +32,27 @@ object LinuxCommandBuilder {
         shellCmd: String,
         user: String = "flux",
         useSharedTmp: Boolean = true,
-        method: String = currentMethod
+        method: String = currentMethod,
+        distroId: String? = null
     ): Pair<Array<String>, HashMap<String, String>> {
+        val profile = distroId?.let {
+            com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(it)
+        }
         return when (method) {
-            "chroot" -> ChrootCommandBuilder.build(ctx, shellCmd, user)
-            else -> ProotCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
+            "chroot" -> ChrootCommandBuilder.build(
+                ctx,
+                shellCmd,
+                user,
+                chrootPath = profile?.chrootPath
+                    ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
+            )
+            else -> ProotCommandBuilder.build(
+                ctx,
+                shellCmd,
+                user,
+                useSharedTmp,
+                distro = profile?.prootName ?: "debian"
+            )
         }
     }
 }

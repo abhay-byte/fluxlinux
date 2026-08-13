@@ -20,7 +20,9 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Runs the simplified onboarding / base install with phase progress + live log.
  * Proot: prepareHost → flux_install (family) → customization via proot-distro.
- * Chroot: root check → prepareHost → setup_debian13_chroot → family → customization in chroot.
+ * Chroot: root check → prepareHost → setup_*_chroot → family → customization in chroot.
+ *
+ * Distro identity from [DistroInstallProfile] (Debian + Alpine).
  *
  * Cancel: generation token + destroy active process; never mutates StateManager after cancel.
  * Overlapping [start] cancels the previous run first.
@@ -83,8 +85,28 @@ class OnboardingInstallRunner(private val ctx: Context) {
         lastNotifPercent = -1
         lastNotifLabel = ""
 
-        val method = BaseDesktopInstallPlan.methodFor(distroId)
-        val phases = BaseDesktopInstallPlan.phasesFor(method)
+        val profile = DistroInstallProfile.forId(distroId)
+        if (profile == null) {
+            busy.set(false)
+            main.post {
+                onProgress(
+                    Progress(
+                        phaseId = "ERR",
+                        phaseLabel = "Failed",
+                        phaseIndex = 0,
+                        phaseCount = 1,
+                        overallPercent = 0,
+                        detail = "Unsupported distro: $distroId",
+                        failed = true,
+                        finished = true,
+                        errorMessage = "Unsupported distro: $distroId"
+                    )
+                )
+            }
+            return
+        }
+        val method = profile.method
+        val phases = BaseDesktopInstallPlan.phasesFor(method, profile.displayName)
         busy.set(true)
         lastNotifPercent = -1
         lastNotifLabel = ""
@@ -93,7 +115,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             BaseInstallService.start(
                 appCtx,
                 title = "FluxLinux — Installing",
-                text = if (method == "chroot") "Debian chroot base desktop" else "Debian proot base desktop",
+                text = "${profile.displayName} base desktop",
                 percent = 0
             )
         } catch (e: Exception) {
@@ -165,20 +187,24 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
         completePhase(phases, 0, onProgress, "Host ready")
 
-        enter(phases, 1, onProgress, "Installing Debian via proot-distro…")
+        val profile = DistroInstallProfile.require(distroId)
+        enter(phases, 1, onProgress, "Installing ${profile.displayName} via proot-distro…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val bash = TermuxHostPaths.libBash(appCtx).absolutePath
         val installScript = TermuxHostPaths.hostScript(appCtx, "flux_install.sh").absolutePath
-        val setupB64 = BaseDesktopInstallPlan.familySetupB64(appCtx, theme)
+        val setupB64 = BaseDesktopInstallPlan.familySetupB64(appCtx, theme, distroId)
         val env = HostCommandBuilder.envMap(appCtx, forceHostSetup = false, includeTerm = false).apply {
             put("PYTHONUNBUFFERED", "1")
+            put("FLUX_ROOTFS_PATH", "${TermuxHostPaths.HOME}/${profile.rootfsFileName}")
+            put("FLUX_ROOTFS_NAME", profile.rootfsFileName)
+            put("FLUX_ROOTFS_SHA256", profile.rootfsSha256)
         }
         // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
         // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
         // and fails with EACCES (error 13). Stream lines as the pipe delivers them.
         val (exitInstall, _) = ShellCommandRunner.runCaptureExit(
             appCtx,
-            arrayOf(bash, installScript, "debian", setupB64),
+            arrayOf(bash, installScript, profile.prootName, setupB64),
             env,
             processHolder = activeProcess,
             onLine = { line ->
@@ -187,21 +213,21 @@ class OnboardingInstallRunner(private val ctx: Context) {
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (exitInstall != 0) {
-            postFail(onProgress, phases, "Debian install failed (exit $exitInstall)")
+            postFail(onProgress, phases, "${profile.displayName} install failed (exit $exitInstall)")
             return
         }
-        if (!TerminalLauncher.isDebianProotInstalled(appCtx)) {
-            postFail(onProgress, phases, "Debian rootfs missing after install")
+        if (!TerminalLauncher.isProotInstalled(appCtx, profile.prootName)) {
+            postFail(onProgress, phases, "${profile.displayName} rootfs missing after install")
             return
         }
-        if (!isProotXfceInstalled(appCtx)) {
+        if (!isProotXfceInstalled(appCtx, profile.prootName)) {
             postFail(
                 onProgress, phases,
                 "XFCE not found after install (startxfce4 missing). Retry setup."
             )
             return
         }
-        completePhase(phases, 1, onProgress, "Debian + XFCE installed")
+        completePhase(phases, 1, onProgress, "${profile.displayName} + XFCE installed")
 
         enter(phases, 2, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
@@ -209,7 +235,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         // Skip guest re-extract when this succeeds or assets are already present.
         log(phases, 2, onProgress, "Staging XFCE theme/icons on host (native tar)…")
         val hostThemeOk = try {
-            ProotXfceAssetInstaller.install(appCtx, theme) { line ->
+            ProotXfceAssetInstaller.install(appCtx, theme, profile.prootName) { line ->
                 if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
             }
         } catch (e: Exception) {
@@ -219,7 +245,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         if (abortIfCancelled(gen, phases, onProgress)) return
         log(phases, 2, onProgress, "Staging Oh My Zsh on host (avoids proot hang)…")
         val hostOmzOk = try {
-            ProotZshBootstrap.install(appCtx) { line ->
+            ProotZshBootstrap.install(appCtx, profile.prootName) { line ->
                 if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
             }
         } catch (e: Exception) {
@@ -231,7 +257,8 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val skipOmz = if (hostOmzOk) "1" else "0"
         val customOk = runProotGuestScript(
             phases, 2, onProgress, gen,
-            scriptAssetPath = BaseDesktopInstallPlan.CUSTOMIZATION_SCRIPT,
+            prootName = profile.prootName,
+            scriptAssetPath = profile.customizationScript,
             envPrefix = "FLUX_THEME=$theme " +
                 "FLUX_SKIP_THEME_ICONS=$skipAssets " +
                 "FLUX_SKIP_OMZ=$skipOmz " +
@@ -247,6 +274,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)
         StateManager.setComponentInstalled(appCtx, distroId, "xfce4_desktop", true)
+        if (profile.hwAccelScript != null) {
+            StateManager.setComponentInstalled(appCtx, distroId, "hw_accel", true)
+        }
         if (customOk) {
             StateManager.setComponentInstalled(appCtx, distroId, "customization", true)
         }
@@ -291,14 +321,26 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
         completePhase(phases, 1, onProgress, "Host ready")
 
+        val profile = DistroInstallProfile.require(distroId)
+        val chrootPath = profile.chrootPath
+            ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
+        val setupAsset = profile.chrootSetupAsset
+            ?: "scripts/chroot/setup_debian13_chroot.sh"
+        val setupName = File(setupAsset).name
+
         enter(phases, 2, onProgress, "Extracting chroot rootfs (may take several minutes)…")
         if (abortIfCancelled(gen, phases, onProgress)) return
-        val staged = RootShell.stageAsset(appCtx, "scripts/chroot/setup_debian13_chroot.sh")
-            ?: TermuxHostPaths.hostScript(appCtx, "setup_debian13_chroot.sh").absolutePath
+        val staged = RootShell.stageAsset(appCtx, setupAsset)
+            ?: TermuxHostPaths.hostScript(appCtx, setupName).absolutePath
         val envHome = TermuxHostPaths.HOME
         // Do not wrap with $PREFIX/bin/stdbuf — host W^X denies exec from app data.
+        val label = profile.distroId.removeSuffix("_chroot")
         val rootCmd =
-            "export FLUX_ROOTFS_PATH='$envHome/debian_13_rootfs.tar.xz'; " +
+            "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
+                "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
+                "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +
+                "export FLUX_CHROOT='$chrootPath'; " +
+                "export FLUX_DISTRO_LABEL='$label'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +
                 "export TERMUX__HOME='$envHome'; " +
                 "export PYTHONUNBUFFERED=1; " +
@@ -318,15 +360,12 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
         // App SELinux cannot see /data/local/tmp — always re-probe as root after install.
         TerminalLauncher.invalidateChrootInstalledCache()
-        val installed = TerminalLauncher.isDebianChrootInstalled()
+        val installed = TerminalLauncher.isChrootInstalled(chrootPath)
         if (!installed) {
-            log(
-                phases, 2, onProgress,
-                "Root probe: chroot missing at ${com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH}"
-            )
+            log(phases, 2, onProgress, "Root probe: chroot missing at $chrootPath")
             postFail(
                 onProgress, phases,
-                "Chroot rootfs missing after install (check root grant + ${com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH})"
+                "Chroot rootfs missing after install (check root grant + $chrootPath)"
             )
             return
         }
@@ -335,14 +374,16 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, 3, onProgress, "Installing XFCE packages…")
         if (abortIfCancelled(gen, phases, onProgress)) return
-        val familyPayload = BaseDesktopInstallPlan.familySetupPayload(appCtx, theme)
-        val familyExit = runChrootGuestBlocking(familyPayload, user = "root", phases, 3, onProgress)
+        val familyPayload = BaseDesktopInstallPlan.familySetupPayload(appCtx, theme, distroId)
+        val familyExit = runChrootGuestBlocking(
+            familyPayload, user = "root", phases, 3, onProgress, chrootPath
+        )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (familyExit != 0) {
             postFail(onProgress, phases, "XFCE setup failed (exit $familyExit)")
             return
         }
-        if (!TerminalLauncher.isDebianChrootXfceInstalled()) {
+        if (!TerminalLauncher.isChrootXfceInstalled(chrootPath)) {
             postFail(
                 onProgress, phases,
                 "XFCE not found after family setup (startxfce4 missing). Retry."
@@ -353,8 +394,10 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, 4, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
-        val customPayload = BaseDesktopInstallPlan.customizationPayload(appCtx, theme)
-        val customExit = runChrootGuestBlocking(customPayload, user = "root", phases, 4, onProgress)
+        val customPayload = BaseDesktopInstallPlan.customizationPayload(appCtx, theme, distroId)
+        val customExit = runChrootGuestBlocking(
+            customPayload, user = "root", phases, 4, onProgress, chrootPath
+        )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (customExit != 0) {
             log(phases, 4, onProgress, "Customization failed or partial (exit $customExit)")
@@ -364,6 +407,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)
         StateManager.setComponentInstalled(appCtx, distroId, "xfce4_desktop", true)
+        if (profile.hwAccelScript != null) {
+            StateManager.setComponentInstalled(appCtx, distroId, "hw_accel", true)
+        }
         if (customExit == 0) {
             StateManager.setComponentInstalled(appCtx, distroId, "customization", true)
         }
@@ -376,6 +422,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         phaseIndex: Int,
         onProgress: (Progress) -> Unit,
         gen: Int,
+        prootName: String,
         scriptAssetPath: String,
         envPrefix: String
     ): Boolean {
@@ -389,11 +436,15 @@ class OnboardingInstallRunner(private val ctx: Context) {
             }
             dest.setExecutable(true)
             val bash = TermuxHostPaths.libBash(appCtx).absolutePath
+            // Prefer bash if present (Debian); Alpine family installs bash before customization.
             // libbash.so only — never prefix stdbuf (W^X EACCES on $PREFIX/bin)
+            val guest =
+                "env $envPrefix PYTHONUNBUFFERED=1 " +
+                    "sh -c 'if [ -x /bin/bash ]; then exec /bin/bash /tmp/$name; " +
+                    "else exec /bin/sh /tmp/$name; fi'"
             val cmd = arrayOf(
                 bash, "-c",
-                "exec python ${TermuxHostPaths.PROOT_DISTRO} login debian --shared-tmp -- " +
-                    "env $envPrefix PYTHONUNBUFFERED=1 bash /tmp/$name"
+                "exec python ${TermuxHostPaths.PROOT_DISTRO} login $prootName --shared-tmp -- $guest"
             )
             val env = HostCommandBuilder.envMap(appCtx, includeTerm = false).apply {
                 put("PYTHONUNBUFFERED", "1")
@@ -422,21 +473,18 @@ class OnboardingInstallRunner(private val ctx: Context) {
         user: String,
         phases: List<BaseDesktopInstallPlan.Phase>,
         phaseIndex: Int,
-        onProgress: (Progress) -> Unit
+        onProgress: (Progress) -> Unit,
+        chrootPath: String = com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
     ): Int {
-        val b64 = android.util.Base64.encodeToString(
-            scriptBody.toByteArray(Charsets.UTF_8),
-            android.util.Base64.NO_WRAP
-        )
-        val guest =
-            "echo '$b64' | base64 -d > /tmp/flux_onboard.sh && chmod +x /tmp/flux_onboard.sh && " +
-                "export PYTHONUNBUFFERED=1; " +
-                "bash /tmp/flux_onboard.sh; " +
-                "RC=\$?; rm -f /tmp/flux_onboard.sh; exit \$RC"
+        // captureInChroot already base64-wraps once via fluxlinux_chroot b64.
+        // Nested echo|base64 is redundant and bloated host su -c strings.
+        // guest_b64 prefers /bin/bash when present, else /bin/sh (Alpine minirootfs).
+        val body = "export PYTHONUNBUFFERED=1\n$scriptBody"
         val result = RootShell.captureInChroot(
-            guest,
+            body,
             user = user,
             context = appCtx,
+            chrootPath = chrootPath,
             timeoutMs = 0L,
             onLine = { line ->
                 if (line.isNotBlank()) log(phases, phaseIndex, onProgress, line)
@@ -641,11 +689,11 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
     }
 
-    private fun isProotXfceInstalled(ctx: Context): Boolean =
-        File(
-            ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/debian/rootfs/usr/bin/startxfce4"
-        ).exists()
+    private fun isProotXfceInstalled(ctx: Context, prootName: String = "debian"): Boolean {
+        val root = File(ctx.filesDir, "usr/var/lib/proot-distro/containers/$prootName/rootfs")
+        return File(root, "usr/bin/startxfce4").exists() ||
+            File(root, "usr/sbin/startxfce4").exists()
+    }
 
     companion object {
         private const val TAG = "OnboardingInstall"

@@ -25,7 +25,8 @@ native/termux-packages
 
 # Staged host assets (large; regenerate via scripts/package_host_assets.sh)
 app/src/*/assets/bootstrap.tar
-app/src/*/assets/rootfs/*.tar.xz
+app/src/*/assets/rootfs/
+assets/rootfs/
 app/src/*/jniLibs/
 
 # Large NDK packages

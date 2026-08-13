@@ -73,7 +73,7 @@ import com.termux.view.TerminalViewClient
  * In-app terminal with multi-session tabs + nativecode-style tool selector grid
  * + full ExtraKeys toolbar (injectKey / ModifierState lock).
  *
- * Empty state = 2-column card grid (`TerminalToolSelector`); active state =
+ * Empty state = compact proot/chroot session rows (`TerminalToolSelector`); active state =
  * interactive `TerminalView` (focus + IME + clipboard) with the ExtraKeys toolbar
  * above the bottom nav. Plan: docs/plans/terminal-grid-extrakeys-interactive.md.
  */
@@ -121,7 +121,7 @@ fun TerminalScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun openCard(type: String, title: String, method: String) {
+    fun openCard(type: String, title: String, method: String, distroId: String? = null) {
         if (method == "host") {
             // R4: gate on host ready — prepare when missing, toast "Host not ready".
             FluxTerminalSessionManager.openHostShellAfterReady(context, title) { result ->
@@ -135,7 +135,11 @@ fun TerminalScreen(
             return
         }
         FluxTerminalSessionManager.openSessionAfterHost(
-            context, type = type, title = title, method = method,
+            context,
+            type = type,
+            title = title,
+            method = method,
+            distroId = distroId,
             onResult = { result ->
                 when (result) {
                     SessionOpenResult.OPENED -> {}
@@ -394,9 +398,9 @@ fun TerminalScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             TerminalToolSelector(
-                onOpen = { type, title, method ->
+                onOpen = { type, title, method, distroId ->
                     showNewSessionSheet = false
-                    openCard(type, title, method)
+                    openCard(type, title, method, distroId)
                 },
                 modifier = Modifier.heightIn(max = 460.dp)
             )

@@ -39,7 +39,8 @@ export TERMUX__HOME="${TERMUX__HOME:-/data/data/${PKG}/files/home}"
 export PREFIX="$TERMUX__PREFIX"
 export HOME="$TERMUX__HOME"
 export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
-export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TMPDIR}"
+# Private glue dir — must not be the --shared-tmp bind ($PREFIX/tmp).
+export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$(dirname "$PREFIX")/proot-tmp}"
 export TERMUX_VERSION="${TERMUX_VERSION:-flux-host}"
 export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
 export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -59,14 +60,16 @@ if [ -r "$PREFIX/etc/profile" ]; then
     export PREFIX="$PREFIX_DEFAULT"
     export HOME="$HOME_DEFAULT"
     export TMPDIR="$PREFIX/tmp"
-    export PROOT_TMP_DIR="$TMPDIR"
+    export PROOT_TMP_DIR="$(dirname "$PREFIX")/proot-tmp"
     export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
     export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
 MARKER_DIR="$HOME/.fluxlinux"
 MARKER_FILE="$MARKER_DIR/setup_termux.done"
-mkdir -p "$MARKER_DIR" "$TMPDIR"
+mkdir -p "$MARKER_DIR" "$TMPDIR" "$PROOT_TMP_DIR"
+chmod 1777 "$TMPDIR" 2>/dev/null || true
+chmod 700 "$PROOT_TMP_DIR" 2>/dev/null || true
 
 if [ "${FLUX_SETUP_FORCE:-0}" = "1" ]; then
     rm -f "$MARKER_FILE"

@@ -200,27 +200,40 @@ class MainActivity : ComponentActivity() {
      * customization runs. Distro Settings used to skip this (only onboarding
      * did), so guest hung on missing git / corrupt OMZ rm. Merges skip flags
      * into [extraEnv]. Safe to call off the main thread.
+     *
+     * [distroId] selects the proot container (`debian`, `alpine`, …). Defaults
+     * to debian only when the id is unknown — never stage Alpine assets into
+     * the Debian tree (or vice versa).
      */
     private fun stageCustomizationHostEnv(
         activity: android.content.Context,
-        extraEnv: Map<String, String>
+        extraEnv: Map<String, String>,
+        distroId: String = "debian"
     ): Map<String, String> {
         val theme = extraEnv["FLUX_THEME"] ?: "dark"
         val merged = extraEnv.toMutableMap()
+        val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+        val prootName = profile?.prootName?.takeIf { it.isNotBlank() }
+            ?: distroId.removeSuffix("_chroot").ifBlank { "debian" }
+        // Chroot customization stages into the matching proot container only when
+        // that container exists; OMZ for pure-chroot is guest-side.
         try {
             val themeOk = com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.install(
-                activity, theme
+                activity, theme, prootName
             ) { line ->
-                android.util.Log.i("FluxLinux", "Host theme: $line")
+                android.util.Log.i("FluxLinux", "Host theme ($prootName): $line")
             }
             if (themeOk) merged["FLUX_SKIP_THEME_ICONS"] = "1"
         } catch (e: Exception) {
             android.util.Log.w("FluxLinux", "Host theme stage failed", e)
         }
         try {
-            val omzOk = com.ivarna.fluxlinux.core.install.ProotZshBootstrap.install(activity) { line ->
-                android.util.Log.i("FluxLinux", "Host OMZ: $line")
+            val omzOk = com.ivarna.fluxlinux.core.install.ProotZshBootstrap.install(
+                activity, prootName
+            ) { line ->
+                android.util.Log.i("FluxLinux", "Host OMZ ($prootName): $line")
             }
+            // Only skip guest OMZ when *this* rootfs actually has oh-my-zsh.sh
             if (omzOk) merged["FLUX_SKIP_OMZ"] = "1"
         } catch (e: Exception) {
             android.util.Log.w("FluxLinux", "Host OMZ stage failed", e)
@@ -287,7 +300,7 @@ class MainActivity : ComponentActivity() {
         }
         if (isCustomizationComponent(component)) {
             Thread {
-                val env = stageCustomizationHostEnv(this, baseEnv)
+                val env = stageCustomizationHostEnv(this, baseEnv, distro.id)
                 runOnUiThread { openWith(env) }
             }.start()
         } else {
@@ -354,7 +367,7 @@ class MainActivity : ComponentActivity() {
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
                 Thread {
-                    val env = stageCustomizationHostEnv(activity, extraEnv)
+                    val env = stageCustomizationHostEnv(activity, extraEnv, distro.id)
                     activity.runOnUiThread { openWith(env) }
                 }.start()
             } else {
@@ -461,15 +474,19 @@ class MainActivity : ComponentActivity() {
                         "proot"
                     }
                     val type = if (root) "shell-root" else "shell"
+                    val label = com.ivarna.fluxlinux.core.install.DistroInstallProfile
+                        .forId(distroId)?.displayName
+                        ?: distroId
                     val title = when (method) {
-                        "chroot" -> if (root) "Debian Rooted Shell" else "Debian (Rooted) Shell"
-                        else -> if (root) "Debian Shell Rooted" else "Debian Shell"
+                        "chroot" -> if (root) "$label Root Shell" else "$label Shell"
+                        else -> if (root) "$label Shell (root)" else "$label Shell"
                     }
                     com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.openSessionAfterHost(
                         this@MainActivity,
                         type = type,
                         title = title,
                         method = method,
+                        distroId = distroId,
                         onResult = { result ->
                             if (result == com.ivarna.fluxlinux.core.terminal.FluxTerminalSessionManager.SessionOpenResult.OPENED) {
                                 openTerminalTab()
