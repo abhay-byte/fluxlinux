@@ -94,8 +94,8 @@ object ChrootCommandBuilder {
         envMap["PATH"] = "/system/bin:/system/xbin:/sbin:" + (envMap["PATH"] ?: "")
         envMap["TERM"] = "xterm-256color"
         envMap["HOME"] = if (u == "root") "/root" else "/home/flux"
-        envMap["LANG"] = "en_US.UTF-8"
-        envMap["LC_ALL"] = "en_US.UTF-8"
+        envMap["LANG"] = "C"
+        envMap.remove("LC_ALL")
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
         envMap["TMPDIR"] = "/tmp"
         envMap["FLUX_CHROOT"] = chrootPath

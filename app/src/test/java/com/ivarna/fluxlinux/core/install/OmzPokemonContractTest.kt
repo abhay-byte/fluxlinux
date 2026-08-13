@@ -99,11 +99,24 @@ class OmzPokemonContractTest {
         assertTrue(manjaro.contains("dbus-broker-units"))
         assertTrue(manjaro.contains("python sed gzip"))
         assertTrue(
+            "family install must ship fastfetch so the shell always has it",
+            manjaro.contains("fastfetch")
+        )
+        assertTrue(
             "en_US.UTF-8 must be generated so agnosterzak can paint @flux",
             manjaro.contains("en_US.UTF-8 UTF-8")
         )
         assertTrue(manjaro.contains("_flux_ensure_locale"))
         assertTrue(manjaro.contains("_flux_ensure_hostname"))
+        assertTrue(
+            "pacman guests must restore glibc i18n data",
+            manjaro.contains("pacman -S --noconfirm --needed glibc")
+        )
+        assertTrue(
+            "directory locales work when locale-archive is empty under proot",
+            manjaro.contains("localedef --no-archive")
+        )
+        assertTrue(manjaro.contains("_flux_sanitize_lang"))
     }
 
     @Test
@@ -134,6 +147,11 @@ class OmzPokemonContractTest {
         assertFalse(text.contains("(pacman)"))
         assertTrue(text.contains("locale -a"))
         assertTrue(text.contains("C.UTF-8"))
+        assertTrue(text.contains("grep -qxFi"))
+        assertFalse(
+            "bare fastfetch dumps every Android bind mount",
+            text.contains("|| fastfetch 2>/dev/null")
+        )
         assertTrue(text.contains("gtk-3.0/settings.ini") || text.contains("gtk-icon-theme-name"))
     }
 
@@ -151,6 +169,8 @@ class OmzPokemonContractTest {
         ).readText()
         assertTrue(common.contains("_flux_ensure_en_us_locale"))
         assertTrue(common.contains("glibc-langpack-en"))
+        assertTrue(common.contains("_flux_sanitize_lang"))
+        assertTrue(common.contains("localedef --no-archive"))
     }
 
     @Test

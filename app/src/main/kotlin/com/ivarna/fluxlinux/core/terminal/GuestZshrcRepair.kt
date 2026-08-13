@@ -28,13 +28,23 @@ object GuestZshrcRepair {
 # Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
 export PATH="${'$'}HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
-  export LANG=en_US.UTF-8
-  export LC_ALL=en_US.UTF-8
-else
-  export LANG=C.UTF-8
-  export LC_ALL=C.UTF-8
+# Generate UTF-8 first so theme / fastfetch / pokemon always render.
+if [ -x /usr/local/sbin/flux-ensure-locale ] && command -v sudo >/dev/null 2>&1; then
+  sudo /usr/local/sbin/flux-ensure-locale 2>/dev/null || true
 fi
+_have=${'$'}(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "${'$'}_have" | grep -qxFi "${'$'}_c" && { _pick="${'$'}_c"; break; }
+done
+if [ -n "${'$'}_pick" ]; then
+  export LANG="${'$'}_pick" LC_ALL="${'$'}_pick"
+else
+  unset LC_ALL
+  export LANG=C
+fi
+unset _have _c _pick
+export PYTHONIOENCODING=UTF-8
 
 # Host PROOT_TMP_DIR is not writable as guest uid; use guest /tmp.
 unset PROOT_TMP_DIR
@@ -47,24 +57,28 @@ export XDG_RUNTIME_DIR="${'$'}{XDG_RUNTIME_DIR:-/tmp}"
 # shell can get SIGTTIN-killed. Disable MONITOR (job control) for the guest.
 setopt no_monitor
 
-# Background visuals - don't block shell startup; skip missing tools (no error spam)
+# Background visuals — theme/fastfetch/pokemon always run when installed.
 {
   if command -v fastfetch >/dev/null 2>&1; then
-    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+    _ff="${'$'}HOME/.local/share/fastfetch/presets/termux.jsonc"
+    if [ -f "${'$'}_ff" ]; then
+      fastfetch --config "${'$'}_ff" 2>/dev/null || true
+    else
+      fastfetch --config termux 2>/dev/null || true
+    fi
+    unset _ff
   fi
   if command -v pokemon-colorscripts >/dev/null 2>&1; then
     pokemon-colorscripts --no-title -r 1,2,3 2>/dev/null || true
   fi
 } &!
 
-# oh-my-zsh (optional — install may fail offline; shell still usable without it)
 export ZSH="${'$'}{ZSH:-${'$'}HOME/.oh-my-zsh}"
 if [ -f "${'$'}ZSH/oh-my-zsh.sh" ]; then
   ZSH_THEME="agnosterzak"
   DISABLE_UPDATE_PROMPT=true
   DISABLE_AUTO_UPDATE=true
   ZSH_DISABLE_COMPFIX=true
-  # Removed zsh-autocomplete (very slow), kept essential plugins
   plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
   source "${'$'}ZSH/oh-my-zsh.sh"
 fi
@@ -155,10 +169,82 @@ fi
             }
             ensureZprofile(zshrc.parentFile)
             // Prefer zsh login shell when binary exists (Alpine often left /bin/bash)
-            if (rootfs != null) ensureFluxLoginShellZsh(rootfs)
+            if (rootfs != null) {
+                ensureFluxLoginShellZsh(rootfs)
+                writeLocaleProfile(rootfs)
+                writeEnsureLocaleScript(rootfs)
+            }
             writeFastfetchPresets(zshrc.parentFile, rootfs)
         } catch (e: Exception) {
             Log.w(TAG, "zshrc repair failed: ${e.message}")
+        }
+    }
+
+    internal val LOCALE_PROFILE = """
+_have=${'$'}(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "${'$'}_have" | grep -qxFi "${'$'}_c" && { _pick="${'$'}_c"; break; }
+done
+if [ -n "${'$'}_pick" ]; then
+  export LANG="${'$'}_pick" LC_ALL="${'$'}_pick"
+else
+  unset LC_ALL
+  export LANG=C
+fi
+unset _have _c _pick
+""".trimStart()
+
+    internal val ENSURE_LOCALE_SH = """
+#!/bin/sh
+# Generate directory locales when locale-archive is empty (Manjaro/Arch proot).
+[ "${'$'}(id -u)" = 0 ] || exit 1
+locale -a 2>/dev/null | grep -qxFi en_US.utf8 && exit 0
+locale -a 2>/dev/null | grep -qxFi en_US.UTF-8 && exit 0
+command -v localedef >/dev/null 2>&1 || exit 0
+mkdir -p /usr/lib/locale
+_map=/tmp/flux-UTF-8
+if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
+  gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "${'$'}_map" || true
+elif [ -f /usr/share/i18n/charmaps/UTF-8 ]; then
+  cp -f /usr/share/i18n/charmaps/UTF-8 "${'$'}_map" || true
+fi
+if [ -s "${'$'}_map" ]; then
+  localedef --no-archive -c -i en_US -f "${'$'}_map" /usr/lib/locale/en_US.utf8 || true
+  localedef --no-archive -c -i POSIX -f "${'$'}_map" /usr/lib/locale/C.utf8 || true
+else
+  localedef --no-archive -c -i en_US -f UTF-8 /usr/lib/locale/en_US.utf8 || true
+fi
+rm -f "${'$'}_map"
+if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
+  printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+fi
+exit 0
+""".trimStart()
+
+    internal fun writeEnsureLocaleScript(rootfs: File) {
+        val dest = File(rootfs, "usr/local/sbin/flux-ensure-locale")
+        try {
+            dest.parentFile?.mkdirs()
+            if (dest.isFile && !dest.canWrite()) return
+            dest.writeText(ENSURE_LOCALE_SH)
+            dest.setExecutable(true, false)
+            Log.i(TAG, "Wrote ${dest.absolutePath}")
+        } catch (e: Exception) {
+            Log.w(TAG, "flux-ensure-locale write failed: ${e.message}")
+        }
+    }
+
+    /** Existing guests: replace flux-locale.sh that blindly exports C.UTF-8. */
+    internal fun writeLocaleProfile(rootfs: File) {
+        val dest = File(rootfs, "etc/profile.d/flux-locale.sh")
+        try {
+            dest.parentFile?.mkdirs()
+            if (dest.isFile && !dest.canWrite()) return
+            dest.writeText(LOCALE_PROFILE)
+            Log.i(TAG, "Wrote locale profile at ${dest.absolutePath}")
+        } catch (e: Exception) {
+            Log.w(TAG, "locale profile write failed: ${e.message}")
         }
     }
 
@@ -190,12 +276,15 @@ fi
 """.trimStart()
 
     internal fun writeFastfetchPresets(fluxHome: File?, rootfs: File?) {
-        val homes = mutableListOf<File>()
-        if (fluxHome != null) homes.add(fluxHome)
-        if (rootfs != null) homes.add(File(rootfs, "root"))
-        for (home in homes) {
-            if (!home.isDirectory) continue
-            val dest = File(home, ".local/share/fastfetch/presets/termux.jsonc")
+        val dests = mutableListOf<File>()
+        if (fluxHome != null) {
+            dests.add(File(fluxHome, ".local/share/fastfetch/presets/termux.jsonc"))
+        }
+        if (rootfs != null) {
+            dests.add(File(rootfs, "root/.local/share/fastfetch/presets/termux.jsonc"))
+            dests.add(File(rootfs, "usr/share/fastfetch/presets/termux.jsonc"))
+        }
+        for (dest in dests) {
             try {
                 dest.parentFile?.mkdirs()
                 if (!dest.canWrite() && dest.isFile) continue
@@ -327,6 +416,14 @@ fi
         if (!text.contains("setopt no_monitor")) return true
         // Hard LANG=en_US.UTF-8 without locale -a fallback spam-fails on Fedora.
         if (!text.contains("locale -a")) return true
+        // Old fallback exported C.UTF-8 even when that locale is missing
+        // (Manjaro ARM) → setlocale + "prompt_segment: character not in range".
+        if (text.contains("export LANG=C.UTF-8") && !text.contains("grep -qxFi")) return true
+        // Bare `fastfetch` lists every Android bind mount under proot.
+        if (text.contains("|| fastfetch 2>/dev/null")) return true
+        // Theme / pokemon must not be gated on LC_ALL (user-visible shell).
+        if (text.contains("ZSH_THEME=\"\"")) return true
+        if (text.contains("[ -n \"\${LC_ALL:-}\" ] && command -v pokemon-colorscripts")) return true
         return false
     }
 }

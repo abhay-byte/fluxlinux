@@ -247,26 +247,99 @@ _flux_require_startxfce4() {
     fi
 }
 
-# Materialize en_US.UTF-8 so launchers (LANG=en_US.UTF-8) do not print
-# "cannot change locale" and agnosterzak can paint @flux. Musl/Chimera
-# keeps C.UTF-8. Idempotent; safe after every glibc family package pass.
-_flux_write_locale_profile() {
-    mkdir -p /etc/profile.d
-    cat > /etc/profile.d/flux-locale.sh <<'EOF'
-if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
-  export LANG=en_US.UTF-8
-  export LC_ALL=en_US.UTF-8
-else
-  export LANG=C.UTF-8
-  export LC_ALL=C.UTF-8
-fi
-EOF
+# Materialize a UTF-8 locale so launchers / agnosterzak / pokemon work.
+# Manjaro ARM bootstrap has a fully-commented locale.gen and no
+# locale-archive; localedef *into the archive* often fails under proot.
+# Directory locales (--no-archive) work. Never export a name glibc cannot
+# load (setlocale warnings + zsh "prompt_segment: character not in range").
+_flux_locale_listed() {
+    locale -a 2>/dev/null | grep -qxFi "$1"
 }
 
 _flux_locale_has_en_us() {
     ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US' && return 0
-    locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)' && return 0
+    _flux_locale_listed en_US.UTF-8 && return 0
+    _flux_locale_listed en_US.utf8 && return 0
     return 1
+}
+
+_flux_locale_has_c_utf8() {
+    ls /usr/lib/locale 2>/dev/null | grep -qiE '^C\.(utf8|UTF-8)$' && return 0
+    _flux_locale_listed C.UTF-8 && return 0
+    _flux_locale_listed C.utf8 && return 0
+    return 1
+}
+
+# Drop inherited LANG/LC_ALL when glibc cannot load them (install + login).
+_flux_sanitize_lang() {
+    _cur="${LC_ALL:-${LANG:-}}"
+    if [ -z "$_cur" ] || [ "$_cur" = "C" ] || [ "$_cur" = "POSIX" ]; then
+        unset LC_ALL
+        export LANG=C
+        unset _cur
+        return 0
+    fi
+    if _flux_locale_listed "$_cur"; then
+        unset _cur
+        return 0
+    fi
+    unset LC_ALL
+    export LANG=C
+    unset _cur
+}
+
+_flux_sanitize_lang
+
+_flux_write_locale_profile() {
+    mkdir -p /etc/profile.d
+    cat > /etc/profile.d/flux-locale.sh <<'EOF'
+# Never export a locale glibc cannot load.
+_have=$(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "$_have" | grep -qxFi "$_c" && { _pick="$_c"; break; }
+done
+if [ -n "$_pick" ]; then
+  export LANG="$_pick" LC_ALL="$_pick"
+else
+  unset LC_ALL
+  export LANG=C
+fi
+unset _have _c _pick
+EOF
+}
+
+_flux_charmap_utf8() {
+    _map=/tmp/flux-UTF-8
+    if [ -s "$_map" ]; then
+        printf '%s' "$_map"
+        return 0
+    fi
+    if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
+        gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "$_map" || true
+    elif [ -f /usr/share/i18n/charmaps/UTF-8 ]; then
+        cp -f /usr/share/i18n/charmaps/UTF-8 "$_map" || true
+    fi
+    if [ -s "$_map" ]; then
+        printf '%s' "$_map"
+        return 0
+    fi
+    return 1
+}
+
+# Directory locale under /usr/lib/locale — works when locale-archive is
+# missing or unwritable (Manjaro/Arch under proot).
+_flux_localedef_dir() {
+    _in="$1"
+    _dest="$2"
+    command -v localedef >/dev/null 2>&1 || return 1
+    mkdir -p /usr/lib/locale
+    _map=$(_flux_charmap_utf8 || true)
+    if [ -n "$_map" ] && [ -s "$_map" ]; then
+        localedef --no-archive -c -i "$_in" -f "$_map" "$_dest"
+    else
+        localedef --no-archive -c -i "$_in" -f UTF-8 "$_dest"
+    fi
 }
 
 _flux_ensure_en_us_locale() {
@@ -274,6 +347,7 @@ _flux_ensure_en_us_locale() {
         _flux_log "Chimera/musl — skipping glibc locale generation"
         printf 'LANG=C.UTF-8\n' > /etc/locale.conf
         _flux_write_locale_profile
+        _flux_sanitize_lang
         return 0
     fi
     _flux_log "Ensuring en_US.UTF-8 locale"
@@ -291,10 +365,16 @@ _flux_ensure_en_us_locale() {
     elif command -v apt-get >/dev/null 2>&1; then
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             locales 2>/dev/null || true
+    elif command -v pacman >/dev/null 2>&1; then
+        # Restores /usr/share/i18n (locales + charmaps) on stripped ARM bootstraps.
+        pacman -S --noconfirm --needed glibc 2>/dev/null || true
     fi
     if [ -f /etc/locale.gen ]; then
         if ! grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null; then
             printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
+        fi
+        if ! grep -q '^C.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null; then
+            printf 'C.UTF-8 UTF-8\n' >> /etc/locale.gen
         fi
     fi
     _ok=0
@@ -303,24 +383,35 @@ _flux_ensure_en_us_locale() {
         locale-gen en_US.UTF-8 2>/dev/null || locale-gen || true
         _flux_locale_has_en_us && _ok=1
     fi
-    if [ "$_ok" != 1 ] && command -v localedef >/dev/null 2>&1; then
-        _map=/tmp/flux-UTF-8
-        if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
-            gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "$_map" || true
-        elif [ -f /usr/share/i18n/charmaps/UTF-8 ]; then
-            cp -f /usr/share/i18n/charmaps/UTF-8 "$_map"
-        fi
-        if [ -s "$_map" ]; then
-            localedef -i en_US -f "$_map" en_US.UTF-8 && _ok=1
-        else
-            localedef -i en_US -f UTF-8 en_US.UTF-8 && _ok=1
-        fi
-        rm -f "$_map"
-    fi
-    _flux_locale_has_en_us && _ok=1
+    # Prefer a directory locale: archive writes often fail under proot.
     if [ "$_ok" != 1 ]; then
-        _flux_log "WARNING: en_US.UTF-8 locale missing after generation"
+        if _flux_localedef_dir en_US /usr/lib/locale/en_US.utf8; then
+            _ok=1
+        elif _flux_localedef_dir en_US en_US.UTF-8; then
+            _ok=1
+        fi
     fi
-    printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+    if ! _flux_locale_has_c_utf8; then
+        _flux_localedef_dir POSIX /usr/lib/locale/C.utf8 || \
+            _flux_localedef_dir C /usr/lib/locale/C.utf8 || true
+    fi
+    rm -f /tmp/flux-UTF-8
+    _flux_locale_has_en_us && _ok=1
+    if [ "$_ok" = 1 ]; then
+        printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+        export LANG=en_US.UTF-8
+        export LC_ALL=en_US.UTF-8
+    elif _flux_locale_has_c_utf8; then
+        _flux_log "WARNING: en_US.UTF-8 missing — using C.UTF-8"
+        printf 'LANG=C.UTF-8\n' > /etc/locale.conf
+        export LANG=C.UTF-8
+        export LC_ALL=C.UTF-8
+    else
+        _flux_log "WARNING: no UTF-8 locale after generation — using POSIX C"
+        printf 'LANG=C\n' > /etc/locale.conf
+        unset LC_ALL
+        export LANG=C
+    fi
     _flux_write_locale_profile
+    _flux_sanitize_lang
 }

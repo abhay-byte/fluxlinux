@@ -62,6 +62,35 @@ class GuestZshrcRepairTest {
     }
 
     @Test
+    fun needsRepair_oldCUtf8Fallback() {
+        val old = """
+            unset PROOT_TMP_DIR
+            setopt no_monitor
+            if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
+              export LANG=en_US.UTF-8
+              export LC_ALL=en_US.UTF-8
+            else
+              export LANG=C.UTF-8
+              export LC_ALL=C.UTF-8
+            fi
+        """.trimIndent()
+        assertTrue(GuestZshrcRepair.needsRepair(old))
+    }
+
+    @Test
+    fun needsRepair_bareFastfetch() {
+        val old = """
+            unset PROOT_TMP_DIR
+            setopt no_monitor
+            if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
+              export LANG=en_US.UTF-8
+            fi
+            fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+        """.trimIndent()
+        assertTrue(GuestZshrcRepair.needsRepair(old))
+    }
+
+    @Test
     fun needsRepair_missingLocaleFallback() {
         val old = """
             unset PROOT_TMP_DIR
@@ -208,6 +237,18 @@ class GuestZshrcRepairTest {
             val text = File(home, ".zshrc").readText()
             assertTrue(text.contains("pacman() { command sudo pacman"))
             assertTrue(!text.contains("apk() { command sudo apk"))
+            assertTrue(text.contains("grep -qxFi"))
+            assertTrue(text.contains("flux-ensure-locale"))
+            assertTrue(text.contains("ZSH_THEME=\"agnosterzak\""))
+            assertTrue(text.contains("pokemon-colorscripts --no-title"))
+            assertFalse(text.contains("ZSH_THEME=\"\""))
+            val rootfs = File(dir, "usr/var/lib/proot-distro/containers/manjaro/rootfs")
+            assertTrue(File(rootfs, "etc/profile.d/flux-locale.sh").isFile)
+            assertTrue(File(rootfs, "usr/local/sbin/flux-ensure-locale").isFile)
+            assertFalse(
+                File(rootfs, "etc/profile.d/flux-locale.sh").readText()
+                    .contains("export LANG=C.UTF-8")
+            )
         } finally {
             dir.deleteRecursively()
         }
@@ -225,8 +266,10 @@ class GuestZshrcRepairTest {
             GuestZshrcRepair.repairIfNeeded(ctx, "proot", "fedora")
             val fluxJsonc = File(home, ".local/share/fastfetch/presets/termux.jsonc")
             val rootJsonc = File(rootfs, "root/.local/share/fastfetch/presets/termux.jsonc")
+            val sysJsonc = File(rootfs, "usr/share/fastfetch/presets/termux.jsonc")
             assertTrue(fluxJsonc.isFile)
             assertTrue(rootJsonc.isFile)
+            assertTrue(sysJsonc.isFile)
             val text = fluxJsonc.readText()
             assertTrue(text.contains("\"folders\""))
             assertTrue(text.contains("\"/\""))

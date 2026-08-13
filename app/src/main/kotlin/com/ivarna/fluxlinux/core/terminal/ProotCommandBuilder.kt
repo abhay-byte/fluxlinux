@@ -18,8 +18,11 @@ object ProotCommandBuilder {
     fun guestLoginEnv(user: String): String {
         val u = if (user == "root") "root" else "flux"
         val home = if (u == "root") "/root" else "/home/flux"
+        // Do not force LANG/LC_ALL here: missing en_US.UTF-8 prints
+        // "cannot change locale" from /bin/sh before profile.d can pick.
+        // Guest flux-locale.sh / .zshrc select a locale that exists.
         return "env -i HOME=$home USER=$u LOGNAME=$u " +
-            "TERM=\"\${TERM:-xterm-256color}\" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 " +
+            "TERM=\"\${TERM:-xterm-256color}\" LANG=C " +
             "TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PATH=$GUEST_PATH"
     }
 

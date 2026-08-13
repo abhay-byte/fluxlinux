@@ -31,6 +31,9 @@ class ProotCommandBuilderTest {
         assertTrue(!joined.contains("login debian"))
         assertTrue(joined.contains("env -i"))
         assertTrue(joined.contains("TMPDIR=/tmp"))
+        assertTrue(joined.contains("LANG=C"))
+        assertTrue(!joined.contains("LC_ALL=en_US.UTF-8"))
+        assertTrue(!joined.contains("LANG=en_US.UTF-8"))
         assertTrue(!joined.contains("PROOT_TMP_DIR="))
     }
 

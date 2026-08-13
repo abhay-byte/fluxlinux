@@ -31,7 +31,7 @@ object ChrootPaths {
     const val CHROOT_HELPER = "/data/local/tmp/fluxlinux_chroot.sh"
     const val CHROOT_HELPER_ASSET = "scripts/chroot/fluxlinux_chroot.sh"
     /** Must match first `# fluxlinux-chroot vN` line in the asset. */
-    const val CHROOT_HELPER_VERSION = "fluxlinux-chroot v2.3"
+    const val CHROOT_HELPER_VERSION = "fluxlinux-chroot v2.4"
 
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"

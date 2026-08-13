@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# fluxlinux-chroot v2.3
+# fluxlinux-chroot v2.4
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
@@ -17,7 +17,7 @@
 #   FLUX_CHROOT  FLUX_PACKAGE  FLUX_HOST_TMP  FLUX_PREFIX  FLUX_BB  FLUX_SHELL
 set -u
 
-VERSION_STR="fluxlinux-chroot v2.3"
+VERSION_STR="fluxlinux-chroot v2.4"
 # Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
 if [ -z "${FLUX_PACKAGE:-}" ]; then
   if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
@@ -246,12 +246,13 @@ guest_path_for_user() {
 build_guest_env_args() {
   _gp=$(guest_path_for_user)
   _term="${TERM:-xterm-256color}"
-  _lang="${LANG:-en_US.UTF-8}"
-  _lc="${LC_ALL:-en_US.UTF-8}"
+  # POSIX C until guest profile.d/zshrc picks a locale that exists.
+  # Forcing en_US.UTF-8 here prints setlocale warnings on Manjaro ARM.
+  _lang="${LANG:-C}"
   if [ "$USER_NAME" = "root" ]; then
-    GUEST_ENV_ARGS="PATH=$_gp HOME=/root USER=root LOGNAME=root TERM=$_term LANG=$_lang LC_ALL=$_lc TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
+    GUEST_ENV_ARGS="PATH=$_gp HOME=/root USER=root LOGNAME=root TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
   else
-    GUEST_ENV_ARGS="PATH=$_gp HOME=/home/flux USER=flux LOGNAME=flux NVM_DIR=/home/flux/.nvm TERM=$_term LANG=$_lang LC_ALL=$_lc TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
+    GUEST_ENV_ARGS="PATH=$_gp HOME=/home/flux USER=flux LOGNAME=flux NVM_DIR=/home/flux/.nvm TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
   fi
 }
 
@@ -295,15 +296,34 @@ ensure_flux_zsh_profile() {
 # Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
 export PATH="$HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+_have=$(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "$_have" | grep -qxFi "$_c" && { _pick="$_c"; break; }
+done
+if [ -n "$_pick" ]; then
+  export LANG="$_pick" LC_ALL="$_pick"
+else
+  unset LC_ALL
+  export LANG=C
+fi
+unset _have _c _pick
 unset PROOT_TMP_DIR
 export TMPDIR="${TMPDIR:-/tmp}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 
 {
   if command -v fastfetch >/dev/null 2>&1; then
-    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+    _ff="$HOME/.local/share/fastfetch/presets/termux.jsonc"
+    if [ -f "$_ff" ]; then
+      fastfetch --config "$_ff" 2>/dev/null || true
+    else
+      fastfetch --config termux 2>/dev/null || true
+    fi
+    unset _ff
+  fi
+  if command -v pokemon-colorscripts >/dev/null 2>&1; then
+    pokemon-colorscripts --no-title -r 1,2,3 2>/dev/null || true
   fi
 } &!
 

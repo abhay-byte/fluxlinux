@@ -20,6 +20,8 @@
 
 **References:** [`docs/scripts_reference.md`](../scripts_reference.md), [`docs/scripts_flowchart.md`](../scripts_flowchart.md), [`docs/adding_new_distro.md`](../adding_new_distro.md), [`docs/plan/fedora-void-opensuse.md`](./fedora-void-opensuse.md), [`docs/plan/deepin-chimera-manjaro.md`](./deepin-chimera-manjaro.md), [`docs/plan/archlinux-alarm-slim-rootfs.md`](./archlinux-alarm-slim-rootfs.md).
 
+**How to use this file:** this is the implementation contract. Paste-ready iteration-1 worker prompt (implement + device-test all 8 new paths, Ubuntu first): [`docs/plans/worker-prompt-ubuntu-kali-parrot-arch-iter1.md`](../plans/worker-prompt-ubuntu-kali-parrot-arch-iter1.md). Existing 8 guests (Alpine / Debian / FVO / DCM) stay live — do not re-install them unless a shared helper changes.
+
 ---
 
 ## 0. Product decisions

@@ -171,21 +171,30 @@ if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; 
     _flux_pkg_add python3 2>/dev/null || _flux_pkg_add python 2>/dev/null || true
 fi
 
-# Existing Fedora/SUSE guests: customization-only re-run must install the
-# langpack so launchers stop printing "cannot change locale".
+# Existing guests: customization-only re-run must materialize a UTF-8 locale
+# so launchers stop printing "cannot change locale" and zsh can paint @flux.
 _flux_pkg_add glibc-langpack-en 2>/dev/null || true
 _flux_pkg_add glibc-locale 2>/dev/null || true
 _flux_pkg_add glibc-locale-base 2>/dev/null || true
 _flux_pkg_add glibc-locales 2>/dev/null || true
 _flux_pkg_add locales 2>/dev/null || true
-if command -v locale-gen >/dev/null 2>&1; then
-    if [ -f /etc/locale.gen ] && ! grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null; then
-        printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
-    fi
-    locale-gen en_US.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
+if command -v pacman >/dev/null 2>&1; then
+    _flux_pkg_add glibc 2>/dev/null || true
 fi
-if ! ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US'; then
-    if command -v localedef >/dev/null 2>&1; then
+if command -v _flux_ensure_en_us_locale >/dev/null 2>&1; then
+    _flux_ensure_en_us_locale
+else
+    if [ -f /etc/locale.gen ]; then
+        grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null \
+            || printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
+    fi
+    if command -v locale-gen >/dev/null 2>&1; then
+        locale-gen en_US.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
+    fi
+    if ! locale -a 2>/dev/null | grep -qxFi en_US.utf8 \
+        && ! locale -a 2>/dev/null | grep -qxFi en_US.UTF-8 \
+        && command -v localedef >/dev/null 2>&1; then
+        mkdir -p /usr/lib/locale
         _map=/tmp/flux-UTF-8
         if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
             gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "$_map" || true
@@ -193,33 +202,35 @@ if ! ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US'; then
             cp -f /usr/share/i18n/charmaps/UTF-8 "$_map"
         fi
         if [ -s "$_map" ]; then
-            localedef -i en_US -f "$_map" en_US.UTF-8 2>/dev/null || true
+            localedef --no-archive -c -i en_US -f "$_map" /usr/lib/locale/en_US.utf8 2>/dev/null || true
+            localedef --no-archive -c -i POSIX -f "$_map" /usr/lib/locale/C.utf8 2>/dev/null || true
         else
-            localedef -i en_US -f UTF-8 en_US.UTF-8 2>/dev/null || true
+            localedef --no-archive -c -i en_US -f UTF-8 /usr/lib/locale/en_US.utf8 2>/dev/null || true
         fi
         rm -f "$_map"
     fi
-fi
-if ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US' \
-    || locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
-    printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
-    export LANG=en_US.UTF-8
-    export LC_ALL=en_US.UTF-8
+    mkdir -p /etc/profile.d
+    cat > /etc/profile.d/flux-locale.sh <<'EOF'
+_have=$(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "$_have" | grep -qxFi "$_c" && { _pick="$_c"; break; }
+done
+if [ -n "$_pick" ]; then
+  export LANG="$_pick" LC_ALL="$_pick"
 else
-    printf 'LANG=C.UTF-8\n' > /etc/locale.conf 2>/dev/null || true
-    export LANG="${LANG:-C.UTF-8}"
-    export LC_ALL="${LC_ALL:-C.UTF-8}"
+  unset LC_ALL
+  export LANG=C
 fi
-mkdir -p /etc/profile.d
-cat > /etc/profile.d/flux-locale.sh <<'EOF'
-if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
-  export LANG=en_US.UTF-8
-  export LC_ALL=en_US.UTF-8
-else
-  export LANG=C.UTF-8
-  export LC_ALL=C.UTF-8
-fi
+unset _have _c _pick
 EOF
+    . /etc/profile.d/flux-locale.sh
+    if [ -n "${LC_ALL:-}" ]; then
+        printf 'LANG=%s\n' "$LANG" > /etc/locale.conf
+    else
+        printf 'LANG=C\n' > /etc/locale.conf
+    fi
+fi
 
 ASSET_REPO="abhay-byte/fluxlinux"
 ASSET_TAG="debian-v1"
@@ -825,13 +836,22 @@ cat > "$ZSHRC" << 'ZSHEOF'
 # Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
 export PATH="$HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
-  export LANG=en_US.UTF-8
-  export LC_ALL=en_US.UTF-8
-else
-  export LANG=C.UTF-8
-  export LC_ALL=C.UTF-8
+if [ -x /usr/local/sbin/flux-ensure-locale ] && command -v sudo >/dev/null 2>&1; then
+  sudo /usr/local/sbin/flux-ensure-locale 2>/dev/null || true
 fi
+_have=$(locale -a 2>/dev/null || true)
+_pick=""
+for _c in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8; do
+  echo "$_have" | grep -qxFi "$_c" && { _pick="$_c"; break; }
+done
+if [ -n "$_pick" ]; then
+  export LANG="$_pick" LC_ALL="$_pick"
+else
+  unset LC_ALL
+  export LANG=C
+fi
+unset _have _c _pick
+export PYTHONIOENCODING=UTF-8
 
 unset PROOT_TMP_DIR
 export TMPDIR="${TMPDIR:-/tmp}"
@@ -843,7 +863,13 @@ setopt no_monitor
 
 {
   if command -v fastfetch >/dev/null 2>&1; then
-    fastfetch --config termux 2>/dev/null || fastfetch 2>/dev/null || true
+    _ff="$HOME/.local/share/fastfetch/presets/termux.jsonc"
+    if [ -f "$_ff" ]; then
+      fastfetch --config "$_ff" 2>/dev/null || true
+    else
+      fastfetch --config termux 2>/dev/null || true
+    fi
+    unset _ff
   fi
   if command -v pokemon-colorscripts >/dev/null 2>&1; then
     pokemon-colorscripts --no-title -r 1,2,3 2>/dev/null || true
@@ -931,6 +957,11 @@ FFEOF
 }
 _flux_write_fastfetch_preset "$USER_HOME" "$CUSTOM_USER:$CUSTOM_GROUP"
 _flux_write_fastfetch_preset /root
+mkdir -p /usr/share/fastfetch/presets
+if [ -f "$USER_HOME/.local/share/fastfetch/presets/termux.jsonc" ]; then
+    cp -f "$USER_HOME/.local/share/fastfetch/presets/termux.jsonc" \
+        /usr/share/fastfetch/presets/termux.jsonc 2>/dev/null || true
+fi
 
 if command -v zsh >/dev/null 2>&1; then
     ZSH_PATH="$(command -v zsh)"

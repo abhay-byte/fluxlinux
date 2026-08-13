@@ -184,8 +184,8 @@ if [ -d /home/flux ]; then
     chmod -R u+rwX /home/flux/.config /home/flux/.cache /home/flux/.local 2>/dev/null || true
 fi
 
-export LANG="${LANG:-C.UTF-8}"
-export LC_ALL="${LC_ALL:-C.UTF-8}"
+unset LC_ALL
+export LANG="${LANG:-C}"
 
 # Proot: host process is the Android app uid. If apk db/lock were written as
 # real host root (uid 0), guest "root"/sudo still cannot lock the DB →
