@@ -156,7 +156,8 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
     group = "build"
     description =
         "Copy pinned Debian + Alpine + Fedora + Void + openSUSE + Deepin + " +
-            "Chimera + Manjaro rootfs into app/src/main/assets/rootfs " +
+            "Chimera + Manjaro + Ubuntu + Kali + Parrot + Arch rootfs into " +
+            "app/src/main/assets/rootfs " +
             "(Alpine as .minirootfs so aapt2 does not strip .gz)"
     workingDir = rootProject.projectDir
     // Alpine must not be packaged as *.tar.gz: aapt2 auto-decompresses and
@@ -180,7 +181,9 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
         for rf in fedora_44_rootfs.tar.xz void_20250202_rootfs.tar.xz \
                  opensuse_tumbleweed_rootfs.tar.xz \
                  deepin_25_rootfs.tar.xz chimera_20251220_rootfs.tar.xz \
-                 manjaro_arm_rootfs.tar.xz; do
+                 manjaro_arm_rootfs.tar.xz \
+                 ubuntu_26.04_rootfs.tar.xz kali_2026_2_rootfs.tar.xz \
+                 parrot_7.2_rootfs.tar.xz archlinux_arm_rootfs.tar.xz; do
           if [ -f "assets/rootfs/${'$'}rf" ]; then
             cp -f "assets/rootfs/${'$'}rf" "app/src/main/assets/rootfs/${'$'}rf"
           fi
@@ -195,7 +198,11 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
         rootProject.file("assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/deepin_25_rootfs.tar.xz"),
         rootProject.file("assets/rootfs/chimera_20251220_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/manjaro_arm_rootfs.tar.xz")
+        rootProject.file("assets/rootfs/manjaro_arm_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/ubuntu_26.04_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/kali_2026_2_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/parrot_7.2_rootfs.tar.xz"),
+        rootProject.file("assets/rootfs/archlinux_arm_rootfs.tar.xz")
     )
     outputs.files(
         file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"),
@@ -205,7 +212,11 @@ val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
         file("src/main/assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
         file("src/main/assets/rootfs/deepin_25_rootfs.tar.xz"),
         file("src/main/assets/rootfs/chimera_20251220_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/manjaro_arm_rootfs.tar.xz")
+        file("src/main/assets/rootfs/manjaro_arm_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/ubuntu_26.04_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/kali_2026_2_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/parrot_7.2_rootfs.tar.xz"),
+        file("src/main/assets/rootfs/archlinux_arm_rootfs.tar.xz")
     )
 }
 

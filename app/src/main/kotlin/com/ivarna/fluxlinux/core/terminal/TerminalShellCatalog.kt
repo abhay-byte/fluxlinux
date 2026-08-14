@@ -47,6 +47,10 @@ data class TerminalShellAvailability(
     val deepinProot: Boolean = false,
     val chimeraProot: Boolean = false,
     val manjaroProot: Boolean = false,
+    val ubuntuProot: Boolean = false,
+    val kaliProot: Boolean = false,
+    val parrotProot: Boolean = false,
+    val archlinuxProot: Boolean = false,
     val debianChroot: Boolean,
     val alpineChroot: Boolean,
     val fedoraChroot: Boolean = false,
@@ -55,6 +59,10 @@ data class TerminalShellAvailability(
     val deepinChroot: Boolean = false,
     val chimeraChroot: Boolean = false,
     val manjaroChroot: Boolean = false,
+    val ubuntuChroot: Boolean = false,
+    val kaliChroot: Boolean = false,
+    val parrotChroot: Boolean = false,
+    val archlinuxChroot: Boolean = false,
     val rootAvailable: Boolean
 ) {
     /** Back-compat aliases used by older tests / call sites. */
@@ -70,6 +78,10 @@ data class TerminalShellAvailability(
         "deepin" -> deepinProot
         "chimera" -> chimeraProot
         "manjaro" -> manjaroProot
+        "ubuntu" -> ubuntuProot
+        "kali" -> kaliProot
+        "parrot" -> parrotProot
+        "archlinux" -> archlinuxProot
         else -> false
     }
 
@@ -82,6 +94,10 @@ data class TerminalShellAvailability(
         "deepin_chroot" -> deepinChroot
         "chimera_chroot" -> chimeraChroot
         "manjaro_chroot" -> manjaroChroot
+        "ubuntu_chroot" -> ubuntuChroot
+        "kali_chroot" -> kaliChroot
+        "parrot_chroot" -> parrotChroot
+        "archlinux_chroot" -> archlinuxChroot
         else -> false
     }
 }
@@ -97,6 +113,10 @@ object TerminalShellCatalog {
             "deepin" -> "Deepin" to R.drawable.distro_deepin
             "chimera" -> "Chimera" to R.drawable.distro_chimera
             "manjaro" -> "Manjaro" to R.drawable.distro_manjaro
+            "ubuntu" -> "Ubuntu" to R.drawable.distro_ubuntu
+            "kali" -> "Kali" to R.drawable.distro_kali
+            "parrot" -> "Parrot" to R.drawable.distro_parrot
+            "archlinux" -> "Arch" to R.drawable.distro_arch
             else -> "Debian" to R.drawable.distro_debian
         }
         return listOf(
@@ -135,6 +155,14 @@ object TerminalShellCatalog {
                 Triple("Chimera Chroot", R.drawable.distro_chimera, "chimera_chroot")
             "manjaro_chroot", "manjaro" ->
                 Triple("Manjaro Chroot", R.drawable.distro_manjaro, "manjaro_chroot")
+            "ubuntu_chroot", "ubuntu" ->
+                Triple("Ubuntu Chroot", R.drawable.distro_ubuntu, "ubuntu_chroot")
+            "kali_chroot", "kali" ->
+                Triple("Kali Chroot", R.drawable.distro_kali, "kali_chroot")
+            "parrot_chroot", "parrot" ->
+                Triple("Parrot Chroot", R.drawable.distro_parrot, "parrot_chroot")
+            "archlinux_chroot", "archlinux" ->
+                Triple("Arch Chroot", R.drawable.distro_arch, "archlinux_chroot")
             else ->
                 Triple("Debian Chroot", R.drawable.distro_debian, "debian13_chroot")
         }
@@ -178,6 +206,10 @@ object TerminalShellCatalog {
             deepinProot = TerminalLauncher.isProotInstalled(ctx, "deepin"),
             chimeraProot = TerminalLauncher.isProotInstalled(ctx, "chimera"),
             manjaroProot = TerminalLauncher.isProotInstalled(ctx, "manjaro"),
+            ubuntuProot = TerminalLauncher.isProotInstalled(ctx, "ubuntu"),
+            kaliProot = TerminalLauncher.isProotInstalled(ctx, "kali"),
+            parrotProot = TerminalLauncher.isProotInstalled(ctx, "parrot"),
+            archlinuxProot = TerminalLauncher.isProotInstalled(ctx, "archlinux"),
             debianChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.DEBIAN_CHROOT_PATH),
             alpineChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.ALPINE_CHROOT_PATH),
             fedoraChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.FEDORA_CHROOT_PATH),
@@ -186,6 +218,10 @@ object TerminalShellCatalog {
             deepinChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.DEEPIN_CHROOT_PATH),
             chimeraChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.CHIMERA_CHROOT_PATH),
             manjaroChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.MANJARO_CHROOT_PATH),
+            ubuntuChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.UBUNTU_CHROOT_PATH),
+            kaliChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.KALI_CHROOT_PATH),
+            parrotChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.PARROT_CHROOT_PATH),
+            archlinuxChroot = TerminalLauncher.isChrootInstalled(ChrootPaths.ARCH_CHROOT_PATH),
             rootAvailable = rootAvailable
         )
 
@@ -245,6 +281,10 @@ object TerminalShellCatalog {
             prootSection("DEEPIN", "deepin", avail.prootInstalled("deepin")),
             prootSection("CHIMERA", "chimera", avail.prootInstalled("chimera")),
             prootSection("MANJARO", "manjaro", avail.prootInstalled("manjaro")),
+            prootSection("UBUNTU", "ubuntu", avail.prootInstalled("ubuntu")),
+            prootSection("KALI", "kali", avail.prootInstalled("kali")),
+            prootSection("PARROT", "parrot", avail.prootInstalled("parrot")),
+            prootSection("ARCHLINUX", "archlinux", avail.prootInstalled("archlinux")),
             chrootSection("DEBIAN", "debian13_chroot", avail.chrootInstalled("debian13_chroot")),
             chrootSection("ALPINE", "alpine_chroot", avail.chrootInstalled("alpine_chroot")),
             chrootSection("FEDORA", "fedora_chroot", avail.chrootInstalled("fedora_chroot")),
@@ -253,6 +293,10 @@ object TerminalShellCatalog {
             chrootSection("DEEPIN", "deepin_chroot", avail.chrootInstalled("deepin_chroot")),
             chrootSection("CHIMERA", "chimera_chroot", avail.chrootInstalled("chimera_chroot")),
             chrootSection("MANJARO", "manjaro_chroot", avail.chrootInstalled("manjaro_chroot")),
+            chrootSection("UBUNTU", "ubuntu_chroot", avail.chrootInstalled("ubuntu_chroot")),
+            chrootSection("KALI", "kali_chroot", avail.chrootInstalled("kali_chroot")),
+            chrootSection("PARROT", "parrot_chroot", avail.chrootInstalled("parrot_chroot")),
+            chrootSection("ARCHLINUX", "archlinux_chroot", avail.chrootInstalled("archlinux_chroot")),
             TerminalShellSection(
                 title = "HOST",
                 subtitle = "OPTIONAL",

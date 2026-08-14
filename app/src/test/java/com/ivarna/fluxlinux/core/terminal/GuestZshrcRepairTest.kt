@@ -33,6 +33,22 @@ class GuestZshrcRepairTest {
     }
 
     @Test
+    fun resolveProotName_ukpa_suffixStripKeepsArchlinux() {
+        assertEquals("ubuntu", GuestZshrcRepair.resolveProotName("ubuntu"))
+        assertEquals("ubuntu", GuestZshrcRepair.resolveProotName("ubuntu_chroot"))
+        assertEquals("kali", GuestZshrcRepair.resolveProotName("kali"))
+        assertEquals("kali", GuestZshrcRepair.resolveProotName("kali_chroot"))
+        assertEquals("parrot", GuestZshrcRepair.resolveProotName("parrot"))
+        assertEquals("parrot", GuestZshrcRepair.resolveProotName("parrot_chroot"))
+        assertEquals("archlinux", GuestZshrcRepair.resolveProotName("archlinux"))
+        assertEquals("archlinux", GuestZshrcRepair.resolveProotName("archlinux_chroot"))
+        // Guard: a future removePrefix("arch") must not land.
+        assertFalse(GuestZshrcRepair.resolveProotName("archlinux_chroot") == "linux")
+        assertFalse(GuestZshrcRepair.resolveProotName("archlinux") == "linux")
+        assertTrue(GuestZshrcRepair.resolveProotName("archlinux_chroot").startsWith("arch"))
+    }
+
+    @Test
     fun needsRepair_hardOmzSource() {
         // Old non-defensive template: unconditional source, no existence guard.
         val bad = "export ZSH=\"\$HOME/.oh-my-zsh\"\nsource \$ZSH/oh-my-zsh.sh\n"
@@ -249,6 +265,73 @@ class GuestZshrcRepairTest {
                 File(rootfs, "etc/profile.d/flux-locale.sh").readText()
                     .contains("export LANG=C.UTF-8")
             )
+            assertTrue(
+                File(rootfs, "etc/profile.d/flux-locale.sh").readText()
+                    .contains("no UTF-8 locale in locale -a")
+            )
+            val ensure = File(rootfs, "usr/local/sbin/flux-ensure-locale").readText()
+            assertTrue(ensure.contains("locale -a"))
+            assertFalse(ensure.contains("--needed glibc"))
+            assertTrue(ensure.contains("pacman -S --noconfirm glibc"))
+            assertTrue(ensure.contains("locale -a has neither en_US.utf8 nor C.utf8"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun repairIfNeeded_ubuntu_createsAptWrappedZshrc() {
+        val dir = prootFilesDir()
+        try {
+            val home = File(
+                dir,
+                "usr/var/lib/proot-distro/containers/ubuntu/rootfs/home/flux"
+            )
+            home.mkdirs()
+            val ctx = FakeContext(dir, "$dir/jni")
+            GuestZshrcRepair.repairIfNeeded(ctx, "proot", "ubuntu")
+            val text = File(home, ".zshrc").readText()
+            assertTrue(text.contains("apt-get() { command sudo apt-get"))
+            assertTrue(text.contains("apt() { command sudo apt"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun repairIfNeeded_archlinux_createsPacmanWrappedZshrc() {
+        val dir = prootFilesDir()
+        try {
+            val home = File(
+                dir,
+                "usr/var/lib/proot-distro/containers/archlinux/rootfs/home/flux"
+            )
+            home.mkdirs()
+            val ctx = FakeContext(dir, "$dir/jni")
+            GuestZshrcRepair.repairIfNeeded(ctx, "proot", "archlinux")
+            val text = File(home, ".zshrc").readText()
+            assertTrue(text.contains("pacman() { command sudo pacman"))
+            assertTrue(!text.contains("apk() { command sudo apk"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun repairIfNeeded_kali_and_parrot_aptWrappers() {
+        val dir = prootFilesDir()
+        try {
+            listOf("kali", "parrot").forEach { name ->
+                val home = File(
+                    dir,
+                    "usr/var/lib/proot-distro/containers/$name/rootfs/home/flux"
+                )
+                home.mkdirs()
+                val ctx = FakeContext(dir, "$dir/jni")
+                GuestZshrcRepair.repairIfNeeded(ctx, "proot", name)
+                val text = File(home, ".zshrc").readText()
+                assertTrue("$name missing apt-get wrapper", text.contains("apt-get() { command sudo apt-get"))
+            }
         } finally {
             dir.deleteRecursively()
         }

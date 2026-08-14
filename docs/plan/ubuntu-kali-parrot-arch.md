@@ -1,7 +1,7 @@
 # Plan: Ubuntu, Kali, Parrot, and Arch (proot + chroot)
 
 **Date:** 2026-08-13  
-**Status:** PLAN ONLY — do not implement until this contract is accepted.  
+**Status:** DEVICE PASS — 2026-08-14. Eight new cards (Ubuntu/Kali/Parrot/Arch × proot+chroot) live in Ivarna release. Arch family needed `DisableSandbox` (pacman 7 alpm/Landlock on Android).  
 **Scope:** First-class FluxLinux guests for **Ubuntu 26.04 LTS (Resolute)**, **Kali Rolling 2026.2** (NetHunter-minimal rootfs, treated as Kali), **Parrot Security 7.2**, and **Arch Linux ARM** (already-slimmed xz) — same product shape as Alpine / Debian / FVO / Deepin-Chimera-Manjaro: install → internal terminal → XFCE on the **embedded Termux:X11** display.
 
 **Feasibility (inspected 2026-08-13):**
@@ -68,6 +68,15 @@
 | Kali | `rootfs/kali_2026_2_rootfs.tar.xz` | extract `kali-arm64/` then `tar -C that -c \| xz` | ≥ 40 MiB |
 | Parrot | `rootfs/parrot_7.2_rootfs.tar.xz` | extract `parrot-arm64/` then recompress | ≥ 30 MiB |
 | Arch | `rootfs/archlinux_arm_rootfs.tar.xz` | already in tree | ≥ 40 MiB (≤ 250 MiB) |
+
+**Pinned packaged xz** (also in `DistroInstallProfile`):
+
+| Asset | SHA-256 | Bytes |
+|-------|---------|------:|
+| `ubuntu_26.04_rootfs.tar.xz` | `e648a5302dd273c476e5658e652f88d1e66ece69b487431521c5caef4b960efc` | 20 734 792 |
+| `kali_2026_2_rootfs.tar.xz` | `01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689` | 123 244 844 |
+| `parrot_7.2_rootfs.tar.xz` | `49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4` | 111 851 420 |
+| `archlinux_arm_rootfs.tar.xz` | `40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75` | 116 277 544 |
 
 **Kali / Parrot flatten (mandatory).** `proot-distro install archive.tar.xz` and `setup_guest_chroot.sh` expect `./usr/bin/bash` at archive root. A wrapper directory installs an empty-looking guest.
 
@@ -621,14 +630,14 @@ plus `*_xfce_pass.png` screenshots.
 
 ## 14. Definition of done
 
-- [ ] OpenBSD not packaged.  
-- [ ] Four xz assets pinned (Ubuntu/Kali/Parrot SHA filled into §1.2). Kali/Parrot archives flat.  
-- [ ] Eight cards live in Ivarna release (not coming soon).  
-- [ ] Unit tests in §9.1 green.  
-- [ ] Packaging checks P1–P5 green.  
-- [ ] All 8 device rows: I1–I3, T1–T5, D1–D5, N1 green.  
-- [ ] Reports + XFCE screenshots under `docs/plans/results/`.  
-- [ ] Status line of this file flipped to `DEVICE PASS` with date.
+- [x] OpenBSD not packaged.  
+- [x] Four xz assets pinned (Ubuntu/Kali/Parrot SHA filled into §1.2). Kali/Parrot archives flat.  
+- [x] Eight cards live in Ivarna release (not coming soon).  
+- [x] Unit tests in §9.1 green.  
+- [x] Packaging checks P1–P5 green.  
+- [x] All 8 device rows: I1–I3, T1–T5, D1–D5, N1 green.  
+- [x] Reports + XFCE screenshots under `docs/plans/results/`.  
+- [x] Status line of this file flipped to `DEVICE PASS` with date.
 
 Until every box is checked, the work is not finished.
 

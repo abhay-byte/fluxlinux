@@ -254,22 +254,28 @@ _flux_require_startxfce4() {
 # locale-archive; localedef *into the archive* often fails under proot.
 # Directory locales (--no-archive) work. Never export a name glibc cannot
 # load (setlocale warnings + zsh "prompt_segment: character not in range").
+# Presence is locale -a only — leftover /usr/lib/locale dir names lie.
 _flux_locale_listed() {
-    locale -a 2>/dev/null | grep -qxFi "$1"
+    # locale -a prints en_US.utf8; callers may pass en_US.UTF-8. Equate them.
+    _want="$1"
+    locale -a 2>/dev/null | grep -qxFi "$_want" && return 0
+    case "$_want" in
+        *.UTF-8)
+            locale -a 2>/dev/null | grep -qxFi "${_want%.UTF-8}.utf8" && return 0
+            ;;
+        *.utf8)
+            locale -a 2>/dev/null | grep -qxFi "${_want%.utf8}.UTF-8" && return 0
+            ;;
+    esac
+    return 1
 }
 
 _flux_locale_has_en_us() {
-    ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US' && return 0
-    _flux_locale_listed en_US.UTF-8 && return 0
-    _flux_locale_listed en_US.utf8 && return 0
-    return 1
+    _flux_locale_listed en_US.UTF-8
 }
 
 _flux_locale_has_c_utf8() {
-    ls /usr/lib/locale 2>/dev/null | grep -qiE '^C\.(utf8|UTF-8)$' && return 0
-    _flux_locale_listed C.UTF-8 && return 0
-    _flux_locale_listed C.utf8 && return 0
-    return 1
+    _flux_locale_listed C.UTF-8
 }
 
 # Drop inherited LANG/LC_ALL when glibc cannot load them (install + login).
@@ -306,6 +312,7 @@ if [ -n "$_pick" ]; then
 else
   unset LC_ALL
   export LANG=C
+  echo "FluxLinux: WARNING: no UTF-8 locale in locale -a; zsh staying LANG=C" >&2
 fi
 unset _have _c _pick
 EOF
@@ -368,8 +375,18 @@ _flux_ensure_en_us_locale() {
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             locales 2>/dev/null || true
     elif command -v pacman >/dev/null 2>&1; then
-        # Restores /usr/share/i18n (locales + charmaps) on stripped ARM bootstraps.
-        pacman -S --noconfirm --needed glibc 2>/dev/null || true
+        # gzip unpacks UTF-8.gz for localedef. --needed glibc is a no-op on
+        # ALARM (already in the db) and does not restore stripped i18n.
+        command -v gzip >/dev/null 2>&1 \
+            || pacman -S --noconfirm gzip 2>/dev/null || true
+        command -v sed >/dev/null 2>&1 \
+            || pacman -S --noconfirm sed 2>/dev/null || true
+        if [ ! -f /usr/share/i18n/locales/en_US ] \
+            || { [ ! -f /usr/share/i18n/charmaps/UTF-8 ] \
+                 && [ ! -f /usr/share/i18n/charmaps/UTF-8.gz ]; }; then
+            _flux_log "Reinstalling glibc to restore /usr/share/i18n"
+            pacman -S --noconfirm glibc 2>/dev/null || true
+        fi
     fi
     if [ -f /etc/locale.gen ]; then
         if ! grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null; then
@@ -409,10 +426,9 @@ _flux_ensure_en_us_locale() {
         export LANG=C.UTF-8
         export LC_ALL=C.UTF-8
     else
-        _flux_log "WARNING: no UTF-8 locale after generation — using POSIX C"
-        printf 'LANG=C\n' > /etc/locale.conf
-        unset LC_ALL
-        export LANG=C
+        _flux_log "ERROR: no UTF-8 locale after generation (locale -a has neither en_US.utf8 nor C.utf8)"
+        _flux_write_locale_profile
+        return 1
     fi
     _flux_write_locale_profile
     _flux_sanitize_lang
@@ -534,7 +550,7 @@ if ! ls /usr/lib/locale 2>/dev/null | grep -qi 'en_US'; then
 fi
 printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
 if command -v _flux_ensure_en_us_locale >/dev/null 2>&1; then
-    _flux_ensure_en_us_locale
+    _flux_ensure_en_us_locale || exit 1
 fi
 
 _flux_require_startxfce4

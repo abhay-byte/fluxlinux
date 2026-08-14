@@ -173,41 +173,54 @@ fi
 
 # Existing guests: customization-only re-run must materialize a UTF-8 locale
 # so launchers stop printing "cannot change locale" and zsh can paint @flux.
+# Presence is locale -a only (directory names under /usr/lib/locale lie).
 _flux_pkg_add glibc-langpack-en 2>/dev/null || true
 _flux_pkg_add glibc-locale 2>/dev/null || true
 _flux_pkg_add glibc-locale-base 2>/dev/null || true
 _flux_pkg_add glibc-locales 2>/dev/null || true
 _flux_pkg_add locales 2>/dev/null || true
 if command -v pacman >/dev/null 2>&1; then
-    _flux_pkg_add glibc 2>/dev/null || true
+    command -v gzip >/dev/null 2>&1 || pacman -S --noconfirm gzip 2>/dev/null || true
+    if [ ! -f /usr/share/i18n/locales/en_US ] \
+        || { [ ! -f /usr/share/i18n/charmaps/UTF-8 ] \
+             && [ ! -f /usr/share/i18n/charmaps/UTF-8.gz ]; }; then
+        # --needed is a no-op when glibc is already installed (ALARM).
+        pacman -S --noconfirm glibc 2>/dev/null || true
+    fi
 fi
 if command -v _flux_ensure_en_us_locale >/dev/null 2>&1; then
-    _flux_ensure_en_us_locale
+    _flux_ensure_en_us_locale || handle_error "UTF-8 locale"
 else
-    if [ -f /etc/locale.gen ]; then
-        grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null \
-            || printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
-    fi
-    if command -v locale-gen >/dev/null 2>&1; then
-        locale-gen en_US.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
-    fi
-    if ! locale -a 2>/dev/null | grep -qxFi en_US.utf8 \
-        && ! locale -a 2>/dev/null | grep -qxFi en_US.UTF-8 \
-        && command -v localedef >/dev/null 2>&1; then
-        mkdir -p /usr/lib/locale
-        _map=/tmp/flux-UTF-8
-        if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
-            gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "$_map" || true
-        elif [ -f /usr/share/i18n/charmaps/UTF-8 ]; then
-            cp -f /usr/share/i18n/charmaps/UTF-8 "$_map"
+    if grep -qE '^ID=.?chimera' /etc/os-release 2>/dev/null \
+        || grep -qE '^ID=.?alpine' /etc/os-release 2>/dev/null; then
+        printf 'LANG=C.UTF-8\n' > /etc/locale.conf
+        export LANG=C.UTF-8
+    else
+        if [ -f /etc/locale.gen ]; then
+            grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null \
+                || printf 'en_US.UTF-8 UTF-8\n' >> /etc/locale.gen
         fi
-        if [ -s "$_map" ]; then
-            localedef --no-archive -c -i en_US -f "$_map" /usr/lib/locale/en_US.utf8 2>/dev/null || true
-            localedef --no-archive -c -i POSIX -f "$_map" /usr/lib/locale/C.utf8 2>/dev/null || true
-        else
-            localedef --no-archive -c -i en_US -f UTF-8 /usr/lib/locale/en_US.utf8 2>/dev/null || true
+        if command -v locale-gen >/dev/null 2>&1; then
+            locale-gen en_US.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
         fi
-        rm -f "$_map"
+        if ! locale -a 2>/dev/null | grep -qxFi en_US.utf8 \
+            && ! locale -a 2>/dev/null | grep -qxFi en_US.UTF-8 \
+            && command -v localedef >/dev/null 2>&1; then
+            mkdir -p /usr/lib/locale
+            _map=/tmp/flux-UTF-8
+            if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
+                gzip -dc /usr/share/i18n/charmaps/UTF-8.gz > "$_map" || true
+            elif [ -f /usr/share/i18n/charmaps/UTF-8 ]; then
+                cp -f /usr/share/i18n/charmaps/UTF-8 "$_map"
+            fi
+            if [ -s "$_map" ]; then
+                localedef --no-archive -c -i en_US -f "$_map" /usr/lib/locale/en_US.utf8 2>/dev/null || true
+                localedef --no-archive -c -i POSIX -f "$_map" /usr/lib/locale/C.utf8 2>/dev/null || true
+            else
+                localedef --no-archive -c -i en_US -f UTF-8 /usr/lib/locale/en_US.utf8 2>/dev/null || true
+            fi
+            rm -f "$_map"
+        fi
     fi
     mkdir -p /etc/profile.d
     cat > /etc/profile.d/flux-locale.sh <<'EOF'
@@ -221,14 +234,16 @@ if [ -n "$_pick" ]; then
 else
   unset LC_ALL
   export LANG=C
+  echo "FluxLinux: WARNING: no UTF-8 locale in locale -a; zsh staying LANG=C" >&2
 fi
 unset _have _c _pick
 EOF
     . /etc/profile.d/flux-locale.sh
-    if [ -n "${LC_ALL:-}" ]; then
-        printf 'LANG=%s\n' "$LANG" > /etc/locale.conf
+    if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)|C\.(utf8|UTF-8)'; then
+        printf 'LANG=%s\n' "${LANG:-C.UTF-8}" > /etc/locale.conf
     else
-        printf 'LANG=C\n' > /etc/locale.conf
+        echo "FluxLinux: ERROR: no UTF-8 locale after generation (locale -a has neither en_US.utf8 nor C.utf8)"
+        handle_error "UTF-8 locale"
     fi
 fi
 
@@ -591,6 +606,17 @@ if ! fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd"; then
     rm -f "$TEMP_ZIP"
 fi
 
+if fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd"; then
+    _gtk_font="JetBrainsMono Nerd Font 10"
+    _mono_font="JetBrainsMono Nerd Font Mono 10"
+    _term_font="JetBrainsMono Nerd Font 12"
+else
+    echo "FluxLinux: JetBrainsMono Nerd not in fontconfig — VTE fallback DejaVu Sans Mono"
+    _gtk_font="DejaVu Sans Mono 10"
+    _mono_font="DejaVu Sans Mono 10"
+    _term_font="DejaVu Sans Mono 12"
+fi
+
 echo "FluxLinux: Applying XFCE4 Settings..."
 XFCONF_DIR="$USER_HOME/.config/xfce4/xfconf/xfce-perchannel-xml"
 mkdir -p "$XFCONF_DIR"
@@ -606,8 +632,8 @@ cat > "$XFCONF_DIR/xsettings.xml" <<EOF
   <property name="Gtk" type="empty">
     <property name="CursorThemeName" type="string" value="$SEL_CURSOR"/>
     <property name="CursorThemeSize" type="int" value="52"/>
-    <property name="FontName" type="string" value="JetBrainsMono Nerd Font 10"/>
-    <property name="MonospaceFontName" type="string" value="JetBrainsMono Nerd Font Mono 10"/>
+    <property name="FontName" type="string" value="$_gtk_font"/>
+    <property name="MonospaceFontName" type="string" value="$_mono_font"/>
   </property>
   <property name="Gdk" type="empty">
     <property name="WindowScalingFactor" type="int" value="2"/>
@@ -621,7 +647,22 @@ cat > "$USER_HOME/.config/gtk-3.0/settings.ini" <<EOF
 gtk-theme-name=$SEL_THEME
 gtk-icon-theme-name=$SEL_ICON
 gtk-cursor-theme-name=$SEL_CURSOR
-gtk-font-name=JetBrainsMono Nerd Font 10
+gtk-font-name=$_gtk_font
+EOF
+
+TERM_CONFIG_DIR="$USER_HOME/.config/xfce4/terminal"
+mkdir -p "$TERM_CONFIG_DIR"
+cat > "$TERM_CONFIG_DIR/terminalrc" <<EOF
+[Configuration]
+FontUseSystem=FALSE
+FontName=$_term_font
+EOF
+cat > "$XFCONF_DIR/xfce4-terminal.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-terminal" version="1.0">
+  <property name="font-use-system" type="bool" value="false"/>
+  <property name="font-name" type="string" value="$_term_font"/>
+</channel>
 EOF
 
 cat > "$XFCONF_DIR/xfwm4.xml" <<EOF
@@ -849,6 +890,7 @@ if [ -n "$_pick" ]; then
 else
   unset LC_ALL
   export LANG=C
+  echo "FluxLinux: WARNING: no UTF-8 locale in locale -a; zsh staying LANG=C" >&2
 fi
 unset _have _c _pick
 export PYTHONIOENCODING=UTF-8

@@ -110,6 +110,10 @@ class OmzPokemonContractTest {
         assertTrue(manjaro.contains("_flux_ensure_hostname"))
         assertTrue(
             "pacman guests must restore glibc i18n data",
+            manjaro.contains("pacman -S --noconfirm glibc")
+        )
+        assertFalse(
+            "--needed glibc is a no-op when glibc is already installed",
             manjaro.contains("pacman -S --noconfirm --needed glibc")
         )
         assertTrue(

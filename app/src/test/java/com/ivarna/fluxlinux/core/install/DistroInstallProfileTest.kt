@@ -68,7 +68,11 @@ class DistroInstallProfileTest {
         assertTrue(names.contains(DistroInstallProfile.DEEPIN_ROOTFS_NAME))
         assertTrue(names.contains(DistroInstallProfile.CHIMERA_ROOTFS_NAME))
         assertTrue(names.contains(DistroInstallProfile.MANJARO_ROOTFS_NAME))
-        assertEquals(8, names.size)
+        assertTrue(names.contains(DistroInstallProfile.UBUNTU_ROOTFS_NAME))
+        assertTrue(names.contains(DistroInstallProfile.KALI_ROOTFS_NAME))
+        assertTrue(names.contains(DistroInstallProfile.PARROT_ROOTFS_NAME))
+        assertTrue(names.contains(DistroInstallProfile.ARCH_ROOTFS_NAME))
+        assertEquals(12, names.size)
     }
 
     @Test
@@ -113,7 +117,15 @@ class DistroInstallProfileTest {
         assertTrue(DistroInstallProfile.isInstallable("chimera_chroot"))
         assertTrue(DistroInstallProfile.isInstallable("manjaro"))
         assertTrue(DistroInstallProfile.isInstallable("manjaro_chroot"))
-        assertFalse(DistroInstallProfile.isInstallable("archlinux"))
+        assertTrue(DistroInstallProfile.isInstallable("ubuntu"))
+        assertTrue(DistroInstallProfile.isInstallable("ubuntu_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("kali"))
+        assertTrue(DistroInstallProfile.isInstallable("kali_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("parrot"))
+        assertTrue(DistroInstallProfile.isInstallable("parrot_chroot"))
+        assertTrue(DistroInstallProfile.isInstallable("archlinux"))
+        assertTrue(DistroInstallProfile.isInstallable("archlinux_chroot"))
+        assertFalse(DistroInstallProfile.isInstallable("openbsd"))
     }
 
     @Test
@@ -162,7 +174,11 @@ class DistroInstallProfileTest {
             DistroInstallProfile.OPENSUSE_ROOTFS_SHA256,
             DistroInstallProfile.DEEPIN_ROOTFS_SHA256,
             DistroInstallProfile.CHIMERA_ROOTFS_SHA256,
-            DistroInstallProfile.MANJARO_ROOTFS_SHA256
+            DistroInstallProfile.MANJARO_ROOTFS_SHA256,
+            DistroInstallProfile.UBUNTU_ROOTFS_SHA256,
+            DistroInstallProfile.KALI_ROOTFS_SHA256,
+            DistroInstallProfile.PARROT_ROOTFS_SHA256,
+            DistroInstallProfile.ARCH_ROOTFS_SHA256
         ).forEach { sha ->
             assertEquals(64, sha.length)
             assertTrue(sha.matches(Regex("[0-9a-f]{64}")))
@@ -254,6 +270,55 @@ class DistroInstallProfileTest {
             "chimera", "chimera_chroot",
             "manjaro", "manjaro_chroot"
         ).forEach { assertTrue(ids.contains(it)) }
-        assertEquals(16, ids.size)
+        assertEquals(24, ids.size)
+    }
+
+    @Test
+    fun ubuntu_kali_parrot_arch_proot_chroot_profiles() {
+        val pairs = listOf(
+            Triple("ubuntu", DistroInstallProfile.UBUNTU_ROOTFS_NAME, ChrootPaths.UBUNTU_CHROOT_PATH),
+            Triple("kali", DistroInstallProfile.KALI_ROOTFS_NAME, ChrootPaths.KALI_CHROOT_PATH),
+            Triple("parrot", DistroInstallProfile.PARROT_ROOTFS_NAME, ChrootPaths.PARROT_CHROOT_PATH),
+            Triple("archlinux", DistroInstallProfile.ARCH_ROOTFS_NAME, ChrootPaths.ARCH_CHROOT_PATH)
+        )
+        pairs.forEach { (id, rootfs, chrootPath) ->
+            val proot = DistroInstallProfile.require(id)
+            assertEquals("proot", proot.method)
+            assertEquals(id, proot.prootName)
+            assertEquals(rootfs, proot.rootfsFileName)
+            assertFalse("$id rootfs must not be .gz (aapt2)", proot.rootfsAsset.endsWith(".gz"))
+            assertTrue(proot.familyScript.contains(if (id == "archlinux") "arch" else id))
+            assertEquals("common/setup/setup_customization_xfce.sh", proot.customizationScript)
+            assertNotNull(proot.hwAccelScript)
+
+            val chroot = DistroInstallProfile.require("${id}_chroot")
+            assertEquals("chroot", chroot.method)
+            assertEquals(chrootPath, chroot.chrootPath)
+            assertEquals("start_guest_gui.sh", chroot.chrootStartGuiScript)
+            assertTrue(chroot.chrootSetupAsset!!.contains("setup_guest_chroot"))
+            assertEquals(chroot.rootfsSha256, proot.rootfsSha256)
+        }
+        assertTrue(DistroInstallProfile.require("ubuntu").rootfsMinBytes >= 15L * 1024L * 1024L)
+        assertTrue(DistroInstallProfile.require("kali").rootfsMinBytes >= 40L * 1024L * 1024L)
+        assertTrue(DistroInstallProfile.require("parrot").rootfsMinBytes >= 30L * 1024L * 1024L)
+        assertTrue(DistroInstallProfile.require("archlinux").rootfsMinBytes >= 40L * 1024L * 1024L)
+        assertTrue(
+            DistroInstallProfile.require("ubuntu").rootfsFileName.endsWith(".tar.xz")
+        )
+        assertFalse(DistroInstallProfile.UBUNTU_ROOTFS_NAME.endsWith(".gz"))
+        assertFalse(DistroInstallProfile.KALI_ROOTFS_NAME.contains("kali-arm64"))
+        assertFalse(DistroInstallProfile.PARROT_ROOTFS_NAME.contains("parrot-arm64"))
+    }
+
+    @Test
+    fun allInstallable_includes_ukpa_cards() {
+        val ids = DistroInstallProfile.allInstallable().map { it.distroId }.toSet()
+        listOf(
+            "ubuntu", "ubuntu_chroot",
+            "kali", "kali_chroot",
+            "parrot", "parrot_chroot",
+            "archlinux", "archlinux_chroot"
+        ).forEach { assertTrue(ids.contains(it)) }
+        assertEquals(24, ids.size)
     }
 }

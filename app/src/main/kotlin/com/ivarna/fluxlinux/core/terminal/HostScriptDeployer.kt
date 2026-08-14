@@ -86,6 +86,22 @@ object HostScriptDeployer {
             "setup_manjaro_family.sh",
             "scripts/manjaro/common/setup/setup_manjaro_family.sh"
         ),
+        HostScript(
+            "setup_ubuntu_family.sh",
+            "scripts/ubuntu/common/setup/setup_ubuntu_family.sh"
+        ),
+        HostScript(
+            "setup_kali_family.sh",
+            "scripts/kali/common/setup/setup_kali_family.sh"
+        ),
+        HostScript(
+            "setup_parrot_family.sh",
+            "scripts/parrot/common/setup/setup_parrot_family.sh"
+        ),
+        HostScript(
+            "setup_arch_family.sh",
+            "scripts/arch/common/setup/setup_arch_family.sh"
+        ),
         // EVP_md2 stub for TW libldap vs OpenSSL 3.5 (sudo/zypper)
         HostScript(
             "libevp_md2.so",

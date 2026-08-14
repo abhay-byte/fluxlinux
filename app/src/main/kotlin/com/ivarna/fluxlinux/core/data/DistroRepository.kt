@@ -142,18 +142,6 @@ object DistroRepository {
         )
     )
 
-    // Shared Components for Arch-based distros
-    private val archComponents = listOf(
-        DistroComponent(
-            id = "arch_desktop",
-            name = "XFCE4 Desktop",
-            description = "Installs XFCE4 Desktop Environment and TigerVNC.",
-            scriptName = "arch/common/setup/setup_arch_family.sh",
-            sizeEstimate = "300 MB",
-            isMandatory = true
-        )
-    )
-
     // Alpine MVP components (apk/musl — no Debian module scripts)
     private val alpineComponents = listOf(
         DistroComponent(
@@ -224,6 +212,18 @@ object DistroRepository {
     )
     private val manjaroComponents = glibcXfceComponents(
         "manjaro/common/setup/setup_manjaro_family.sh"
+    )
+    private val ubuntuComponents = glibcXfceComponents(
+        "ubuntu/common/setup/setup_ubuntu_family.sh"
+    )
+    private val kaliComponents = glibcXfceComponents(
+        "kali/common/setup/setup_kali_family.sh"
+    )
+    private val parrotComponents = glibcXfceComponents(
+        "parrot/common/setup/setup_parrot_family.sh"
+    )
+    private val archlinuxComponents = glibcXfceComponents(
+        "arch/common/setup/setup_arch_family.sh"
     )
 
     val supportedDistros = listOf(
@@ -424,6 +424,102 @@ object DistroRepository {
             configuration = SupportedDistro.MANJARO,
             components = manjaroComponents
         ),
+        Distro(
+            id = "ubuntu",
+            name = "Ubuntu",
+            description = "Ubuntu 26.04 with XFCE4 (proot).",
+            color = Color(0xFFE95420),
+            iconRes = R.drawable.distro_ubuntu,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.UBUNTU,
+            components = ubuntuComponents
+        ),
+        Distro(
+            id = "ubuntu_chroot",
+            name = "Ubuntu (Rooted)",
+            description = "Ubuntu 26.04 chroot environment (Requires Root).",
+            color = Color(0xFFE95420),
+            iconRes = R.drawable.distro_ubuntu,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.UBUNTU,
+            components = ubuntuComponents
+        ),
+        Distro(
+            id = "kali",
+            name = "Kali",
+            description = "Kali Rolling with XFCE4 (proot).",
+            color = Color(0xFF367BF5),
+            iconRes = R.drawable.distro_kali,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.KALI,
+            components = kaliComponents
+        ),
+        Distro(
+            id = "kali_chroot",
+            name = "Kali (Rooted)",
+            description = "Kali Rolling chroot environment (Requires Root).",
+            color = Color(0xFF367BF5),
+            iconRes = R.drawable.distro_kali,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.KALI,
+            components = kaliComponents
+        ),
+        Distro(
+            id = "parrot",
+            name = "Parrot",
+            description = "Parrot 7.2 with XFCE4 (proot).",
+            color = Color(0xFF00D9FF),
+            iconRes = R.drawable.distro_parrot,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.PARROT,
+            components = parrotComponents
+        ),
+        Distro(
+            id = "parrot_chroot",
+            name = "Parrot (Rooted)",
+            description = "Parrot 7.2 chroot environment (Requires Root).",
+            color = Color(0xFF00D9FF),
+            iconRes = R.drawable.distro_parrot,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.PARROT,
+            components = parrotComponents
+        ),
+        Distro(
+            id = "archlinux",
+            name = "Arch",
+            description = "Arch Linux ARM with XFCE4 (proot).",
+            color = Color(0xFF1793D1),
+            iconRes = R.drawable.distro_arch,
+            comingSoon = false,
+            prootSupported = true,
+            chrootSupported = false,
+            configuration = SupportedDistro.ARCH,
+            components = archlinuxComponents
+        ),
+        Distro(
+            id = "archlinux_chroot",
+            name = "Arch (Rooted)",
+            description = "Arch Linux ARM chroot environment (Requires Root).",
+            color = Color(0xFF1793D1),
+            iconRes = R.drawable.distro_arch,
+            comingSoon = false,
+            prootSupported = false,
+            chrootSupported = true,
+            configuration = SupportedDistro.ARCH,
+            components = archlinuxComponents
+        ),
         
         // Coming Soon - Sorted alphabetically
         Distro(
@@ -435,18 +531,6 @@ object DistroRepository {
             comingSoon = true,
             prootSupported = false, // no i686 support
             chrootSupported = true
-        ),
-        Distro(
-            id = "archlinux",
-            name = "Arch Linux",
-            description = "A simple, lightweight Linux distribution.",
-            color = Color(0xFF1793D1),
-            iconRes = R.drawable.distro_arch,
-            comingSoon = true,
-            prootSupported = true,
-            chrootSupported = true,
-            configuration = SupportedDistro.ARCH,
-            components = archComponents
         ),
         Distro(
             id = "artix",
@@ -490,16 +574,6 @@ object DistroRepository {
             chrootSupported = true
         ),
         Distro(
-            id = "kali",
-            name = "Kali Linux",
-            description = "Advanced penetration testing and security auditing.",
-            color = Color(0xFF367BF5),
-            iconRes = R.drawable.distro_kali,
-            comingSoon = true,
-            prootSupported = false, // Not in proot-distro
-            chrootSupported = true
-        ),
-        Distro(
             id = "openkylin",
             name = "OpenKylin",
             description = "Community-driven Linux distribution from China.",
@@ -511,16 +585,6 @@ object DistroRepository {
         ),
 
         Distro(
-            id = "parrot",
-            name = "Parrot OS",
-            description = "Security-focused distribution for pentesting and privacy.",
-            color = Color(0xFF00D9FF),
-            iconRes = R.drawable.distro_parrot,
-            comingSoon = true,
-            prootSupported = false, // Not in proot-distro
-            chrootSupported = true
-        ),
-        Distro(
             id = "rocky",
             name = "Rocky Linux",
             description = "Enterprise-grade Linux distribution.",
@@ -530,17 +594,5 @@ object DistroRepository {
             prootSupported = true, // only 64bit
             chrootSupported = true
         ),
-        Distro(
-            id = "ubuntu",
-            name = "Ubuntu",
-            description = "The world's most popular Linux distribution.",
-            color = Color(0xFFE95420),
-            iconRes = R.drawable.distro_ubuntu,
-            comingSoon = true,
-            prootSupported = true, // no i686
-            chrootSupported = true,
-            configuration = SupportedDistro.UBUNTU
-        ),
-
     )
 }

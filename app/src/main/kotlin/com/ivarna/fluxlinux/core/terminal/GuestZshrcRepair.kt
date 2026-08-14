@@ -42,6 +42,7 @@ if [ -n "${'$'}_pick" ]; then
 else
   unset LC_ALL
   export LANG=C
+  echo "FluxLinux: WARNING: no UTF-8 locale in locale -a; zsh staying LANG=C" >&2
 fi
 unset _have _c _pick
 export PYTHONIOENCODING=UTF-8
@@ -191,6 +192,7 @@ if [ -n "${'$'}_pick" ]; then
 else
   unset LC_ALL
   export LANG=C
+  echo "FluxLinux: WARNING: no UTF-8 locale in locale -a; zsh staying LANG=C" >&2
 fi
 unset _have _c _pick
 """.trimStart()
@@ -199,9 +201,20 @@ unset _have _c _pick
 #!/bin/sh
 # Generate directory locales when locale-archive is empty (Manjaro/Arch proot).
 [ "${'$'}(id -u)" = 0 ] || exit 1
-locale -a 2>/dev/null | grep -qxFi en_US.utf8 && exit 0
-locale -a 2>/dev/null | grep -qxFi en_US.UTF-8 && exit 0
-command -v localedef >/dev/null 2>&1 || exit 0
+if locale -a 2>/dev/null | grep -qxFi en_US.utf8 \
+    || locale -a 2>/dev/null | grep -qxFi en_US.UTF-8; then
+  printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+  exit 0
+fi
+if command -v pacman >/dev/null 2>&1; then
+  command -v gzip >/dev/null 2>&1 || pacman -S --noconfirm gzip >/dev/null 2>&1 || true
+  if [ ! -f /usr/share/i18n/locales/en_US ] \
+      || { [ ! -f /usr/share/i18n/charmaps/UTF-8 ] \
+           && [ ! -f /usr/share/i18n/charmaps/UTF-8.gz ]; }; then
+    pacman -S --noconfirm glibc >/dev/null 2>&1 || true
+  fi
+fi
+command -v localedef >/dev/null 2>&1 || exit 1
 mkdir -p /usr/lib/locale
 _map=/tmp/flux-UTF-8
 if [ -f /usr/share/i18n/charmaps/UTF-8.gz ] && command -v gzip >/dev/null 2>&1; then
@@ -218,8 +231,14 @@ fi
 rm -f "${'$'}_map"
 if locale -a 2>/dev/null | grep -qiE 'en_US\.(utf8|UTF-8)'; then
   printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
+  exit 0
 fi
-exit 0
+if locale -a 2>/dev/null | grep -qiE 'C\.(utf8|UTF-8)'; then
+  printf 'LANG=C.UTF-8\n' > /etc/locale.conf
+  exit 0
+fi
+echo "FluxLinux: ERROR: no UTF-8 locale after generation (locale -a has neither en_US.utf8 nor C.utf8)" >&2
+exit 1
 """.trimStart()
 
     internal fun writeEnsureLocaleScript(rootfs: File) {
@@ -305,7 +324,9 @@ exit 0
     private fun isGlibcGuest(distroId: String?): Boolean {
         val name = resolveProotName(distroId)
         return name == "fedora" || name == "void" || name == "opensuse" ||
-            name == "deepin" || name == "manjaro"
+            name == "deepin" || name == "manjaro" ||
+            name == "ubuntu" || name == "kali" || name == "parrot" ||
+            name == "archlinux"
     }
 
     /** apk-based guests: Alpine (v2) + Chimera (v3, musl). */

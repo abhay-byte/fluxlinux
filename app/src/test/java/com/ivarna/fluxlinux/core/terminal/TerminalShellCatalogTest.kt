@@ -28,6 +28,10 @@ class TerminalShellCatalogTest {
         deepinProot: Boolean = false,
         chimeraProot: Boolean = false,
         manjaroProot: Boolean = false,
+        ubuntuProot: Boolean = false,
+        kaliProot: Boolean = false,
+        parrotProot: Boolean = false,
+        archlinuxProot: Boolean = false,
         debianChroot: Boolean = false,
         alpineChroot: Boolean = false,
         fedoraChroot: Boolean = false,
@@ -36,6 +40,10 @@ class TerminalShellCatalogTest {
         deepinChroot: Boolean = false,
         chimeraChroot: Boolean = false,
         manjaroChroot: Boolean = false,
+        ubuntuChroot: Boolean = false,
+        kaliChroot: Boolean = false,
+        parrotChroot: Boolean = false,
+        archlinuxChroot: Boolean = false,
         rootAvailable: Boolean = false
     ) = TerminalShellAvailability(
         debianProot = debianProot,
@@ -46,6 +54,10 @@ class TerminalShellCatalogTest {
         deepinProot = deepinProot,
         chimeraProot = chimeraProot,
         manjaroProot = manjaroProot,
+        ubuntuProot = ubuntuProot,
+        kaliProot = kaliProot,
+        parrotProot = parrotProot,
+        archlinuxProot = archlinuxProot,
         debianChroot = debianChroot,
         alpineChroot = alpineChroot,
         fedoraChroot = fedoraChroot,
@@ -54,6 +66,10 @@ class TerminalShellCatalogTest {
         deepinChroot = deepinChroot,
         chimeraChroot = chimeraChroot,
         manjaroChroot = manjaroChroot,
+        ubuntuChroot = ubuntuChroot,
+        kaliChroot = kaliChroot,
+        parrotChroot = parrotChroot,
+        archlinuxChroot = archlinuxChroot,
         rootAvailable = rootAvailable
     )
 
@@ -153,7 +169,9 @@ class TerminalShellCatalogTest {
         assertEquals(
             listOf(
                 "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT", "PROOT",
+                "PROOT", "PROOT", "PROOT", "PROOT",
                 "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT", "CHROOT",
+                "CHROOT", "CHROOT", "CHROOT", "CHROOT",
                 "OPTIONAL"
             ),
             sections.map { it.subtitle }
@@ -162,8 +180,10 @@ class TerminalShellCatalogTest {
             listOf(
                 "DEBIAN SHELL", "ALPINE SHELL", "FEDORA SHELL", "VOID SHELL", "OPENSUSE SHELL",
                 "DEEPIN SHELL", "CHIMERA SHELL", "MANJARO SHELL",
+                "UBUNTU SHELL", "KALI SHELL", "PARROT SHELL", "ARCHLINUX SHELL",
                 "DEBIAN SHELL", "ALPINE SHELL", "FEDORA SHELL", "VOID SHELL", "OPENSUSE SHELL",
                 "DEEPIN SHELL", "CHIMERA SHELL", "MANJARO SHELL",
+                "UBUNTU SHELL", "KALI SHELL", "PARROT SHELL", "ARCHLINUX SHELL",
                 "HOST"
             ),
             sections.map { it.title }
@@ -270,6 +290,67 @@ class TerminalShellCatalogTest {
     @Test
     fun chrootDefs_deepin_chimera_manjaro() {
         val ids = listOf("deepin_chroot", "chimera_chroot", "manjaro_chroot")
+        ids.forEach { id ->
+            val defs = TerminalShellCatalog.chrootDefs(id)
+            assertEquals(listOf("shell", "shell-root"), defs.map { it.type })
+            assertTrue(defs.all { it.method == "chroot" && it.distroId == id })
+        }
+    }
+
+    @Test
+    fun ubuntuProotInstalled_cardsEnabled() {
+        val cards = TerminalShellCatalog.sections(ctx(), avail(ubuntuProot = true))
+            .first { it.title == "UBUNTU SHELL" && it.subtitle == "PROOT" }.cards
+        assertTrue(cards.all { it.enabled })
+        assertEquals("ubuntu", cards[0].def.distroId)
+    }
+
+    @Test
+    fun kaliProotNotInstalled_cardsDisabled() {
+        val cards = TerminalShellCatalog.sections(ctx(), avail())
+            .first { it.title == "KALI SHELL" && it.subtitle == "PROOT" }.cards
+        cards.forEach { card ->
+            assertFalse(card.enabled)
+            assertEquals("Install KALI in Distros", card.disabledReason)
+        }
+    }
+
+    @Test
+    fun parrotChrootInstalledAndRoot_enabled() {
+        val chroot = TerminalShellCatalog.sections(
+            ctx(),
+            avail(parrotChroot = true, rootAvailable = true)
+        ).first { it.title == "PARROT SHELL" && it.subtitle == "CHROOT" }.cards
+        chroot.forEach { card ->
+            assertTrue(card.enabled)
+            assertNull(card.disabledReason)
+            assertEquals("parrot_chroot", card.def.distroId)
+        }
+    }
+
+    @Test
+    fun archlinuxChrootMissing_disabledChrootNotInstalled() {
+        val chroot = TerminalShellCatalog.sections(
+            ctx(),
+            avail(archlinuxProot = true, rootAvailable = true)
+        ).first { it.title == "ARCHLINUX SHELL" && it.subtitle == "CHROOT" }.cards
+        chroot.forEach { card ->
+            assertFalse(card.enabled)
+            assertEquals("Chroot not installed", card.disabledReason)
+        }
+    }
+
+    @Test
+    fun prootDefs_ukpa() {
+        assertEquals("ubuntu", TerminalShellCatalog.prootDefs("ubuntu")[0].distroId)
+        assertEquals("kali", TerminalShellCatalog.prootDefs("kali")[0].distroId)
+        assertEquals("parrot", TerminalShellCatalog.prootDefs("parrot")[0].distroId)
+        assertEquals("archlinux", TerminalShellCatalog.prootDefs("archlinux")[0].distroId)
+    }
+
+    @Test
+    fun chrootDefs_ukpa() {
+        val ids = listOf("ubuntu_chroot", "kali_chroot", "parrot_chroot", "archlinux_chroot")
         ids.forEach { id ->
             val defs = TerminalShellCatalog.chrootDefs(id)
             assertEquals(listOf("shell", "shell-root"), defs.map { it.type })

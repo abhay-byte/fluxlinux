@@ -1,7 +1,7 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
 # start_gui_chroot.sh — Launch XFCE4 in chroot (app-uid host + root guest)
 # Host stack mirrors start_gui.sh (Pulse/VirGL/embedded X11).
-# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot|deepin_chroot|chimera_chroot|manjaro_chroot.
+# Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot|deepin_chroot|chimera_chroot|manjaro_chroot|ubuntu_chroot|kali_chroot|parrot_chroot|archlinux_chroot.
 # NEVER am force-stop own package.
 
 DISTRO_HINT="${1:-${FLUX_CHROOT_DISTRO:-debian13_chroot}}"
@@ -51,6 +51,22 @@ case "$DISTRO_HINT" in
     ;;
   manjaro|manjaro_chroot)
     CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootManjaro}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  ubuntu|ubuntu_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootUbuntu}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  kali|kali_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootKali}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  parrot|parrot_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootParrot}"
+    ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
+    ;;
+  archlinux|archlinux_chroot)
+    CHROOT_PATH="${CHROOT_PATH:-/data/local/tmp/chrootArch}"
     ROOT_GUI_NAME="${ROOT_GUI_NAME:-start_guest_gui.sh}"
     ;;
   *)

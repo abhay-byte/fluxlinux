@@ -35,12 +35,20 @@ class DistroRepositoryTest {
         assertTrue(available.contains("chimera_chroot"))
         assertTrue(available.contains("manjaro"))
         assertTrue(available.contains("manjaro_chroot"))
-        assertEquals(16, available.size)
+        assertTrue(available.contains("ubuntu"))
+        assertTrue(available.contains("ubuntu_chroot"))
+        assertTrue(available.contains("kali"))
+        assertTrue(available.contains("kali_chroot"))
+        assertTrue(available.contains("parrot"))
+        assertTrue(available.contains("parrot_chroot"))
+        assertTrue(available.contains("archlinux"))
+        assertTrue(available.contains("archlinux_chroot"))
+        assertEquals(24, available.size)
     }
 
     @Test
     fun newPairs_areProotOnly_and_chrootOnly() {
-        listOf("deepin", "chimera", "manjaro").forEach { id ->
+        listOf("deepin", "chimera", "manjaro", "ubuntu", "kali", "parrot", "archlinux").forEach { id ->
             val proot = DistroRepository.supportedDistros.first { it.id == id }
             assertFalse(proot.comingSoon)
             assertTrue(proot.prootSupported)
@@ -58,7 +66,11 @@ class DistroRepositoryTest {
         listOf(
             "deepin", "deepin_chroot",
             "chimera", "chimera_chroot",
-            "manjaro", "manjaro_chroot"
+            "manjaro", "manjaro_chroot",
+            "ubuntu", "ubuntu_chroot",
+            "kali", "kali_chroot",
+            "parrot", "parrot_chroot",
+            "archlinux", "archlinux_chroot"
         ).forEach { id ->
             val distro = DistroRepository.supportedDistros.first { it.id == id }
             val ids = distro.components.map { it.id }
@@ -72,7 +84,10 @@ class DistroRepositoryTest {
     @Test
     fun newCards_doNotReferenceDebianModuleScripts() {
         val scripts = DistroRepository.supportedDistros
-            .filter { it.id in setOf("deepin", "chimera", "manjaro") }
+            .filter { it.id in setOf(
+                "deepin", "chimera", "manjaro",
+                "ubuntu", "kali", "parrot", "archlinux"
+            ) }
             .flatMap { it.components }
             .map { it.scriptName }
         assertFalse(scripts.any { it.contains("debian/") })

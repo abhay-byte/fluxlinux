@@ -46,6 +46,22 @@ class ChrootPathsTest {
             ChrootPaths.MANJARO_CHROOT_PATH,
             ChrootPaths.pathForDistro("manjaro_chroot")
         )
+        assertEquals(
+            ChrootPaths.UBUNTU_CHROOT_PATH,
+            ChrootPaths.pathForDistro("ubuntu_chroot")
+        )
+        assertEquals(
+            ChrootPaths.KALI_CHROOT_PATH,
+            ChrootPaths.pathForDistro("kali_chroot")
+        )
+        assertEquals(
+            ChrootPaths.PARROT_CHROOT_PATH,
+            ChrootPaths.pathForDistro("parrot_chroot")
+        )
+        assertEquals(
+            ChrootPaths.ARCH_CHROOT_PATH,
+            ChrootPaths.pathForDistro("archlinux_chroot")
+        )
     }
 
     @Test
@@ -58,9 +74,13 @@ class ChrootPathsTest {
             ChrootPaths.OPENSUSE_CHROOT_PATH,
             ChrootPaths.DEEPIN_CHROOT_PATH,
             ChrootPaths.CHIMERA_CHROOT_PATH,
-            ChrootPaths.MANJARO_CHROOT_PATH
+            ChrootPaths.MANJARO_CHROOT_PATH,
+            ChrootPaths.UBUNTU_CHROOT_PATH,
+            ChrootPaths.KALI_CHROOT_PATH,
+            ChrootPaths.PARROT_CHROOT_PATH,
+            ChrootPaths.ARCH_CHROOT_PATH
         )
-        assertEquals(8, paths.size)
+        assertEquals(12, paths.size)
     }
 
     @Test
@@ -68,5 +88,9 @@ class ChrootPathsTest {
         assertEquals("/data/local/tmp/chrootDeepin", ChrootPaths.DEEPIN_CHROOT_PATH)
         assertEquals("/data/local/tmp/chrootChimera", ChrootPaths.CHIMERA_CHROOT_PATH)
         assertEquals("/data/local/tmp/chrootManjaro", ChrootPaths.MANJARO_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootUbuntu", ChrootPaths.UBUNTU_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootKali", ChrootPaths.KALI_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootParrot", ChrootPaths.PARROT_CHROOT_PATH)
+        assertEquals("/data/local/tmp/chrootArch", ChrootPaths.ARCH_CHROOT_PATH)
     }
 }

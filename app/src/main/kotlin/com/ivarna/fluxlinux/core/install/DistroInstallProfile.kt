@@ -96,6 +96,31 @@ data class DistroInstallProfile(
             "b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156"
         const val MANJARO_ROOTFS_MIN_BYTES = 80L * 1024L * 1024L
 
+        // Ubuntu 26.04 LTS (Resolute) arm64 base — gzip recompressed to xz
+        // (aapt2 auto-decompresses *.gz). SHA is of the packaged xz.
+        const val UBUNTU_ROOTFS_NAME = "ubuntu_26.04_rootfs.tar.xz"
+        const val UBUNTU_ROOTFS_SHA256 =
+            "e648a5302dd273c476e5658e652f88d1e66ece69b487431521c5caef4b960efc"
+        const val UBUNTU_ROOTFS_MIN_BYTES = 15L * 1024L * 1024L
+
+        // Kali Rolling 2026.2 (NetHunter-minimal, flattened — no kali-arm64/).
+        const val KALI_ROOTFS_NAME = "kali_2026_2_rootfs.tar.xz"
+        const val KALI_ROOTFS_SHA256 =
+            "01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689"
+        const val KALI_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+
+        // Parrot Security 7.2 (flattened — no parrot-arm64/).
+        const val PARROT_ROOTFS_NAME = "parrot_7.2_rootfs.tar.xz"
+        const val PARROT_ROOTFS_SHA256 =
+            "49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4"
+        const val PARROT_ROOTFS_MIN_BYTES = 30L * 1024L * 1024L
+
+        // Arch Linux ARM slim userspace (already in tree).
+        const val ARCH_ROOTFS_NAME = "archlinux_arm_rootfs.tar.xz"
+        const val ARCH_ROOTFS_SHA256 =
+            "40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75"
+        const val ARCH_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+
         private const val XFCE_CUSTOM = "common/setup/setup_customization_xfce.sh"
         private const val HW_ACCEL_GUEST = "common/setup/setup_hw_accel_guest.sh"
         private const val GUEST_CHROOT_SETUP = "scripts/chroot/setup_guest_chroot.sh"
@@ -365,6 +390,138 @@ data class DistroInstallProfile(
             displayName = "Manjaro (Rooted)",
         )
 
+        private val UBUNTU_PROOT = DistroInstallProfile(
+            distroId = "ubuntu",
+            prootName = "ubuntu",
+            method = "proot",
+            rootfsAsset = "rootfs/$UBUNTU_ROOTFS_NAME",
+            rootfsFileName = UBUNTU_ROOTFS_NAME,
+            rootfsSha256 = UBUNTU_ROOTFS_SHA256,
+            rootfsMinBytes = UBUNTU_ROOTFS_MIN_BYTES,
+            familyScript = "ubuntu/common/setup/setup_ubuntu_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Ubuntu",
+        )
+
+        private val UBUNTU_CHROOT = DistroInstallProfile(
+            distroId = "ubuntu_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$UBUNTU_ROOTFS_NAME",
+            rootfsFileName = UBUNTU_ROOTFS_NAME,
+            rootfsSha256 = UBUNTU_ROOTFS_SHA256,
+            rootfsMinBytes = UBUNTU_ROOTFS_MIN_BYTES,
+            familyScript = "ubuntu/common/setup/setup_ubuntu_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.UBUNTU_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Ubuntu (Rooted)",
+        )
+
+        private val KALI_PROOT = DistroInstallProfile(
+            distroId = "kali",
+            prootName = "kali",
+            method = "proot",
+            rootfsAsset = "rootfs/$KALI_ROOTFS_NAME",
+            rootfsFileName = KALI_ROOTFS_NAME,
+            rootfsSha256 = KALI_ROOTFS_SHA256,
+            rootfsMinBytes = KALI_ROOTFS_MIN_BYTES,
+            familyScript = "kali/common/setup/setup_kali_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Kali",
+        )
+
+        private val KALI_CHROOT = DistroInstallProfile(
+            distroId = "kali_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$KALI_ROOTFS_NAME",
+            rootfsFileName = KALI_ROOTFS_NAME,
+            rootfsSha256 = KALI_ROOTFS_SHA256,
+            rootfsMinBytes = KALI_ROOTFS_MIN_BYTES,
+            familyScript = "kali/common/setup/setup_kali_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.KALI_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Kali (Rooted)",
+        )
+
+        private val PARROT_PROOT = DistroInstallProfile(
+            distroId = "parrot",
+            prootName = "parrot",
+            method = "proot",
+            rootfsAsset = "rootfs/$PARROT_ROOTFS_NAME",
+            rootfsFileName = PARROT_ROOTFS_NAME,
+            rootfsSha256 = PARROT_ROOTFS_SHA256,
+            rootfsMinBytes = PARROT_ROOTFS_MIN_BYTES,
+            familyScript = "parrot/common/setup/setup_parrot_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Parrot",
+        )
+
+        private val PARROT_CHROOT = DistroInstallProfile(
+            distroId = "parrot_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$PARROT_ROOTFS_NAME",
+            rootfsFileName = PARROT_ROOTFS_NAME,
+            rootfsSha256 = PARROT_ROOTFS_SHA256,
+            rootfsMinBytes = PARROT_ROOTFS_MIN_BYTES,
+            familyScript = "parrot/common/setup/setup_parrot_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.PARROT_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Parrot (Rooted)",
+        )
+
+        private val ARCH_PROOT = DistroInstallProfile(
+            distroId = "archlinux",
+            prootName = "archlinux",
+            method = "proot",
+            rootfsAsset = "rootfs/$ARCH_ROOTFS_NAME",
+            rootfsFileName = ARCH_ROOTFS_NAME,
+            rootfsSha256 = ARCH_ROOTFS_SHA256,
+            rootfsMinBytes = ARCH_ROOTFS_MIN_BYTES,
+            familyScript = "arch/common/setup/setup_arch_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            displayName = "Arch",
+        )
+
+        private val ARCH_CHROOT = DistroInstallProfile(
+            distroId = "archlinux_chroot",
+            prootName = "",
+            method = "chroot",
+            rootfsAsset = "rootfs/$ARCH_ROOTFS_NAME",
+            rootfsFileName = ARCH_ROOTFS_NAME,
+            rootfsSha256 = ARCH_ROOTFS_SHA256,
+            rootfsMinBytes = ARCH_ROOTFS_MIN_BYTES,
+            familyScript = "arch/common/setup/setup_arch_family.sh",
+            customizationScript = XFCE_CUSTOM,
+            hwAccelScript = HW_ACCEL_GUEST,
+            chrootSetupAsset = GUEST_CHROOT_SETUP,
+            chrootUninstallAsset = GUEST_CHROOT_UNINSTALL,
+            chrootPath = ChrootPaths.ARCH_CHROOT_PATH,
+            chrootStartGuiScript = "start_guest_gui.sh",
+            chrootStopGuiScript = "stop_guest_gui.sh",
+            displayName = "Arch (Rooted)",
+        )
+
         private val BY_ID: Map<String, DistroInstallProfile> = mapOf(
             "debian" to DEBIAN_PROOT,
             "debian13_chroot" to DEBIAN_CHROOT,
@@ -383,12 +540,21 @@ data class DistroInstallProfile(
             "chimera_chroot" to CHIMERA_CHROOT,
             "manjaro" to MANJARO_PROOT,
             "manjaro_chroot" to MANJARO_CHROOT,
+            "ubuntu" to UBUNTU_PROOT,
+            "ubuntu_chroot" to UBUNTU_CHROOT,
+            "kali" to KALI_PROOT,
+            "kali_chroot" to KALI_CHROOT,
+            "parrot" to PARROT_PROOT,
+            "parrot_chroot" to PARROT_CHROOT,
+            "archlinux" to ARCH_PROOT,
+            "archlinux_chroot" to ARCH_CHROOT,
         )
 
         /** All profiles that ship a distinct rootfs archive (deduped by file name). */
         fun allRootfsProfiles(): List<DistroInstallProfile> = listOf(
             DEBIAN_PROOT, ALPINE_PROOT, FEDORA_PROOT, VOID_PROOT, OPENSUSE_PROOT,
             DEEPIN_PROOT, CHIMERA_PROOT, MANJARO_PROOT,
+            UBUNTU_PROOT, KALI_PROOT, PARROT_PROOT, ARCH_PROOT,
         )
 
         /** Installable cards in catalog order (proot then matching chroot). */
@@ -397,6 +563,8 @@ data class DistroInstallProfile(
             DEBIAN_CHROOT, ALPINE_CHROOT, FEDORA_CHROOT, VOID_CHROOT, OPENSUSE_CHROOT,
             DEEPIN_PROOT, CHIMERA_PROOT, MANJARO_PROOT,
             DEEPIN_CHROOT, CHIMERA_CHROOT, MANJARO_CHROOT,
+            UBUNTU_PROOT, KALI_PROOT, PARROT_PROOT, ARCH_PROOT,
+            UBUNTU_CHROOT, KALI_CHROOT, PARROT_CHROOT, ARCH_CHROOT,
         )
 
         fun forId(distroId: String): DistroInstallProfile? = BY_ID[distroId]

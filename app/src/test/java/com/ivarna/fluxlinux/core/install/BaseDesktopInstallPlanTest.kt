@@ -173,6 +173,44 @@ class BaseDesktopInstallPlanTest {
     }
 
     @Test
+    fun distroById_ukpa() {
+        assertEquals("ubuntu", BaseDesktopInstallPlan.distroById("ubuntu")!!.id)
+        assertEquals("ubuntu_chroot", BaseDesktopInstallPlan.distroById("ubuntu_chroot")!!.id)
+        assertEquals("kali", BaseDesktopInstallPlan.distroById("kali")!!.id)
+        assertEquals("kali_chroot", BaseDesktopInstallPlan.distroById("kali_chroot")!!.id)
+        assertEquals("parrot", BaseDesktopInstallPlan.distroById("parrot")!!.id)
+        assertEquals("parrot_chroot", BaseDesktopInstallPlan.distroById("parrot_chroot")!!.id)
+        assertEquals("archlinux", BaseDesktopInstallPlan.distroById("archlinux")!!.id)
+        assertEquals("archlinux_chroot", BaseDesktopInstallPlan.distroById("archlinux_chroot")!!.id)
+    }
+
+    @Test
+    fun methodFor_ukpa() {
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("ubuntu"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("ubuntu_chroot"))
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("kali"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("kali_chroot"))
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("parrot"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("parrot_chroot"))
+        assertEquals("proot", BaseDesktopInstallPlan.methodFor("archlinux"))
+        assertEquals("chroot", BaseDesktopInstallPlan.methodFor("archlinux_chroot"))
+    }
+
+    @Test
+    fun profileFor_ukpa() {
+        assertEquals("ubuntu", BaseDesktopInstallPlan.profileFor("ubuntu")!!.prootName)
+        assertEquals("kali", BaseDesktopInstallPlan.profileFor("kali")!!.prootName)
+        assertEquals("parrot", BaseDesktopInstallPlan.profileFor("parrot")!!.prootName)
+        assertEquals("archlinux", BaseDesktopInstallPlan.profileFor("archlinux")!!.prootName)
+        assertEquals("chroot", BaseDesktopInstallPlan.profileFor("ubuntu_chroot")!!.method)
+        listOf("ubuntu", "kali", "parrot", "archlinux").forEach { id ->
+            val p = BaseDesktopInstallPlan.profileFor(id)!!
+            assertFalse("$id family must not contain debian", p.familyScript.contains("debian"))
+            assertFalse("$id family must not contain alpine", p.familyScript.contains("alpine"))
+        }
+    }
+
+    @Test
     fun terminalComponentFor_rejectsUnknownDistro() {
         try {
             com.ivarna.fluxlinux.core.data.terminalComponentFor("nope")

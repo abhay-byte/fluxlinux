@@ -54,6 +54,30 @@ case "$DISTRO" in
         ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156}"
         FAMILY_SCRIPT_NAME="setup_manjaro_family.sh"
         ;;
+    ubuntu)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-ubuntu_26.04_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-e648a5302dd273c476e5658e652f88d1e66ece69b487431521c5caef4b960efc}"
+        FAMILY_SCRIPT_NAME="setup_ubuntu_family.sh"
+        ;;
+    kali)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-kali_2026_2_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689}"
+        FAMILY_SCRIPT_NAME="setup_kali_family.sh"
+        ;;
+    parrot)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-parrot_7.2_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4}"
+        FAMILY_SCRIPT_NAME="setup_parrot_family.sh"
+        ;;
+    archlinux)
+        ROOTFS_NAME="${FLUX_ROOTFS_NAME:-archlinux_arm_rootfs.tar.xz}"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75}"
+        FAMILY_SCRIPT_NAME="setup_arch_family.sh"
+        ;;
     *)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-debian_13_rootfs.tar.xz}"
         ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"

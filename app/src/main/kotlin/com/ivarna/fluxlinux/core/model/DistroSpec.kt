@@ -61,9 +61,15 @@ enum class SupportedDistro(
         releaseType = ReleaseType.FIXED
     ),
     
-    // Future expansion placeholder
     KALI(
         id = "kali",
+        family = DistroFamily.DEBIAN,
+        packageManager = PackageManager.APT,
+        releaseType = ReleaseType.ROLLING
+    ),
+
+    PARROT(
+        id = "parrot",
         family = DistroFamily.DEBIAN,
         packageManager = PackageManager.APT,
         releaseType = ReleaseType.ROLLING

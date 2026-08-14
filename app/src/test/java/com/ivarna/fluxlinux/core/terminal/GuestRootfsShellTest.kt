@@ -58,4 +58,23 @@ class GuestRootfsShellTest {
         val root = tmp.newFolder("empty")
         assertFalse(TerminalLauncher.guestRootfsHasShell(root))
     }
+
+    @Test
+    fun nested_kali_arm64_wrapper_is_not_installed() {
+        // Flatten regression: Kali/Parrot archives must have ./usr/bin/bash at
+        // archive root. A wrapper dir (kali-arm64/usr/bin/bash) looks empty.
+        val root = tmp.newFolder("kali-nested")
+        File(root, "kali-arm64/usr/bin").mkdirs()
+        File(root, "kali-arm64/usr/bin/bash").writeText("x")
+        File(root, "kali-arm64/usr/bin/bash").setExecutable(true)
+        assertFalse(TerminalLauncher.guestRootfsHasShell(root))
+    }
+
+    @Test
+    fun flat_usr_bin_bash_counts_as_installed() {
+        val root = tmp.newFolder("kali-flat")
+        File(root, "usr/bin").mkdirs()
+        File(root, "usr/bin/bash").writeText("x")
+        assertTrue(TerminalLauncher.guestRootfsHasShell(root))
+    }
 }

@@ -23,7 +23,9 @@ case "$GUESTPATH" in
     /data/local/tmp/chrootDebian13|/data/local/tmp/chrootAlpine|\
     /data/local/tmp/chrootFedora|/data/local/tmp/chrootVoid|\
     /data/local/tmp/chrootOpenSUSE|/data/local/tmp/chrootDeepin|\
-    /data/local/tmp/chrootChimera|/data/local/tmp/chrootManjaro) ;;
+    /data/local/tmp/chrootChimera|/data/local/tmp/chrootManjaro|\
+    /data/local/tmp/chrootUbuntu|/data/local/tmp/chrootKali|\
+    /data/local/tmp/chrootParrot|/data/local/tmp/chrootArch) ;;
     *)
         error "Refusing to remove unexpected path: $GUESTPATH"
         exit 1

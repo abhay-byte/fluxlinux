@@ -21,6 +21,11 @@ object ChrootPaths {
     const val CHIMERA_CHROOT_PATH = "/data/local/tmp/chrootChimera"
     const val MANJARO_CHROOT_PATH = "/data/local/tmp/chrootManjaro"
 
+    const val UBUNTU_CHROOT_PATH = "/data/local/tmp/chrootUbuntu"
+    const val KALI_CHROOT_PATH = "/data/local/tmp/chrootKali"
+    const val PARROT_CHROOT_PATH = "/data/local/tmp/chrootParrot"
+    const val ARCH_CHROOT_PATH = "/data/local/tmp/chrootArch"
+
     /**
      * Default chroot path for unscoped APIs (settings / legacy).
      * Prefer [DEBIAN_CHROOT_PATH] / [ALPINE_CHROOT_PATH] or profile.chrootPath.
@@ -45,6 +50,10 @@ object ChrootPaths {
         "deepin_chroot" -> DEEPIN_CHROOT_PATH
         "chimera_chroot" -> CHIMERA_CHROOT_PATH
         "manjaro_chroot" -> MANJARO_CHROOT_PATH
+        "ubuntu_chroot" -> UBUNTU_CHROOT_PATH
+        "kali_chroot" -> KALI_CHROOT_PATH
+        "parrot_chroot" -> PARROT_CHROOT_PATH
+        "archlinux_chroot" -> ARCH_CHROOT_PATH
         else -> CHROOT_PATH
     }
 }
