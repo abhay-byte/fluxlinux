@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# fluxlinux-chroot v2.4
+# fluxlinux-chroot v2.6
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
@@ -17,7 +17,7 @@
 #   FLUX_CHROOT  FLUX_PACKAGE  FLUX_HOST_TMP  FLUX_PREFIX  FLUX_BB  FLUX_SHELL
 set -u
 
-VERSION_STR="fluxlinux-chroot v2.4"
+VERSION_STR="fluxlinux-chroot v2.6"
 # Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
 if [ -z "${FLUX_PACKAGE:-}" ]; then
   if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
@@ -267,6 +267,82 @@ guest_bin_exists() {
   [ -x "$FLUX_CHROOT/bin/$1" ] || [ -x "$FLUX_CHROOT/usr/bin/$1" ]
 }
 
+# Absolute guest path for an applet (/bin, /usr/bin, /sbin, /usr/sbin).
+# Fedora 44+ puts su/runuser under util-linux, often only in /usr/sbin.
+guest_bin_path() {
+  for _d in /bin /usr/bin /sbin /usr/sbin; do
+    if [ -x "$FLUX_CHROOT$_d/$1" ]; then
+      printf '%s' "$_d/$1"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Switch to USER_NAME without guest /bin/su (busybox chroot --userspec).
+# UID/GID come from the *guest* passwd — host getpwnam cannot see flux.
+guest_userspec() {
+  _pw="$FLUX_CHROOT/etc/passwd"
+  _uid=$(awk -F: -v u="$USER_NAME" '$1==u {print $3; exit}' "$_pw")
+  _gid=$(awk -F: -v u="$USER_NAME" '$1==u {print $4; exit}' "$_pw")
+  [ -n "${_uid:-}" ] && [ -n "${_gid:-}" ] || \
+    die "cannot switch to $USER_NAME: no su/runuser and no passwd entry"
+  build_guest_env_args
+  # shellcheck disable=SC2086
+  exec $BB chroot --userspec="$_uid:$_gid" "$FLUX_CHROOT" \
+    /usr/bin/env -i $GUEST_ENV_ARGS "$@"
+}
+
+# Drop to USER_NAME then exec remaining argv (non-interactive).
+# Order matches start_guest_gui: runuser, then su, then --userspec.
+guest_as_user() {
+  [ "$#" -ge 1 ] || die "guest_as_user requires CMD"
+  _runuser=$(guest_bin_path runuser || true)
+  if [ -n "${_runuser:-}" ]; then
+    guest_chroot_env "$_runuser" -u "$USER_NAME" -- "$@"
+  fi
+  _su=$(guest_bin_path su || true)
+  if [ -n "${_su:-}" ]; then
+    # su - USER -s SHELL [ -c CMD … ]
+    guest_chroot_env "$_su" - "$USER_NAME" -s "$@"
+  fi
+  guest_userspec "$@"
+}
+
+# Interactive login as USER_NAME. LOGIN_SHELL is already resolve_login_shell'd.
+# su - handles home/cd; runuser/userspec cd via $HOME from build_guest_env_args.
+guest_login_user() {
+  case "$LOGIN_SHELL" in
+    zsh)
+      _bin=/bin/zsh
+      _boot="exec /bin/zsh -l"
+      ;;
+    sh|ash)
+      _bin=/bin/sh
+      _boot="exec /bin/sh -l"
+      ;;
+    bash|*)
+      _bin=/bin/bash
+      _boot="exec /bin/bash --login"
+      ;;
+  esac
+  _inner="${_cd}${_boot}"
+
+  _runuser=$(guest_bin_path runuser || true)
+  if [ -n "${_runuser:-}" ]; then
+    guest_chroot_env "$_runuser" -u "$USER_NAME" -- /bin/sh -c "cd 2>/dev/null || true; $_inner"
+  fi
+  _su=$(guest_bin_path su || true)
+  if [ -n "${_su:-}" ]; then
+    if [ -n "$_cd" ]; then
+      guest_chroot_env "$_su" - "$USER_NAME" -s "$_bin" -c "$_inner"
+    else
+      guest_chroot_env "$_su" - "$USER_NAME" -s "$_bin"
+    fi
+  fi
+  guest_userspec /bin/sh -c "cd 2>/dev/null || true; $_inner"
+}
+
 # App uid cannot stat /data/local/tmp (SELinux). Resolve as root from the rootfs.
 resolve_login_shell() {
   _req="${1:-zsh}"
@@ -376,6 +452,14 @@ guest_login() {
             guest_chroot_env /bin/zsh -l
           fi
           ;;
+        sh|ash)
+          # Alpine/Chimera minirootfs — resolver may return sh when bash/zsh missing
+          if [ -n "$_cd" ]; then
+            guest_chroot_env /bin/sh -c "${_cd}exec /bin/sh -l"
+          else
+            guest_chroot_env /bin/sh -l
+          fi
+          ;;
         bash|*)
           if [ -n "$_cd" ]; then
             guest_chroot_env /bin/bash --login -c "${_cd}exec /bin/bash --login"
@@ -386,30 +470,7 @@ guest_login() {
       esac
       ;;
     flux|*)
-      case "$LOGIN_SHELL" in
-        bash)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash -c "${_cd}exec /bin/bash -l"
-          else
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash
-          fi
-          ;;
-        sh|ash)
-          # Alpine minirootfs / portable shell (no zsh/bash required)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh -c "${_cd}exec /bin/sh -l"
-          else
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh
-          fi
-          ;;
-        zsh|*)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/zsh -c "${_cd}exec /bin/zsh -l"
-          else
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/zsh
-          fi
-          ;;
-      esac
+      guest_login_user
       ;;
   esac
 }
@@ -435,7 +496,7 @@ guest_sh() {
   if [ "$USER_NAME" = "root" ]; then
     guest_chroot_env "$_gshell" -c "$_cmd"
   else
-    guest_chroot_env /bin/su - "$USER_NAME" -s "$_gshell" -c "$_cmd"
+    guest_as_user "$_gshell" -c "$_cmd"
   fi
 }
 
@@ -448,7 +509,9 @@ guest_exec() {
     guest_chroot_env "$@"
   else
     _joined=$(quote_argv "$@")
-    guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash -c "exec $_joined"
+    _eshell=/bin/bash
+    guest_bin_exists bash || _eshell=/bin/sh
+    guest_as_user "$_eshell" -c "exec $_joined"
   fi
 }
 
@@ -467,7 +530,7 @@ guest_b64() {
     # Outer bootstrap: sh always exists; inner script picks bash if available
     guest_chroot_env /bin/sh -c "$_inner"
   else
-    guest_chroot_env /bin/su - "$USER_NAME" -s /bin/sh -c "$_inner"
+    guest_as_user /bin/sh -c "$_inner"
   fi
 }
 

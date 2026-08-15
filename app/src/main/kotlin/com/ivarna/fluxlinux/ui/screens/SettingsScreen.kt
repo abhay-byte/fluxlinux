@@ -138,7 +138,7 @@ fun SettingsScreen(
             SettingsNavCard(
                 icon = Icons.Default.Terminal,
                 title = "Terminal",
-                subtitle = "Font zoom and extra keyboard rows",
+                subtitle = "Font zoom, extra keys, and guest shell",
                 onClick = { onNavigateToTerminalSettings?.invoke() }
             )
             SettingsNavCard(

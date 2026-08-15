@@ -1,10 +1,12 @@
 package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
+import android.util.Log
 import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
+import com.ivarna.fluxlinux.core.utils.TerminalPreferences
 import com.termux.terminal.TerminalSession
 
 /**
@@ -16,7 +18,10 @@ object GuestSessionFactory {
 
     /**
      * Create + open an interactive guest session.
-     * [shellCmd] "exec zsh" (default) or blank → interactive login; else guest payload.
+     * [shellCmd] default `"exec zsh"` (the interactive sentinel) or blank →
+     * interactive login; the actual guest binary comes from
+     * [TerminalPreferences.getGuestLoginShell] (zsh default, bash opt-in).
+     * Anything else is a guest payload.
      */
     fun openSession(
         ctx: Context,
@@ -33,8 +38,12 @@ object GuestSessionFactory {
         // Alpine proot: ensure apk db/lock is app-writable so `sudo apk` works.
         GuestApkDbRepair.repairIfNeeded(ctx, method, distroId)
         val user = LinuxCommandBuilder.sessionUserForType(type)
+        // Always ZSH or BASH from prefs — never null (chroot root follows the pref too).
+        val loginShell = TerminalPreferences.getGuestLoginShell(ctx)
+        Log.d("GuestSessionFactory", "loginShell=${loginShell.id} method=$method distroId=$distroId")
         val (args, envMap) = LinuxCommandBuilder.build(
-            ctx, shellCmd, user = user, method = method, distroId = distroId
+            ctx, shellCmd, user = user, method = method, distroId = distroId,
+            loginShell = loginShell
         )
 
         val isChroot = method == "chroot"

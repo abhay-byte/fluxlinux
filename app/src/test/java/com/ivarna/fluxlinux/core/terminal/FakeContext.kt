@@ -7,8 +7,9 @@ import java.io.File
 /**
  * Minimal Context stub for JVM unit tests of builders.
  * Wraps a null base; only the members the builders touch are wired.
+ * `open` so pref-aware stubs (FakePrefsContext) can extend it.
  */
-class FakeContext(
+open class FakeContext(
     private val filesDir: File,
     private val nativeLibDir: String
 ) : ContextWrapper(null) {

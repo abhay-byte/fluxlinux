@@ -1,9 +1,10 @@
 package com.ivarna.fluxlinux.core.utils
 
 import android.content.Context
+import com.ivarna.fluxlinux.core.terminal.GuestLoginShell
 
 /**
- * Global terminal UI prefs (font zoom + ExtraKeys toolbar).
+ * Global terminal UI prefs (font zoom + ExtraKeys toolbar + guest login shell).
  * Mirrors nativecode-ai `pref_show_extra_keys` / font size behaviour.
  */
 object TerminalPreferences {
@@ -11,6 +12,7 @@ object TerminalPreferences {
     private const val PREFS_NAME = "flux_terminal_prefs"
     private const val KEY_FONT_SIZE = "font_size"
     private const val KEY_SHOW_EXTRA_KEYS = "show_extra_keys"
+    private const val KEY_GUEST_LOGIN_SHELL = "guest_login_shell"
 
     const val FONT_MIN = 10
     const val FONT_MAX = 48
@@ -34,4 +36,18 @@ object TerminalPreferences {
     fun setExtraKeysEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_SHOW_EXTRA_KEYS, enabled).apply()
     }
+
+    fun getGuestLoginShell(context: Context): GuestLoginShell =
+        GuestLoginShell.fromId(
+            prefs(context).getString(KEY_GUEST_LOGIN_SHELL, null)
+        )
+
+    fun setGuestLoginShell(context: Context, shell: GuestLoginShell) {
+        prefs(context).edit()
+            .putString(KEY_GUEST_LOGIN_SHELL, shell.id)
+            .apply()
+    }
+
+    fun preferZsh(context: Context): Boolean =
+        getGuestLoginShell(context) == GuestLoginShell.ZSH
 }

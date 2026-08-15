@@ -58,4 +58,57 @@ class LinuxCommandBuilderTest {
             assertEquals("/system/bin/sh", chrootArgs[0])
         }
     }
+
+    @Test
+    fun chrootRoot_noLoginShell_keepsLegacyBash() {
+        withSeededSu {
+            val (args, _) = LinuxCommandBuilder.build(
+                ctx(), "exec zsh", user = "root", method = "chroot"
+            )
+            assertTrue(args[2].contains("login --user root --shell bash"))
+        }
+    }
+
+    @Test
+    fun chrootRoot_zshPref_flipsToZsh() {
+        withSeededSu {
+            val (args, _) = LinuxCommandBuilder.build(
+                ctx(), "exec zsh", user = "root", method = "chroot",
+                loginShell = GuestLoginShell.ZSH
+            )
+            assertTrue(args[2].contains("login --user root --shell zsh"))
+        }
+    }
+
+    @Test
+    fun chrootRoot_bashPref_staysBash() {
+        withSeededSu {
+            val (args, _) = LinuxCommandBuilder.build(
+                ctx(), "exec zsh", user = "root", method = "chroot",
+                loginShell = GuestLoginShell.BASH
+            )
+            assertTrue(args[2].contains("login --user root --shell bash"))
+        }
+    }
+
+    @Test
+    fun chrootFlux_noLoginShell_keepsLegacyZsh() {
+        withSeededSu {
+            val (args, _) = LinuxCommandBuilder.build(
+                ctx(), "exec zsh", user = "flux", method = "chroot"
+            )
+            assertTrue(args[2].contains("login --user flux --shell zsh"))
+        }
+    }
+
+    @Test
+    fun chrootFlux_bashPref_usesBash() {
+        withSeededSu {
+            val (args, _) = LinuxCommandBuilder.build(
+                ctx(), "exec zsh", user = "flux", method = "chroot",
+                loginShell = GuestLoginShell.BASH
+            )
+            assertTrue(args[2].contains("login --user flux --shell bash"))
+        }
+    }
 }

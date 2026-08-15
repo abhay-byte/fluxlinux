@@ -52,6 +52,8 @@ object FluxTerminalSessionManager {
     /**
      * Interactive guest session after ensuring the host is prepared. Use from UI threads.
      * [method] MUST come from `terminalComponentFor(distroId).method` for card actions (plan §2.6).
+     * [shellCmd] default `"exec zsh"` is the interactive sentinel — the guest binary
+     * comes from `TerminalPreferences` (GuestSessionFactory injection point).
      * Reports a distinct [SessionOpenResult] so the UI can toast the right failure (R3).
      */
     fun openSessionAfterHost(
@@ -85,7 +87,11 @@ object FluxTerminalSessionManager {
         }
     }
 
-    /** Interactive guest session (host already prepared). */
+    /**
+     * Interactive guest session (host already prepared).
+     * [shellCmd] default `"exec zsh"` = interactive sentinel; guest binary comes
+     * from `TerminalPreferences` (zsh default, bash opt-in).
+     */
     fun openSession(
         ctx: Context,
         type: String,

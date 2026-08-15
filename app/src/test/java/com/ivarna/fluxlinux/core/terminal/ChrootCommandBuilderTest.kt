@@ -29,6 +29,36 @@ class ChrootCommandBuilderTest {
     }
 
     @Test
+    fun interactiveRoot_explicitZshPref() {
+        val inner = ChrootCommandBuilder.buildRootInner(
+            "",
+            user = "root",
+            loginShellRoot = GuestLoginShell.DEFAULT.chrootFlag
+        )
+        assertEquals("exec sh $helper login --user root --shell zsh", inner)
+    }
+
+    @Test
+    fun interactiveFlux_loginBash() {
+        val inner = ChrootCommandBuilder.buildRootInner(
+            "exec zsh",
+            user = "flux",
+            loginShellFlux = "bash"
+        )
+        assertEquals("exec sh $helper login --user flux --shell bash", inner)
+    }
+
+    @Test
+    fun interactiveRoot_honorsBashPref() {
+        val inner = ChrootCommandBuilder.buildRootInner(
+            "exec zsh",
+            user = "root",
+            loginShellRoot = "bash"
+        )
+        assertEquals("exec sh $helper login --user root --shell bash", inner)
+    }
+
+    @Test
     fun interactiveAlpine_loginSh() {
         val inner = ChrootCommandBuilder.buildRootInner(
             "exec zsh",
@@ -43,6 +73,19 @@ class ChrootCommandBuilderTest {
     fun workdir_login_usesWorkdir() {
         val inner = ChrootCommandBuilder.buildRootInner("mkdir -p /home/flux/proj && cd /home/flux/proj && exec zsh", user = "flux")
         assertEquals("exec sh $helper login --user flux --shell zsh --workdir '/home/flux/proj'", inner)
+    }
+
+    @Test
+    fun workdir_execBash_usesWorkdirAndShellFromParams() {
+        val inner = ChrootCommandBuilder.buildRootInner(
+            "mkdir -p /home/flux/proj && cd /home/flux/proj && exec bash",
+            user = "flux",
+            loginShellFlux = "bash"
+        )
+        assertEquals(
+            "exec sh $helper login --user flux --shell bash --workdir '/home/flux/proj'",
+            inner
+        )
     }
 
     @Test

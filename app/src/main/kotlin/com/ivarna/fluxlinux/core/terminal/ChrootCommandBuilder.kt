@@ -19,19 +19,24 @@ object ChrootCommandBuilder {
         ctx: Context,
         shellCmd: String,
         user: String = "flux",
-        chrootPath: String = ChrootPaths.CHROOT_PATH
+        chrootPath: String = ChrootPaths.CHROOT_PATH,
+        loginShell: GuestLoginShell? = null
     ): Pair<Array<String>, HashMap<String, String>> {
         ensureHelperScript(ctx)
-        // Always request zsh for flux. App uid cannot stat /data/local/tmp
-        // (SELinux) so a File.exists() probe falsely forced Alpine onto ash.
-        // Helper resolves the real binary as root and falls back sh/bash.
+        // Shell comes from loginShell; helper resolves the real binary as root
+        // (app uid cannot stat /data/local/tmp). When loginShell is null (legacy
+        // callers), flux stays zsh and root stays bash (sh on Alpine paths).
         val isAlpine = chrootPath.contains("Alpine", ignoreCase = true)
-        val loginShellFlux = "zsh"
-        val loginShellRoot = if (isAlpine) "sh" else "bash"
+        val fluxFlag = loginShell?.chrootFlag ?: "zsh"
+        val rootFlag = when {
+            loginShell != null -> loginShell.chrootFlag
+            isAlpine -> "sh"
+            else -> "bash"
+        }
         val rootInner = buildRootInner(
             shellCmd, user,
-            loginShellFlux = loginShellFlux,
-            loginShellRoot = loginShellRoot
+            loginShellFlux = fluxFlag,
+            loginShellRoot = rootFlag
         )
         // Pin FLUX_CHROOT for Alpine/Debian multi-chroot coexistence
         val withPath = "export FLUX_CHROOT='$chrootPath'; $rootInner"
@@ -54,11 +59,8 @@ object ChrootCommandBuilder {
         loginShellRoot: String = "bash"
     ): String {
         val u = if (user == "root") "root" else "flux"
-        val workdir = parseInteractiveWorkdir(shellCmd)
-        val isInteractive = workdir != null ||
-            shellCmd == "exec zsh" ||
-            shellCmd == "/bin/bash --login" ||
-            shellCmd.isBlank()
+        val workdir = GuestLoginShell.parseInteractiveWorkdir(shellCmd)
+        val isInteractive = GuestLoginShell.isInteractiveLogin(shellCmd)
 
         // Always `sh $HELPER` (not bare exec of script) — SELinux often blocks exec of
         // /data/local/tmp/*.sh; /system/bin/sh interpreting the script is reliable.
@@ -124,16 +126,4 @@ object ChrootCommandBuilder {
 
     private fun shellSingleQuote(s: String): String =
         "'" + s.replace("'", "'\\''") + "'"
-
-    /**
-     * Workspace shell: `mkdir -p DIR && cd DIR && exec zsh` → interactive login + --workdir.
-     * Returns workdir path, or null if not that form.
-     */
-    private fun parseInteractiveWorkdir(shellCmd: String): String? {
-        val t = shellCmd.trim()
-        val m = Regex("""^mkdir -p (.+) && cd \1 && exec zsh$""").matchEntire(t)
-            ?: return null
-        val dir = m.groupValues[1].trim()
-        return dir.takeIf { it.isNotEmpty() && !it.contains('\'') }
-    }
 }

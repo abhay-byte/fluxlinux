@@ -26,15 +26,17 @@ object ProotCommandBuilder {
             "TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PATH=$GUEST_PATH"
     }
 
-    /** Prefer zsh (customization), then bash, then ash/sh (Alpine minirootfs). */
-    const val GUEST_LOGIN_SHELL =
-        "/bin/sh -lc 'if [ -x /bin/zsh ]; then exec /bin/zsh -l; " +
-            "elif [ -x /bin/bash ]; then exec /bin/bash -l; else exec /bin/sh -l; fi'"
+    /** zsh-first cascade (default pref). */
+    val GUEST_LOGIN_SHELL: String get() = GuestLoginShell.prootLoginCascade(GuestLoginShell.DEFAULT)
 
     /**
      * Pure argv builder (unit-testable without Android).
-     * Interactive login when [shellCmd] is a login sentinel; otherwise a
-     * single-quoted guest payload (host bash never expands `$HOME`/`$PATH`).
+     * Interactive login when [shellCmd] is a login sentinel
+     * ([GuestLoginShell.isLoginSentinel]); otherwise a single-quoted guest
+     * payload (host bash never expands `$HOME`/`$PATH`).
+     *
+     * The interactive guest binary comes from [loginShell] — the sentinel
+     * string itself never picks the shell.
      *
      * @param distro proot-distro container name (`debian`, `alpine`, …)
      */
@@ -44,15 +46,16 @@ object ProotCommandBuilder {
         shellCmd: String,
         user: String = "flux",
         useSharedTmp: Boolean = true,
-        distro: String = "debian"
+        distro: String = "debian",
+        loginShell: GuestLoginShell = GuestLoginShell.DEFAULT
     ): Array<String> {
         val sharedTmpFlag = if (useSharedTmp) "--shared-tmp" else ""
         val env = guestLoginEnv(user)
-        return if (shellCmd == "exec zsh" || shellCmd == "/bin/bash --login" || shellCmd.isBlank()) {
+        return if (GuestLoginShell.isLoginSentinel(shellCmd)) {
             arrayOf(
                 shell, "-c",
                 "exec python $prootDistro login $distro $sharedTmpFlag --user $user -- " +
-                    "$env $GUEST_LOGIN_SHELL"
+                    "$env ${GuestLoginShell.prootLoginCascade(loginShell)}"
             )
         } else {
             // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
@@ -72,11 +75,12 @@ object ProotCommandBuilder {
         shellCmd: String,
         user: String = "flux",
         useSharedTmp: Boolean = true,
-        distro: String = "debian"
+        distro: String = "debian",
+        loginShell: GuestLoginShell = GuestLoginShell.DEFAULT
     ): Pair<Array<String>, HashMap<String, String>> {
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val prootDistro = TermuxHostPaths.PROOT_DISTRO
-        val args = buildArgs(shell, prootDistro, shellCmd, user, useSharedTmp, distro)
+        val args = buildArgs(shell, prootDistro, shellCmd, user, useSharedTmp, distro, loginShell)
         // Host package env + interactive TERM (guest login inherits package identity)
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
         return args to envMap

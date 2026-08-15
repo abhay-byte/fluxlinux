@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (v2.0.0)
+
+### Features
+- feat: Settings → Terminal guest login shell toggle (zsh default, bash opt-in) — new proot/chroot sessions honor it; chroot root now follows the pref (default zsh) with the Settings switch as the escape hatch
+
+### Bug Fixes
+- fix: fluxlinux_chroot v2.5 — chroot root login fail-opens to sh when bash/zsh are missing (Alpine/Chimera minirootfs)
+- fix: Fedora chroot flux login — do not hardcode `/bin/su` (missing on Fedora 44+); helper v2.6 uses runuser then su then busybox `--userspec`, and Fedora family installs util-linux
+
 ## v1.8.0
 
 ### Features

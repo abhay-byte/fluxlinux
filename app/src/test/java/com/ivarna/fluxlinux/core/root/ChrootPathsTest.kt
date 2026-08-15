@@ -1,10 +1,34 @@
 package com.ivarna.fluxlinux.core.root
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChrootPathsTest {
+
+    @Test
+    fun helper_version_is_v26() {
+        assertEquals("fluxlinux-chroot v2.6", ChrootPaths.CHROOT_HELPER_VERSION)
+    }
+
+    @Test
+    fun helper_fluxLoginPrefersRunuserThenUserspec() {
+        val cwd = java.io.File("").absoluteFile
+        val candidates = listOf(
+            java.io.File(cwd, "src/main/assets/scripts/chroot/fluxlinux_chroot.sh"),
+            java.io.File(cwd, "app/src/main/assets/scripts/chroot/fluxlinux_chroot.sh")
+        )
+        val text = candidates.first { it.isFile }.readText()
+        assertTrue("guest_login_user must exist", text.contains("guest_login_user()"))
+        assertTrue("runuser first (start_guest_gui parity)", text.contains("guest_bin_path runuser"))
+        assertTrue("userspec fallback for Fedora without su", text.contains("chroot --userspec="))
+        assertFalse(
+            "flux login must not hardcode /bin/su only",
+            text.contains("guest_chroot_env /bin/su - \"\$USER_NAME\"")
+        )
+    }
 
     @Test
     fun debian_and_alpine_paths_differ() {

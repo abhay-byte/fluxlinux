@@ -168,6 +168,8 @@ class OmzPokemonContractTest {
             fedora.contains("glibc-langpack-en") || fedora.contains("localedef")
         )
         assertTrue(fedora.contains("en_US.UTF-8"))
+        // Fedora 44+ moved `su` out of shadow-utils; chroot flux login needs util-linux.
+        assertTrue(fedora.contains("util-linux"))
         val common = repoFile(
             "src/main/assets/scripts/common/setup/flux_guest_common.sh"
         ).readText()

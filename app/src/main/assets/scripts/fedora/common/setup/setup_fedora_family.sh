@@ -484,7 +484,7 @@ $DNF -y --setopt=install_weak_deps=False makecache || {
 
 _flux_log "Installing base packages..."
 $DNF $DNF_OPTS install \
-    bash sudo shadow-utils passwd ca-certificates curl wget unzip tar \
+    bash sudo shadow-utils util-linux passwd ca-certificates curl wget unzip tar \
     gzip xz tzdata \
     dbus dbus-daemon \
     || {
