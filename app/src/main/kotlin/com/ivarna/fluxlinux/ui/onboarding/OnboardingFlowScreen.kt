@@ -596,7 +596,7 @@ private fun OptionsPage(
         if (distroId.contains("chroot")) {
             Spacer(Modifier.height(12.dp))
             Text(
-                "Rooted path: grant superuser to FluxLinux. BusyBox may be required on some devices.",
+                "Rooted path: grant superuser to FluxLinux. Magisk, KernelSU, and APatch already include BusyBox — a separate module is not required.",
                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
                 fontSize = 13.sp
             )

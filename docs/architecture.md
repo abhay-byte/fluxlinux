@@ -45,7 +45,7 @@ FluxLinux historically acted as an **orchestrator** (external `com.termux` + `co
 | Component | Isolation | Requires | Used by |
 |-----------|-----------|----------|---------|
 | `termux-flux-terminal` | Host prefix + proot-distro Debian | None (rootless) | Debian card install/run, host shell |
-| `chroot-root-shell` | `busybox chroot` via SSOT helper | Root + BusyBox NDK | Debian (Rooted) card install/run |
+| `chroot-root-shell` | `busybox chroot` via SSOT helper | Root | Debian (Rooted) card install/run |
 
 Routing is centralized: `terminalComponentFor(distroId)` (`core/data/TerminalComponent.kt`) — Debian → `TERMUX_FLUX_TERMINAL`, Debian Rooted → `CHROOT_ROOT_SHELL`. The removed `termux` card has no component.
 

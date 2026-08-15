@@ -9,7 +9,7 @@
 ## 📖 Table of Contents
 
 0. [🔑 Step 0: Grant Root Access to FluxLinux](#-step-0-grant-root-access-to-fluxlinux)
-1. [🧰 Step 1: Install BusyBox NDK](#-step-1-install-busybox-ndk)
+1. [🧰 Step 1: BusyBox (only if setup cannot find one)](#-step-1-busybox-only-if-setup-cannot-find-one)
 2. [🐧 Step 2: Select Debian (Rooted) Distribution](#-step-2-select-debian-rooted-distribution)
 3. [⚙️ Step 3: Configure Debian Settings](#️-step-3-configure-debian-settings)
 4. [📋 Step 4: Generate and Copy the Setup Command](#-step-4-generate-and-copy-the-setup-command)
@@ -34,17 +34,19 @@ Before starting the installation, you must ensure that **FluxLinux** has root ac
 
 ---
 
-## 🧰 Step 1: Install BusyBox NDK
+## 🧰 Step 1: BusyBox (only if setup cannot find one)
 
-Because Chroot relies on low-level Linux utilities, you must install the BusyBox NDK module. You can download and install the BusyBox module directly inside your root manager (e.g. Magisk, KernelSU, or APatch).
+Chroot uses the BusyBox that already ships with Magisk, KernelSU, or APatch. A separate NDK module is **not required** unless FluxLinux cannot find a manager BusyBox during setup.
 
-1. Click **Download Module** on the BusyBox Installation screen.
+If setup later fails to find BusyBox:
+
+1. Click **Download Module** on the BusyBox screen.
 2. Your browser will open the download for the BusyBox NDK installer file.
 3. Flash the downloaded file inside your root manager's Module page.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | FluxLinux will prompt you to install BusyBox NDK if it isn't detected. Click **Download Module**. |
+| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | FluxLinux uses the BusyBox from your root manager when present. Flash the NDK module only if setup cannot find one. |
 | **Download Module** | <img src="img/step-six-download-busybox-module.png" width="500" /> | Your browser will download the BusyBox module package (`UPDATE-Busybox.Installer.zip`) to your phone's storage. |
 | **Flash in Root Manager** | <img src="img/step-six-then-flash-module-in-your-root-application.png" width="500" /> | Open your root manager application (e.g. APatch, KernelSU, or Magisk), go to the Modules tab, select the downloaded file, and flash it. |
 

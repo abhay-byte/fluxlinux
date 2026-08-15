@@ -175,17 +175,19 @@ If your device is rooted (Magisk/KernelSU/APatch), simply click **Apply Fix via 
 
 ## 🧰 Step 6: Install BusyBox (Optional / Rooted Users Only)
 
-For non-root users, BusyBox is not required on this screen, and you can skip this step or the app will pass it automatically.
+BusyBox is **optional**. Magisk, KernelSU, and APatch already include a BusyBox that FluxLinux can use for chroot. You only need the separate NDK module if setup cannot find a manager BusyBox.
 
-If you are using a rooted device, you can download and install the BusyBox module directly inside your root manager (e.g. Magisk, KernelSU, or APatch):
+Non-root users can skip this step.
 
-1. Click **Download Module** on the BusyBox Installation screen.
+If a later chroot install cannot find BusyBox:
+
+1. Click **Download Module** on the BusyBox screen.
 2. Your browser will open the download for the BusyBox NDK installer file.
 3. Flash the downloaded file inside your root manager's Module page.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | For rooted devices, this page prompts you to install BusyBox NDK. Non-root users can skip this. Click **Download Module**. |
+| **BusyBox Installation Screen** | <img src="img/step-six-for-root-install-busybox.png" width="500" /> | Rooted devices usually already have BusyBox from the root manager. Flash the NDK module only if chroot setup cannot find one. Non-root users can skip this. |
 | **Download Module** | <img src="img/step-six-download-busybox-module.png" width="500" /> | Your browser will download the BusyBox module package (`UPDATE-Busybox.Installer.zip`) to your phone's storage. |
 | **Flash in Root Manager** | <img src="img/step-six-then-flash-module-in-your-root-application.png" width="500" /> | Open your root manager application (e.g. APatch, KernelSU, or Magisk), go to the Modules tab, select the downloaded file, and flash it. |
 

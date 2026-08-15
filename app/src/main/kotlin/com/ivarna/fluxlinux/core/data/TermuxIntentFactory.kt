@@ -565,7 +565,20 @@ object TermuxIntentFactory {
                 mkdir -p $termuxTmp;
                 echo "$scriptB64" | base64 -d > $termuxTmp/flux_feature.sh;
                 chmod +x $termuxTmp/flux_feature.sh;
-                busybox chroot /data/local/tmp/chrootDebian /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
+                BB="${'$'}{FLUX_BB:-}";
+                if [ -z "${'$'}BB" ] || ! [ -x "${'$'}BB" ] || ! "${'$'}BB" --list >/dev/null 2>&1; then
+                  BB="";
+                  for path in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+                    if [ -x "${'$'}path" ] && "${'$'}path" --list >/dev/null 2>&1; then BB="${'$'}path"; break; fi;
+                  done;
+                fi;
+                if [ -z "${'$'}BB" ]; then BB="${'$'}(command -v busybox)"; fi;
+                if [ -z "${'$'}BB" ] || ! "${'$'}BB" --list >/dev/null 2>&1; then
+                  if [ -x /data/local/tmp/flux_busybox ] && /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+                    BB=/data/local/tmp/flux_busybox;
+                  fi;
+                fi;
+                "${'$'}BB" chroot /data/local/tmp/chrootDebian /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
                 STATUS=${'$'}?;
                 rm -f $termuxTmp/flux_feature.sh;
                 exit ${'$'}STATUS;
@@ -607,7 +620,20 @@ object TermuxIntentFactory {
                     mount --bind $termuxTmp ${'$'}mnt/tmp >/dev/null 2>&1;
                     echo "$scriptB64" | base64 -d > $termuxTmp/flux_feature.sh;
                     chmod +x $termuxTmp/flux_feature.sh;
-                    busybox chroot ${'$'}mnt /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
+                    BB="${'$'}{FLUX_BB:-}";
+                    if [ -z "${'$'}BB" ] || ! [ -x "${'$'}BB" ] || ! "${'$'}BB" --list >/dev/null 2>&1; then
+                      BB="";
+                      for path in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+                        if [ -x "${'$'}path" ] && "${'$'}path" --list >/dev/null 2>&1; then BB="${'$'}path"; break; fi;
+                      done;
+                    fi;
+                    if [ -z "${'$'}BB" ]; then BB="${'$'}(command -v busybox)"; fi;
+                    if [ -z "${'$'}BB" ] || ! "${'$'}BB" --list >/dev/null 2>&1; then
+                      if [ -x /data/local/tmp/flux_busybox ] && /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+                        BB=/data/local/tmp/flux_busybox;
+                      fi;
+                    fi;
+                    "${'$'}BB" chroot ${'$'}mnt /bin/su - root -c "bash /tmp/flux_feature.sh$scriptArg";
                     STATUS=${'$'}?;
                     rm -f $termuxTmp/flux_feature.sh;
                 fi;

@@ -22,25 +22,49 @@ echo "FluxLinux: Chroot XFCE (root stage)"
 echo "  rootfs=$CHROOT_ROOT"
 echo "========================================"
 
-# Busybox: Magisk/system only (skip Termux/app busybox for chroot mounts)
-BB=""
-if command -v busybox >/dev/null 2>&1; then
-  DETECTED_BB=$(command -v busybox)
-  case "$DETECTED_BB" in
-    *"com.termux"*|*"fluxlinux"*|*"nativecode"*) ;;
-    *) BB="$DETECTED_BB" ;;
-  esac
+# resolve root BusyBox (manager built-in; NDK module not required)
+_rr=""
+for _c in \
+  "${FLUX_RESOLVE_BB:-}" \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr"
+  resolve_bb || true
 fi
-if [ -z "$BB" ]; then
-  for path in /data/adb/magisk/busybox /data/adb/modules/busybox-ndk/system/bin/busybox \
-    /sbin/busybox /system/xbin/busybox /system/bin/busybox /debug_ramdisk/busybox; do
-    if [ -x "$path" ]; then BB="$path"; break; fi
-  done
+if [ -z "${BB:-}" ]; then
+  # sidecar missing (desktop/uninstall/staged setup) — same B1 walk as resolve_bb
+  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ] &&
+     "$FLUX_BB" --list >/dev/null 2>&1; then BB="$FLUX_BB"; fi
+  if [ -z "${BB:-}" ] && [ -x /data/local/tmp/flux_busybox ] &&
+     /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+    BB=/data/local/tmp/flux_busybox
+  fi
+  if [ -z "${BB:-}" ]; then
+    for path in \
+      /data/adb/ksu/bin/busybox \
+      /data/adb/ap/bin/busybox \
+      /data/adb/magisk/busybox \
+      /data/adb/modules/busybox-ndk/system/xbin/busybox \
+      /data/adb/modules/busybox-ndk/system/bin/busybox \
+      /debug_ramdisk/busybox \
+      /sbin/busybox \
+      /system/xbin/busybox \
+      /system/bin/busybox
+    do
+      if [ -x "$path" ]; then BB="$path"; break; fi
+    done
+  fi
 fi
-if [ -z "$BB" ]; then
-  echo "FluxLinux: ERROR — root-capable busybox not found"
+if [ -z "${BB:-}" ]; then
+  echo "FluxLinux: ERROR — root-capable busybox not found" >&2
   exit 1
 fi
+
 echo "FluxLinux: busybox=$BB"
 
 if [ ! -d "$CHROOT_ROOT" ]; then

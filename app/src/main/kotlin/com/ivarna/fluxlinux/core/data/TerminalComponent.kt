@@ -8,7 +8,7 @@ enum class TerminalComponent(val method: String, val label: String) {
     /** Host + proot Debian sessions (no root). */
     TERMUX_FLUX_TERMINAL("proot", "Flux Terminal"),
 
-    /** Root + BusyBox + SSOT chroot helper. */
+    /** Root + SSOT chroot helper. */
     CHROOT_ROOT_SHELL("chroot", "Root Shell")
 }
 

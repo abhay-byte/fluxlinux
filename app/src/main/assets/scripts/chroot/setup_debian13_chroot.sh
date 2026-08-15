@@ -199,20 +199,20 @@ configure_debian_chroot() {
     # Prefer system mount — busybox often "can't find /data" on KSU (sudo stays nosuid)
     /system/bin/mount -o remount,dev,suid /data 2>/dev/null || $BB mount -o remount,dev,suid /data 2>/dev/null || $BB mount -o remount,dev,suid / 2>/dev/null || true
 
-    $BB mount --bind /dev "$DEBIANPATH/dev" || goodbye
-    $BB mount --bind /sys "$DEBIANPATH/sys" || goodbye
-    $BB mount -t proc proc "$DEBIANPATH/proc" || goodbye
-    $BB mount -t devpts devpts "$DEBIANPATH/dev/pts" || goodbye
+    $BB mount --bind /dev "$DEBIANPATH/dev" || /system/bin/mount --bind /dev "$DEBIANPATH/dev" || goodbye
+    $BB mount --bind /sys "$DEBIANPATH/sys" || /system/bin/mount --bind /sys "$DEBIANPATH/sys" || goodbye
+    $BB mount -t proc proc "$DEBIANPATH/proc" || /system/bin/mount -t proc proc "$DEBIANPATH/proc" || goodbye
+    $BB mount -t devpts devpts "$DEBIANPATH/dev/pts" || /system/bin/mount -t devpts devpts "$DEBIANPATH/dev/pts" || goodbye
 
     mkdir -p "$DEBIANPATH/dev/shm"
-    $BB mount -t tmpfs -o size=512M,mode=1777 tmpfs "$DEBIANPATH/dev/shm" || goodbye
+    $BB mount -t tmpfs -o size=512M,mode=1777 tmpfs "$DEBIANPATH/dev/shm" || /system/bin/mount -t tmpfs -o size=512M,mode=1777 tmpfs "$DEBIANPATH/dev/shm" || goodbye
 
     # Debian /tmp must be sticky world-writable for apt (_apt).
     # Do NOT bind Termux files/usr/tmp here — app_data perms/SELinux break mkstemp.
     ensure_chroot_tmp
 
     mkdir -p "$DEBIANPATH/sdcard"
-    $BB mount --bind /sdcard "$DEBIANPATH/sdcard" || goodbye
+    $BB mount --bind /sdcard "$DEBIANPATH/sdcard" || /system/bin/mount --bind /sdcard "$DEBIANPATH/sdcard" || goodbye
 
     progress "Configuring Network and Groups..."
     $BB chroot "$DEBIANPATH" /bin/bash -c '
@@ -450,41 +450,49 @@ main() {
         exit 1
     fi
 
-    # --- BUSYBOX DETECTION ---
-    BB=""
+# resolve root BusyBox (manager built-in; NDK module not required)
+_rr=""
+for _c in \
+  "${FLUX_RESOLVE_BB:-}" \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr"
+  resolve_bb || true
+fi
+if [ -z "${BB:-}" ]; then
+  # sidecar missing (desktop/uninstall/staged setup) — same B1 walk as resolve_bb
+  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ] &&
+     "$FLUX_BB" --list >/dev/null 2>&1; then BB="$FLUX_BB"; fi
+  if [ -z "${BB:-}" ] && [ -x /data/local/tmp/flux_busybox ] &&
+     /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+    BB=/data/local/tmp/flux_busybox
+  fi
+  if [ -z "${BB:-}" ]; then
+    for path in \
+      /data/adb/ksu/bin/busybox \
+      /data/adb/ap/bin/busybox \
+      /data/adb/magisk/busybox \
+      /data/adb/modules/busybox-ndk/system/xbin/busybox \
+      /data/adb/modules/busybox-ndk/system/bin/busybox \
+      /debug_ramdisk/busybox \
+      /sbin/busybox \
+      /system/xbin/busybox \
+      /system/bin/busybox
+    do
+      if [ -x "$path" ]; then BB="$path"; break; fi
+    done
+  fi
+fi
+if [ -z "${BB:-}" ]; then
+  echo "FluxLinux: ERROR — root-capable busybox not found" >&2
+  exit 1
+fi
 
-    if command -v busybox >/dev/null 2>&1; then
-        DETECTED_BB=$(command -v busybox)
-        case "$DETECTED_BB" in
-            *com.termux*|*fluxlinux*|*nativecode*) ;;
-            *)
-                if [ -x "$DETECTED_BB" ]; then
-                    BB="$DETECTED_BB"
-                fi
-                ;;
-        esac
-    fi
-
-    if [ -z "$BB" ]; then
-        CANDIDATES="/data/adb/magisk/busybox \
-        /data/adb/modules/busybox-ndk/system/bin/busybox \
-        /sbin/busybox \
-        /system/xbin/busybox \
-        /system/bin/busybox \
-        /debug_ramdisk/busybox"
-
-        for path in $CANDIDATES; do
-            if [ -x "$path" ]; then
-                BB="$path"
-                break
-            fi
-        done
-    fi
-
-    if [ -z "$BB" ]; then
-         error "Root-capable Busybox not found!"
-         exit 1
-    fi
 
     progress "Using Root Busybox: $BB"
 

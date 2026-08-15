@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# fluxlinux-chroot v2.6
+# fluxlinux-chroot v2.8
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
@@ -17,7 +17,7 @@
 #   FLUX_CHROOT  FLUX_PACKAGE  FLUX_HOST_TMP  FLUX_PREFIX  FLUX_BB  FLUX_SHELL
 set -u
 
-VERSION_STR="fluxlinux-chroot v2.6"
+VERSION_STR="fluxlinux-chroot v2.8"
 # Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
 if [ -z "${FLUX_PACKAGE:-}" ]; then
   if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
@@ -58,36 +58,79 @@ require_root() {
   [ "$(id -u)" = "0" ] || die "must run as root (id=$(id -u))"
 }
 
-resolve_bb() {
-  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ]; then
-    BB="$FLUX_BB"
-    return 0
-  fi
-  if command -v busybox >/dev/null 2>&1; then
-    _det=$(command -v busybox)
-    case "$_det" in
-      *com.termux*|*fluxlinux*|*nativecode*) ;;
-      *) BB="$_det" ;;
-    esac
-  fi
-  if [ -z "$BB" ]; then
-    for path in \
-      /data/adb/ksu/bin/busybox \
-      /data/adb/magisk/busybox \
-      /data/adb/modules/busybox-ndk/system/bin/busybox \
-      /debug_ramdisk/busybox \
-      /sbin/busybox \
-      /system/xbin/busybox \
-      /system/bin/busybox
-    do
-      if [ -x "$path" ]; then
-        BB="$path"
-        break
+# Shared resolver (sidecar). Helper stays single-file if only this script was copied.
+_rr=""
+for _c in \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+_RESOLVE_BB_SOURCED=0
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr" && _RESOLVE_BB_SOURCED=1 || true
+fi
+if [ "$_RESOLVE_BB_SOURCED" != "1" ]; then
+  bb_has() {
+    "$1" --list 2>/dev/null | tr ' \t' '\n' | grep -qx "$2"
+  }
+
+  bb_ok() {
+    [ -n "${1:-}" ] && [ -x "$1" ] || return 1
+    case "$1" in *com.termux*|*fluxlinux*|*nativecode*) return 1 ;; esac
+    bb_has "$1" chroot && bb_has "$1" mount
+  }
+
+  resolve_bb() {
+    BB=""
+    if [ -n "${FLUX_BB:-}" ] && bb_ok "$FLUX_BB"; then
+      BB="$FLUX_BB"
+    elif bb_ok /data/local/tmp/flux_busybox; then
+      BB=/data/local/tmp/flux_busybox
+    else
+      for path in \
+        /data/adb/ksu/bin/busybox \
+        /data/adb/ap/bin/busybox \
+        /data/adb/magisk/busybox \
+        /data/adb/modules/busybox-ndk/system/xbin/busybox \
+        /data/adb/modules/busybox-ndk/system/bin/busybox \
+        /debug_ramdisk/busybox \
+        /sbin/busybox
+      do
+        if bb_ok "$path"; then
+          BB="$path"
+          break
+        fi
+      done
+      if [ -z "$BB" ]; then
+        _det=$(command -v busybox 2>/dev/null || true)
+        if [ -n "${_det:-}" ] && bb_ok "$_det"; then
+          BB="$_det"
+        fi
       fi
-    done
-  fi
-  [ -n "$BB" ] || die "root-capable busybox not found"
-}
+      if [ -z "$BB" ]; then
+        for path in \
+          /system/xbin/busybox \
+          /system/bin/busybox
+        do
+          if bb_ok "$path"; then
+            BB="$path"
+            break
+          fi
+        done
+      fi
+    fi
+    [ -n "$BB" ] || return 1
+    if [ "$BB" != /data/local/tmp/flux_busybox ]; then
+      cp -f "$BB" /data/local/tmp/flux_busybox 2>/dev/null \
+        && chmod 755 /data/local/tmp/flux_busybox 2>/dev/null \
+        && bb_ok /data/local/tmp/flux_busybox \
+        && BB=/data/local/tmp/flux_busybox || true
+    fi
+    return 0
+  }
+fi
 
 # True if target path is already a mount point (exact match in /proc/mounts).
 is_mounted() {
@@ -102,7 +145,8 @@ bind_if_missing() {
   if is_mounted "$_dst"; then
     return 0
   fi
-  $BB mount --bind "$_src" "$_dst" 2>/dev/null || true
+  $BB mount --bind "$_src" "$_dst" 2>/dev/null \
+    || /system/bin/mount --bind "$_src" "$_dst" 2>/dev/null || true
 }
 
 mount_type_if_missing() {
@@ -115,9 +159,11 @@ mount_type_if_missing() {
     return 0
   fi
   if [ -n "$_opts" ]; then
-    $BB mount -t "$_type" -o "$_opts" "$_src" "$_dst" 2>/dev/null || true
+    $BB mount -t "$_type" -o "$_opts" "$_src" "$_dst" 2>/dev/null \
+      || /system/bin/mount -t "$_type" -o "$_opts" "$_src" "$_dst" 2>/dev/null || true
   else
-    $BB mount -t "$_type" "$_src" "$_dst" 2>/dev/null || true
+    $BB mount -t "$_type" "$_src" "$_dst" 2>/dev/null \
+      || /system/bin/mount -t "$_type" "$_src" "$_dst" 2>/dev/null || true
   fi
 }
 
@@ -260,7 +306,10 @@ build_guest_env_args() {
 guest_chroot_env() {
   build_guest_env_args
   # shellcheck disable=SC2086
-  exec $BB chroot "$FLUX_CHROOT" /usr/bin/env -i $GUEST_ENV_ARGS "$@"
+  if [ -n "${BB:-}" ] && bb_has "$BB" chroot; then
+    exec $BB chroot "$FLUX_CHROOT" /usr/bin/env -i $GUEST_ENV_ARGS "$@"
+  fi
+  exec /system/bin/chroot "$FLUX_CHROOT" /usr/bin/env -i $GUEST_ENV_ARGS "$@"
 }
 
 guest_bin_exists() {
@@ -279,22 +328,31 @@ guest_bin_path() {
   return 1
 }
 
-# Switch to USER_NAME without guest /bin/su (busybox chroot --userspec).
-# UID/GID come from the *guest* passwd — host getpwnam cannot see flux.
+# Switch to USER_NAME without guest su/runuser.
+# Android busybox chroot is "NEWROOT [PROG]" only — GNU --userspec is treated
+# as NEWROOT and fails with "can't change root directory to '--userspec=…'".
+# Stage host busybox into the guest (argv0 must be "busybox") and drop uid
+# with setuidgid NUMERIC (name lookup does not see guest "flux").
 guest_userspec() {
   _pw="$FLUX_CHROOT/etc/passwd"
   _uid=$(awk -F: -v u="$USER_NAME" '$1==u {print $3; exit}' "$_pw")
-  _gid=$(awk -F: -v u="$USER_NAME" '$1==u {print $4; exit}' "$_pw")
-  [ -n "${_uid:-}" ] && [ -n "${_gid:-}" ] || \
+  [ -n "${_uid:-}" ] || \
     die "cannot switch to $USER_NAME: no su/runuser and no passwd entry"
+  if ! "$BB" --list 2>/dev/null | tr ' \t' '\n' | grep -qx setuidgid; then
+    die "busybox setuidgid missing; cannot drop to $USER_NAME (no guest su)"
+  fi
+  mkdir -p "$FLUX_CHROOT/tmp" || true
+  _bb=/tmp/busybox
+  cp -f "$BB" "$FLUX_CHROOT$_bb" || die "cannot stage busybox for setuidgid"
+  chmod 755 "$FLUX_CHROOT$_bb"
   build_guest_env_args
   # shellcheck disable=SC2086
-  exec $BB chroot --userspec="$_uid:$_gid" "$FLUX_CHROOT" \
+  exec $BB chroot "$FLUX_CHROOT" "$_bb" setuidgid "$_uid" \
     /usr/bin/env -i $GUEST_ENV_ARGS "$@"
 }
 
 # Drop to USER_NAME then exec remaining argv (non-interactive).
-# Order matches start_guest_gui: runuser, then su, then --userspec.
+# Order matches start_guest_gui: runuser, then su, then numeric setuidgid.
 guest_as_user() {
   [ "$#" -ge 1 ] || die "guest_as_user requires CMD"
   _runuser=$(guest_bin_path runuser || true)
@@ -584,7 +642,7 @@ case "$MODE" in
 esac
 
 require_root
-resolve_bb
+resolve_bb || die "root-capable busybox not found"
 
 # Flag parse: collect until -- or end; modes sh/exec/b64 need --
 REMAINING_ARGS=""

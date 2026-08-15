@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.res.Configuration
 
+import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.core.utils.RootUtils
 import com.ivarna.fluxlinux.core.utils.SystemInfoUtils
@@ -47,7 +48,9 @@ import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -2074,149 +2077,162 @@ fun BusyBoxInstallStep(
 ) {
     val context = LocalContext.current
     val isRooted = remember { RootUtils.isRootAvailable() }
-    var busyBoxInstalledChecked by remember { mutableStateOf(!isRooted) }
-    
+    var probing by remember { mutableStateOf(true) }
+    var resolvedPath by remember { mutableStateOf<String?>(null) }
+    var ackOptionalModule by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            RootShell.ensureBusyBoxResolver(context.applicationContext)
+        }
+        RootShell.probeBusyBox { path ->
+            resolvedPath = path
+            probing = false
+        }
+    }
+
+    val found = !resolvedPath.isNullOrEmpty()
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Step 6: BusyBox Installation",
+            text = "Step 6: BusyBox",
             color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "For Rooted Users Only",
-            color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Always show the card so users know about the requirement
-        androidx.compose.material3.Card(
-            colors = androidx.compose.material3.CardDefaults.cardColors(
-                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-            ),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("📦", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                        "BusyBox NDK",
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                        )
-                        Text(
-                        "Required for Chroot (Rooted Devices)",
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.7f),
-                        fontSize = 12.sp
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
+
+        when {
+            probing -> {
                 Text(
-                    if (isRooted) 
-                        "Root access detected! You MUST install this module to use Chroot environments."
-                    else 
-                        "Root access was not automatically detected, but if you have a rooted device (Magisk/KernelSU/APatch), you MUST install this module.",
+                    "Looking for BusyBox…",
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
+            }
+            found -> {
                 Text(
-                    "Please download and flash this module in your root manager.",
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f),
-                    fontSize = 13.sp
+                    "Using the BusyBox that came with your root manager. You do not need to flash a separate module.",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    "Credit: osm0sis",
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
-                    fontSize = 12.sp
+                    resolvedPath.orEmpty(),
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(
-                    onClick = {
-                        val url = "https://xdaforums.com/attachments/update-busybox-installer-v1-36-1-all-signed-zip.6000117/"
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+            }
+            isRooted -> {
+                androidx.compose.material3.Card(
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                 ) {
-                    Text("Download Module", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary)
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📦", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column {
+                                Text(
+                                    "BusyBox NDK",
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                                Text(
+                                    "Optional fallback if chroot setup cannot find a manager BusyBox",
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            "If install fails later, flash BusyBox NDK in Magisk / KernelSU / APatch.",
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            "Credit: osm0sis",
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.secondary,
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                val url = "https://xdaforums.com/attachments/update-busybox-installer-v1-36-1-all-signed-zip.6000117/"
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Download Module", color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { ackOptionalModule = !ackOptionalModule }
+                        .padding(8.dp)
+                ) {
+                    Checkbox(
+                        checked = ackOptionalModule,
+                        onCheckedChange = { ackOptionalModule = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                            uncheckedColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    )
+                    Text(
+                        "I will install BusyBox NDK only if chroot setup fails",
+                        fontSize = 14.sp,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+            else -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
+                        .padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.material3.MaterialTheme.colorScheme.secondary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Not rooted? You can safely skip this step.",
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (!isRooted) {
-             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer.copy(alpha=0.3f))
-                    .padding(16.dp)
-            ) {
-                 Row(verticalAlignment = Alignment.CenterVertically) {
-                     Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.material3.MaterialTheme.colorScheme.secondary)
-                     Spacer(modifier = Modifier.width(12.dp))
-                     Text(
-                        "Not rooted? You can safely skip this step.",
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                        fontSize = 14.sp
-                     )
-                 }
-            }
-        }
-        
-        if (isRooted) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { busyBoxInstalledChecked = !busyBoxInstalledChecked }
-                    .padding(8.dp)
-            ) {
-                Checkbox(
-                    checked = busyBoxInstalledChecked,
-                    onCheckedChange = { busyBoxInstalledChecked = it },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                        uncheckedColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)
-                    )
-                )
-                Text(
-                    "I have installed the BusyBox NDK module",
-                    fontSize = 14.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-        }
-        
-        if (busyBoxInstalledChecked) {
+        if (!probing) {
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = onContinue,

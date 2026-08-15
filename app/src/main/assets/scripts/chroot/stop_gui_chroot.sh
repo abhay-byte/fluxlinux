@@ -67,6 +67,8 @@ case "$DISTRO_HINT" in
 esac
 ROOT_STOP_SCRIPT="$TERMUX_HOME/$ROOT_STOP_NAME"
 ROOT_STOP_TMP="/data/local/tmp/$ROOT_STOP_NAME"
+RESOLVER_SRC="$TERMUX_HOME/resolve_bb.sh"
+RESOLVER_TMP="/data/local/tmp/fluxlinux_resolve_bb.sh"
 
 echo "========================================"
 echo "FluxLinux: STOP XFCE (chroot mode)"
@@ -80,9 +82,12 @@ else
   for s in /system/bin/su /system/xbin/su /sbin/su; do
     if [ -x "$s" ]; then SU_BIN="$s"; break; fi
   done
-  "$SU_BIN" -c "cp -f '$ROOT_STOP_SCRIPT' '$ROOT_STOP_TMP' 2>/dev/null; chmod 755 '$ROOT_STOP_TMP'; \
+  "$SU_BIN" -c "cp -f '$ROOT_STOP_SCRIPT' '$ROOT_STOP_TMP' 2>/dev/null; \
+    [ -f '$RESOLVER_SRC' ] && cp -f '$RESOLVER_SRC' '$RESOLVER_TMP' 2>/dev/null; \
+    chmod 755 '$ROOT_STOP_TMP' '$RESOLVER_TMP' 2>/dev/null; \
     DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
-    TARGET_PREFIX='$TERMUX_PREFIX' sh '$ROOT_STOP_TMP'"
+    TARGET_PREFIX='$TERMUX_PREFIX' \
+    FLUX_BB='${FLUX_BB:-}' FLUX_RESOLVE_BB='$RESOLVER_TMP' sh '$ROOT_STOP_TMP'"
 fi
 
 echo "Stopping PulseAudio + VirGL (app uid)..."

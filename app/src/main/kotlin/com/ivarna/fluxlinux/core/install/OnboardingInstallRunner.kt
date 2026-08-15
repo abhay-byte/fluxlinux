@@ -348,11 +348,13 @@ class OnboardingInstallRunner(private val ctx: Context) {
         if (!RootShell.isRootAvailable()) {
             postFail(
                 onProgress, phases,
-                "Root not available. Grant superuser to FluxLinux, install BusyBox if needed, then retry."
+                "Root not available. Grant superuser to FluxLinux, then retry."
             )
             return
         }
         completePhase(phases, r0Idx, onProgress, "Root OK")
+        RootShell.ensureBusyBoxResolver(appCtx)
+        val resolvedBb = RootShell.resolveBusyBox()
 
         enter(phases, hostIdx, onProgress, "Extracting bootstrap + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
@@ -416,7 +418,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val envHome = TermuxHostPaths.HOME
         // Do not wrap with $PREFIX/bin/stdbuf — host W^X denies exec from app data.
         val label = profile.distroId.removeSuffix("_chroot")
+        val bbExport = if (!resolvedBb.isNullOrEmpty()) "export FLUX_BB='$resolvedBb'; " else ""
         val rootCmd =
+            bbExport +
             "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +

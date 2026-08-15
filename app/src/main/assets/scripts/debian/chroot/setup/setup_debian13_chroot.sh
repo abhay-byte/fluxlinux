@@ -125,14 +125,14 @@ configure_debian_chroot() {
     progress "Mounting filesystems..."
     $BB mount -o remount,dev,suid /data
     
-    $BB mount --bind /dev "$DEBIANPATH/dev" || goodbye
-    $BB mount --bind /sys "$DEBIANPATH/sys" || goodbye
-    $BB mount -t proc proc "$DEBIANPATH/proc" || goodbye
-    $BB mount -t devpts devpts "$DEBIANPATH/dev/pts" || goodbye
+    $BB mount --bind /dev "$DEBIANPATH/dev" || /system/bin/mount --bind /dev "$DEBIANPATH/dev" || goodbye
+    $BB mount --bind /sys "$DEBIANPATH/sys" || /system/bin/mount --bind /sys "$DEBIANPATH/sys" || goodbye
+    $BB mount -t proc proc "$DEBIANPATH/proc" || /system/bin/mount -t proc proc "$DEBIANPATH/proc" || goodbye
+    $BB mount -t devpts devpts "$DEBIANPATH/dev/pts" || /system/bin/mount -t devpts devpts "$DEBIANPATH/dev/pts" || goodbye
 
     # /dev/shm for Electron apps
     mkdir -p "$DEBIANPATH/dev/shm"
-    $BB mount -t tmpfs -o size=512M tmpfs "$DEBIANPATH/dev/shm" || goodbye
+    $BB mount -t tmpfs -o size=512M tmpfs "$DEBIANPATH/dev/shm" || /system/bin/mount -t tmpfs -o size=512M tmpfs "$DEBIANPATH/dev/shm" || goodbye
 
     # Mount sdcard
 
@@ -140,7 +140,7 @@ configure_debian_chroot() {
 mkdir -p \$DEBIANPATH/tmp
 \$BB mount --bind /data/data/com.termux/files/usr/tmp \$DEBIANPATH/tmp
     mkdir -p "$DEBIANPATH/sdcard"
-    $BB mount --bind /sdcard "$DEBIANPATH/sdcard" || goodbye
+    $BB mount --bind /sdcard "$DEBIANPATH/sdcard" || /system/bin/mount --bind /sdcard "$DEBIANPATH/sdcard" || goodbye
 
     # --- CHROOT CONFIGURAION ---
     # We use non-interactive mode (-c) to automate the guide's interactive steps
@@ -281,49 +281,50 @@ main() {
         exit 1
     fi
 
-    # --- BUSYBOX DETECTION (Robust/Root-Only) ---
-    BB=""
-    
-    # 1. Check PATH first (Smart Fallback)
-    if command -v busybox >/dev/null 2>&1; then
-        DETECTED_BB=$(command -v busybox)
-        # Check if it's the Termux one (which we want to avoid for root actions)
-        case "$DETECTED_BB" in
-            *"com.termux"*)
-                # Matches termux path, ignore it per user request
-                ;;
-            *)
-                # Path doesn't look like termux, assume it's system/magisk
-                if [ -x "$DETECTED_BB" ]; then
-                    BB="$DETECTED_BB"
-                fi
-                ;;
-        esac
-    fi
-    
-    # 2. If not found in PATH (or was Termux), scan hardcoded Magisk paths
-    if [ -z "$BB" ]; then
-        # Priority: Magisk/System Busybox
-        CANDIDATES="/data/adb/magisk/busybox \
-        /data/adb/modules/busybox-ndk/system/bin/busybox \
-        /sbin/busybox \
-        /system/xbin/busybox \
-        /system/bin/busybox \
-        /debug_ramdisk/busybox"
-        
-        for path in $CANDIDATES; do
-            if [ -x "$path" ]; then
-                BB="$path"
-                break
-            fi
-        done
-    fi
-    
-    if [ -z "$BB" ]; then
-         error "Root-capable Busybox not found!"
-         printf "\033[1;33m[!] Scanned paths:\n$CANDIDATES\033[0m\n"
-         exit 1
-    else
+# resolve root BusyBox (manager built-in; NDK module not required)
+_rr=""
+for _c in \
+  "${FLUX_RESOLVE_BB:-}" \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr"
+  resolve_bb || true
+fi
+if [ -z "${BB:-}" ]; then
+  # sidecar missing (desktop/uninstall/staged setup) — same B1 walk as resolve_bb
+  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ] &&
+     "$FLUX_BB" --list >/dev/null 2>&1; then BB="$FLUX_BB"; fi
+  if [ -z "${BB:-}" ] && [ -x /data/local/tmp/flux_busybox ] &&
+     /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+    BB=/data/local/tmp/flux_busybox
+  fi
+  if [ -z "${BB:-}" ]; then
+    for path in \
+      /data/adb/ksu/bin/busybox \
+      /data/adb/ap/bin/busybox \
+      /data/adb/magisk/busybox \
+      /data/adb/modules/busybox-ndk/system/xbin/busybox \
+      /data/adb/modules/busybox-ndk/system/bin/busybox \
+      /debug_ramdisk/busybox \
+      /sbin/busybox \
+      /system/xbin/busybox \
+      /system/bin/busybox
+    do
+      if [ -x "$path" ]; then BB="$path"; break; fi
+    done
+  fi
+fi
+if [ -z "${BB:-}" ]; then
+  echo "FluxLinux: ERROR — root-capable busybox not found" >&2
+  exit 1
+fi
+
+    if [ -n "$BB" ]; then
          # Test Busybox
          if ! "$BB" true >/dev/null 2>&1; then
             printf "\033[1;33m[!] Found Busybox at $BB but it seems broken.\033[0m\n"

@@ -42,6 +42,9 @@ object RootShell {
     @Volatile
     private var cachedSuInvocation: List<String>? = null
 
+    @Volatile
+    private var cachedBusyBoxPath: String? = null
+
     // ─────────────────────────────────────────────────────────────────────────
     // Public API
     // ─────────────────────────────────────────────────────────────────────────
@@ -307,6 +310,94 @@ object RootShell {
     }
 
     /**
+     * Resolve a root-capable BusyBox via the staged shell resolver (su only).
+     * Does not stage the sidecar — callers must [ensureBusyBoxResolver] first.
+     * Background thread only. Caches the first success.
+     */
+    fun resolveBusyBox(): String? {
+        cachedBusyBoxPath?.let { return it }
+        val pkg = com.ivarna.fluxlinux.BuildConfig.APPLICATION_ID
+        val probe =
+            "export FLUX_PACKAGE='$pkg'; " +
+                "if [ -f ${BusyBoxPaths.RESOLVER_ON_DEVICE} ]; then " +
+                ". ${BusyBoxPaths.RESOLVER_ON_DEVICE}; " +
+                "resolve_bb && printf '%s\\n' \"\$BB\" && exit 0; " +
+                "fi; exit 1"
+        val result = captureResult(probe, timeoutMs = 8_000L)
+        if (result.exitCode != 0) return null
+        val path = result.stdout.lineSequence()
+            .map { it.trim() }
+            .lastOrNull { it.startsWith("/") }
+        if (path.isNullOrEmpty()) return null
+        cachedBusyBoxPath = path
+        return path
+    }
+
+    /**
+     * Async BusyBox probe. Runs [resolveBusyBox] off the UI thread; [onResult] on main.
+     */
+    fun probeBusyBox(forceClearCache: Boolean = false, onResult: (String?) -> Unit) {
+        executor.execute {
+            if (forceClearCache) clearBusyBoxCache()
+            val path = try {
+                resolveBusyBox()
+            } catch (_: Exception) {
+                null
+            }
+            mainHandler.post { onResult(path) }
+        }
+    }
+
+    /** Cache only — never probes. */
+    fun cachedBusyBox(): String? = cachedBusyBoxPath
+
+    fun clearBusyBoxCache() {
+        cachedBusyBoxPath = null
+    }
+
+    fun seedBusyBoxForTest(path: String?) {
+        cachedBusyBoxPath = path
+    }
+
+    /**
+     * Stage [BusyBoxPaths.RESOLVER_ASSET] to [BusyBoxPaths.RESOLVER_ON_DEVICE]
+     * using the same su cp/chmod pattern as [ensureChrootHelper].
+     */
+    fun ensureBusyBoxResolver(ctx: Context): Boolean {
+        return try {
+            val staged = stageAsset(ctx, BusyBoxPaths.RESOLVER_ASSET)
+                ?: run {
+                    val tmp = File(ctx.cacheDir, "resolve_bb.sh")
+                    ctx.assets.open(BusyBoxPaths.RESOLVER_ASSET).use { input ->
+                        tmp.outputStream().use { input.copyTo(it) }
+                    }
+                    tmp.absolutePath
+                }
+            var code = executeSync(
+                "cp -f '$staged' ${BusyBoxPaths.RESOLVER_ON_DEVICE} && " +
+                    "chmod 755 ${BusyBoxPaths.RESOLVER_ON_DEVICE}"
+            )
+            if (code != 0) {
+                val bytes = ctx.assets.open(BusyBoxPaths.RESOLVER_ASSET).use { it.readBytes() }
+                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                code = executeSync(
+                    "echo $b64 | base64 -d > ${BusyBoxPaths.RESOLVER_ON_DEVICE} && " +
+                        "chmod 755 ${BusyBoxPaths.RESOLVER_ON_DEVICE}"
+                )
+            }
+            if (code != 0) {
+                Log.w(TAG, "ensureBusyBoxResolver root stage failed exit=$code")
+                return false
+            }
+            Log.i(TAG, "ensureBusyBoxResolver staged ${BusyBoxPaths.RESOLVER_ON_DEVICE}")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "ensureBusyBoxResolver failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Single shell snippet that runs [cmd] as root — for TerminalSession / `sh -c` only.
      * Escapes [cmd] in single quotes so `;` `&&` `$` inside the guest chain stay intact.
      */
@@ -336,6 +427,7 @@ object RootShell {
      */
     fun ensureChrootHelper(ctx: Context): Boolean {
         return try {
+            ensureBusyBoxResolver(ctx)
             val existing = capture(
                 "head -n 2 ${ChrootPaths.CHROOT_HELPER} 2>/dev/null || true",
                 timeoutMs = 4_000L
@@ -433,22 +525,31 @@ object RootShell {
      */
     private fun buildChrootHelperCmd(user: String, b64: String, chrootPath: String): String {
         val helper = ChrootPaths.CHROOT_HELPER
+        val resolver = BusyBoxPaths.RESOLVER_ON_DEVICE
         val pkg = com.ivarna.fluxlinux.BuildConfig.APPLICATION_ID
         val prefix = "/data/data/$pkg/files/usr"
         val hostTmp = "$prefix/tmp"
+        val bb = cachedBusyBox()
+        val fluxBb = if (!bb.isNullOrEmpty()) "export FLUX_BB='$bb'; " else ""
         // Always pin package paths so zenithblue (and future flavors) do not fall
         // back to the script's ivarna defaults when FLUX_* is unset.
         //
         // Android /system/bin/sh rejects `VAR=val if …; then` (assignment before
         // compound command → "syntax error: unexpected 'then'"). Use export +
         // semicolons so the if-list is a normal compound statement.
-        return "export FLUX_PACKAGE='$pkg' FLUX_PREFIX='$prefix' " +
+        return "${fluxBb}export FLUX_PACKAGE='$pkg' FLUX_PREFIX='$prefix' " +
             "FLUX_HOST_TMP='$hostTmp' FLUX_CHROOT='$chrootPath'; " +
             "if [ ! -f $helper ]; then " +
             "for _s in " +
             "/data/data/$pkg/files/home/fluxlinux_chroot.sh " +
             "/data/data/$pkg/files/staged_scripts/fluxlinux_chroot.sh; do " +
             "[ -f \"\$_s\" ] && cp -f \"\$_s\" $helper && chmod 755 $helper && break; " +
+            "done; fi; " +
+            "if [ ! -f $resolver ]; then " +
+            "for _s in " +
+            "/data/data/$pkg/files/home/resolve_bb.sh " +
+            "/data/data/$pkg/files/staged_scripts/resolve_bb.sh; do " +
+            "[ -f \"\$_s\" ] && cp -f \"\$_s\" $resolver && chmod 755 $resolver && break; " +
             "done; fi; " +
             "if [ -f $helper ]; then sh $helper b64 --user $user -- $b64; " +
             "else echo '[RootShell] missing $helper — reinstall chroot or open a chroot session once' >&2; exit 127; fi"

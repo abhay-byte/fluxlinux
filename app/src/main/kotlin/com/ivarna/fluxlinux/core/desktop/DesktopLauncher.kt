@@ -8,6 +8,7 @@ import android.util.Log
 import android.widget.Toast
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
 import com.ivarna.fluxlinux.core.service.DesktopSessionService
+import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.terminal.HostScriptDeployer
 import com.ivarna.fluxlinux.core.terminal.ShellCommandRunner
 import com.ivarna.fluxlinux.core.terminal.ShellJob
@@ -84,6 +85,8 @@ object DesktopLauncher {
                 val path = profile?.chrootPath
                     ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
                 Thread {
+                    RootShell.ensureBusyBoxResolver(app)
+                    RootShell.resolveBusyBox()
                     val installed = TerminalLauncher.isChrootInstalled(path)
                     main.post {
                         if (!installed) {
@@ -174,10 +177,13 @@ object DesktopLauncher {
             else -> profile?.prootName ?: "debian"
         }
         val args = arrayOf(bash, script.absolutePath, scriptArg)
+        val envMap = HashMap<String, String>()
+        RootShell.cachedBusyBox()?.let { envMap["FLUX_BB"] = it }
 
         guiShellJob = ShellCommandRunner.runStreamedCancelable(
             app,
             args,
+            envMap = envMap.takeIf { it.isNotEmpty() },
             onLine = { line ->
                 GuiDesktopLog.append(app, line)
                 appendLive(line)
@@ -257,27 +263,41 @@ object DesktopLauncher {
                 .forId(distroId)?.prootName ?: "debian"
         }
         toast(app, "Stopping desktop…")
-        guiShellJob = ShellCommandRunner.runStreamedCancelable(
-            app,
-            arrayOf(bash, script.absolutePath, stopArg),
-            onLine = { line ->
-                GuiDesktopLog.append(app, line)
-                appendLive(line)
-            },
-            onDone = { code ->
-                GuiDesktopLog.append(app, "[exit $code]")
-                appendLive("[exit $code]")
-                _ui.update {
-                    it.copy(
-                        phase = Phase.Idle,
-                        displayReady = false,
-                        logsAvailable = GuiDesktopLog.hasContent(app),
-                        logText = GuiDesktopLog.read(app)
-                    )
+        val launchStop = {
+            val envMap = HashMap<String, String>()
+            RootShell.cachedBusyBox()?.let { envMap["FLUX_BB"] = it }
+            guiShellJob = ShellCommandRunner.runStreamedCancelable(
+                app,
+                arrayOf(bash, script.absolutePath, stopArg),
+                envMap = envMap.takeIf { it.isNotEmpty() },
+                onLine = { line ->
+                    GuiDesktopLog.append(app, line)
+                    appendLive(line)
+                },
+                onDone = { code ->
+                    GuiDesktopLog.append(app, "[exit $code]")
+                    appendLive("[exit $code]")
+                    _ui.update {
+                        it.copy(
+                            phase = Phase.Idle,
+                            displayReady = false,
+                            logsAvailable = GuiDesktopLog.hasContent(app),
+                            logText = GuiDesktopLog.read(app)
+                        )
+                    }
+                    onDone?.invoke()
                 }
-                onDone?.invoke()
-            }
-        )
+            )
+        }
+        if (method == "chroot") {
+            Thread {
+                RootShell.ensureBusyBoxResolver(app)
+                RootShell.resolveBusyBox()
+                main.post { launchStop() }
+            }.start()
+        } else {
+            launchStop()
+        }
         // Immediate idle for Open X11 button (stop stream may still print)
         _ui.update {
             it.copy(

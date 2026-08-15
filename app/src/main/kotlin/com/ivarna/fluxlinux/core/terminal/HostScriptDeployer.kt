@@ -112,6 +112,7 @@ object HostScriptDeployer {
         HostScript("setup_alpine_chroot.sh", "scripts/chroot/setup_alpine_chroot.sh"),
         HostScript("uninstall_alpine_chroot.sh", "scripts/chroot/uninstall_alpine_chroot.sh"),
         HostScript("fluxlinux_chroot.sh", "scripts/chroot/fluxlinux_chroot.sh"),
+        HostScript("resolve_bb.sh", "scripts/chroot/resolve_bb.sh"),
         HostScript("chroot_processes.sh", "scripts/chroot/chroot_processes.sh", required = false),
         HostScript("chroot_size.sh", "scripts/chroot/chroot_size.sh", required = false),
         // Desktop (proot)

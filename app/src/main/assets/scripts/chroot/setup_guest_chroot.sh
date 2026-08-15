@@ -153,18 +153,18 @@ configure_guest_chroot() {
         || $BB mount -o remount,dev,suid /data 2>/dev/null \
         || $BB mount -o remount,dev,suid / 2>/dev/null || true
 
-    $BB mount --bind /dev "$GUESTPATH/dev" || goodbye
-    $BB mount --bind /sys "$GUESTPATH/sys" || goodbye
-    $BB mount -t proc proc "$GUESTPATH/proc" || goodbye
-    $BB mount -t devpts devpts "$GUESTPATH/dev/pts" || goodbye
+    $BB mount --bind /dev "$GUESTPATH/dev" || /system/bin/mount --bind /dev "$GUESTPATH/dev" || goodbye
+    $BB mount --bind /sys "$GUESTPATH/sys" || /system/bin/mount --bind /sys "$GUESTPATH/sys" || goodbye
+    $BB mount -t proc proc "$GUESTPATH/proc" || /system/bin/mount -t proc proc "$GUESTPATH/proc" || goodbye
+    $BB mount -t devpts devpts "$GUESTPATH/dev/pts" || /system/bin/mount -t devpts devpts "$GUESTPATH/dev/pts" || goodbye
 
     mkdir -p "$GUESTPATH/dev/shm"
-    $BB mount -t tmpfs -o size=512M,mode=1777 tmpfs "$GUESTPATH/dev/shm" || goodbye
+    $BB mount -t tmpfs -o size=512M,mode=1777 tmpfs "$GUESTPATH/dev/shm" || /system/bin/mount -t tmpfs -o size=512M,mode=1777 tmpfs "$GUESTPATH/dev/shm" || goodbye
 
     ensure_chroot_tmp
 
     mkdir -p "$GUESTPATH/sdcard"
-    $BB mount --bind /sdcard "$GUESTPATH/sdcard" || goodbye
+    $BB mount --bind /sdcard "$GUESTPATH/sdcard" || /system/bin/mount --bind /sdcard "$GUESTPATH/sdcard" || goodbye
 
     progress "Configuring Network and Android groups..."
     guest_sh '
@@ -254,28 +254,49 @@ main() {
         exit 1
     fi
 
-    BB=""
-    if command -v busybox >/dev/null 2>&1; then
-        DETECTED_BB=$(command -v busybox)
-        case "$DETECTED_BB" in
-            *com.termux*|*fluxlinux*|*nativecode*) ;;
-            *) [ -x "$DETECTED_BB" ] && BB="$DETECTED_BB" ;;
-        esac
-    fi
-    if [ -z "$BB" ]; then
-        for path in \
-            /data/adb/ksu/bin/busybox \
-            /data/adb/magisk/busybox \
-            /data/adb/modules/busybox-ndk/system/bin/busybox \
-            /sbin/busybox /system/xbin/busybox /system/bin/busybox /debug_ramdisk/busybox
-        do
-            if [ -x "$path" ]; then BB="$path"; break; fi
-        done
-    fi
-    if [ -z "$BB" ]; then
-        error "Root-capable Busybox not found!"
-        exit 1
-    fi
+# resolve root BusyBox (manager built-in; NDK module not required)
+_rr=""
+for _c in \
+  "${FLUX_RESOLVE_BB:-}" \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr"
+  resolve_bb || true
+fi
+if [ -z "${BB:-}" ]; then
+  # sidecar missing (desktop/uninstall/staged setup) — same B1 walk as resolve_bb
+  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ] &&
+     "$FLUX_BB" --list >/dev/null 2>&1; then BB="$FLUX_BB"; fi
+  if [ -z "${BB:-}" ] && [ -x /data/local/tmp/flux_busybox ] &&
+     /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+    BB=/data/local/tmp/flux_busybox
+  fi
+  if [ -z "${BB:-}" ]; then
+    for path in \
+      /data/adb/ksu/bin/busybox \
+      /data/adb/ap/bin/busybox \
+      /data/adb/magisk/busybox \
+      /data/adb/modules/busybox-ndk/system/xbin/busybox \
+      /data/adb/modules/busybox-ndk/system/bin/busybox \
+      /debug_ramdisk/busybox \
+      /sbin/busybox \
+      /system/xbin/busybox \
+      /system/bin/busybox
+    do
+      if [ -x "$path" ]; then BB="$path"; break; fi
+    done
+  fi
+fi
+if [ -z "${BB:-}" ]; then
+  echo "FluxLinux: ERROR — root-capable busybox not found" >&2
+  exit 1
+fi
+
     progress "Using Root Busybox: $BB"
 
     GUESTPATH="${FLUX_CHROOT:-/data/local/tmp/chrootGuest}"

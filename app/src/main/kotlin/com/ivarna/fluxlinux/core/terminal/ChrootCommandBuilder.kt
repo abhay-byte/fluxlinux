@@ -23,6 +23,8 @@ object ChrootCommandBuilder {
         loginShell: GuestLoginShell? = null
     ): Pair<Array<String>, HashMap<String, String>> {
         ensureHelperScript(ctx)
+        RootShell.ensureBusyBoxResolver(ctx)
+        RootShell.resolveBusyBox()
         // Shell comes from loginShell; helper resolves the real binary as root
         // (app uid cannot stat /data/local/tmp). When loginShell is null (legacy
         // callers), flux stays zsh and root stays bash (sh on Alpine paths).
@@ -39,7 +41,9 @@ object ChrootCommandBuilder {
             loginShellRoot = rootFlag
         )
         // Pin FLUX_CHROOT for Alpine/Debian multi-chroot coexistence
-        val withPath = "export FLUX_CHROOT='$chrootPath'; $rootInner"
+        val bb = RootShell.cachedBusyBox()
+        val exportBb = if (!bb.isNullOrEmpty()) "export FLUX_BB='$bb'; " else ""
+        val withPath = "${exportBb}export FLUX_CHROOT='$chrootPath'; $rootInner"
         val cmd = RootShell.shellRootCommand(withPath)
         // Inline WINCH trap on outer sh (mShellPid). Keep this shell as parent (no leading exec).
         val winchCmd = winchWrap(cmd)
@@ -101,6 +105,7 @@ object ChrootCommandBuilder {
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
         envMap["TMPDIR"] = "/tmp"
         envMap["FLUX_CHROOT"] = chrootPath
+        RootShell.cachedBusyBox()?.let { envMap["FLUX_BB"] = it }
         return envMap
     }
 

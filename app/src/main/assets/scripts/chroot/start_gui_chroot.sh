@@ -78,6 +78,8 @@ ROOT_GUI_SCRIPT="$TERMUX_HOME/$ROOT_GUI_NAME"
 ROOT_GUI_TMP="/data/local/tmp/$ROOT_GUI_NAME"
 HELPER_SRC="$TERMUX_HOME/fluxlinux_chroot.sh"
 HELPER_TMP="/data/local/tmp/fluxlinux_chroot.sh"
+RESOLVER_SRC="$TERMUX_HOME/resolve_bb.sh"
+RESOLVER_TMP="/data/local/tmp/fluxlinux_resolve_bb.sh"
 
 echo "========================================"
 echo "FluxLinux: START XFCE (chroot mode)"
@@ -209,6 +211,10 @@ if [ -f "$HELPER_SRC" ]; then
   cp -f "$HELPER_SRC" "$HELPER_TMP" 2>/dev/null || true
   chmod 755 "$HELPER_TMP" 2>/dev/null || true
 fi
+if [ -f "$RESOLVER_SRC" ]; then
+  cp -f "$RESOLVER_SRC" "$RESOLVER_TMP" 2>/dev/null || true
+  chmod 755 "$RESOLVER_TMP" 2>/dev/null || true
+fi
 SU_BIN=""
 for s in /system/bin/su /system/xbin/su /sbin/su; do
   if [ -x "$s" ]; then SU_BIN="$s"; break; fi
@@ -224,13 +230,17 @@ fi
 if [ -f "$ROOT_GUI_TMP" ] || cp -f "$ROOT_GUI_SCRIPT" "$ROOT_GUI_TMP" 2>/dev/null; then
   "$SU_BIN" -c "cp -f '$ROOT_GUI_SCRIPT' '$ROOT_GUI_TMP' 2>/dev/null; \
     [ -f '$HELPER_SRC' ] && cp -f '$HELPER_SRC' '$HELPER_TMP' 2>/dev/null; \
-    chmod 755 '$ROOT_GUI_TMP' '$HELPER_TMP' 2>/dev/null; \
+    [ -f '$RESOLVER_SRC' ] && cp -f '$RESOLVER_SRC' '$RESOLVER_TMP' 2>/dev/null; \
+    chmod 755 '$ROOT_GUI_TMP' '$HELPER_TMP' '$RESOLVER_TMP' 2>/dev/null; \
     DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
-    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
+    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' \
+    FLUX_BB='${FLUX_BB:-}' FLUX_RESOLVE_BB='$RESOLVER_TMP' sh '$ROOT_GUI_TMP'"
 else
   "$SU_BIN" -c "cp -f '$ROOT_GUI_SCRIPT' '$ROOT_GUI_TMP' && chmod 755 '$ROOT_GUI_TMP' && \
+    [ -f '$RESOLVER_SRC' ] && cp -f '$RESOLVER_SRC' '$RESOLVER_TMP' 2>/dev/null; \
     DEBIANPATH='$CHROOT_PATH' CHROOT_ROOT='$CHROOT_PATH' FLUX_CHROOT='$CHROOT_PATH' \
-    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' sh '$ROOT_GUI_TMP'"
+    TARGET_PREFIX='$TERMUX_PREFIX' HELPER='$HELPER_TMP' \
+    FLUX_BB='${FLUX_BB:-}' FLUX_RESOLVE_BB='$RESOLVER_TMP' sh '$ROOT_GUI_TMP'"
 fi
 rc=$?
 echo "FluxLinux: chroot GUI exit=$rc"

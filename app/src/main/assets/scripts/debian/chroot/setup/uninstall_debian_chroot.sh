@@ -30,11 +30,44 @@ progress "Target: $DEBIANPATH"
 
 # 1. Safety Check: Unmount everything first
 # We use busybox umount if available, or system umount
-if command -v busybox >/dev/null 2>&1; then
-    BB="busybox"
-else
-    BB=""
+# resolve root BusyBox (manager built-in; NDK module not required)
+_rr=""
+for _c in \
+  "${FLUX_RESOLVE_BB:-}" \
+  "$(dirname "$0")/resolve_bb.sh" \
+  /data/local/tmp/fluxlinux_resolve_bb.sh
+do
+  [ -n "$_c" ] && [ -f "$_c" ] && _rr="$_c" && break
+done
+if [ -n "$_rr" ]; then
+  # shellcheck disable=SC1090
+  . "$_rr"
+  resolve_bb || true
 fi
+if [ -z "${BB:-}" ]; then
+  if [ -n "${FLUX_BB:-}" ] && [ -x "$FLUX_BB" ] &&
+     "$FLUX_BB" --list >/dev/null 2>&1; then BB="$FLUX_BB"; fi
+  if [ -z "${BB:-}" ] && [ -x /data/local/tmp/flux_busybox ] &&
+     /data/local/tmp/flux_busybox --list >/dev/null 2>&1; then
+    BB=/data/local/tmp/flux_busybox
+  fi
+  if [ -z "${BB:-}" ]; then
+    for path in \
+      /data/adb/ksu/bin/busybox \
+      /data/adb/ap/bin/busybox \
+      /data/adb/magisk/busybox \
+      /data/adb/modules/busybox-ndk/system/xbin/busybox \
+      /data/adb/modules/busybox-ndk/system/bin/busybox \
+      /debug_ramdisk/busybox \
+      /sbin/busybox \
+      /system/xbin/busybox \
+      /system/bin/busybox
+    do
+      if [ -x "$path" ]; then BB="$path"; break; fi
+    done
+  fi
+fi
+
 
 # 1. Kill Stale Processes
 progress "Checking for stalled processes..."
@@ -65,7 +98,7 @@ if [ -z "$MOUNTS" ]; then
 else
     for mnt in $MOUNTS; do
         progress "Unmounting: $mnt"
-        $BB umount -l "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null
+        $BB umount -l "$mnt" 2>/dev/null || /system/bin/umount -l "$mnt" 2>/dev/null
     done
 fi
 
