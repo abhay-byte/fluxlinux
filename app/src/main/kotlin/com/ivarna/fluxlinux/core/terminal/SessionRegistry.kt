@@ -33,7 +33,9 @@ object SessionRegistry {
         val method: String,    // "proot" | "chroot" | "host"
         val onFinished: (() -> Unit)? = null,
         /** Always fired when the process exits (any status, including signal). */
-        val onClosed: ((exitStatus: Int) -> Unit)? = null
+        val onClosed: ((exitStatus: Int) -> Unit)? = null,
+        val distroId: String? = null,
+        val iconRes: Int? = null,
     )
 
     private val sessionsList = ArrayList<ManagedSession>()
@@ -67,6 +69,8 @@ object SessionRegistry {
     fun isOpen(): Boolean = sessionsList.isNotEmpty()
 
     fun titles(): List<String> = sessionsList.map { it.title }
+
+    fun sessions(): List<ManagedSession> = sessionsList.toList()
 
     fun hasFreeTab(): Boolean = sessionsList.size < MAX_TABS
 

@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -33,6 +34,9 @@ fun GlassScaffold(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = topBar,
+            // Do not consume IME / status-bar insets here. Terminal owns IME
+            // padding so ExtraKeys sit on the keyboard; Home TopBar owns status bars.
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             content = { paddingValues ->
                 Box(
                     modifier = Modifier

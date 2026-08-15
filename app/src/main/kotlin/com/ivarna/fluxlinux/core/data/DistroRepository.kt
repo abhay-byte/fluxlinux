@@ -595,4 +595,24 @@ object DistroRepository {
             chrootSupported = true
         ),
     )
+
+    /**
+     * Installable PRoot or Chroot card for the same family as [id].
+     * Falls back to the first installable card of that method.
+     */
+    fun iconResFor(distroId: String?): Int? =
+        distroId?.let { id -> supportedDistros.find { it.id == id }?.iconRes }
+
+    fun installableVariant(id: String, chroot: Boolean): Distro? {
+        val current = supportedDistros.find { it.id == id }
+        val family = current?.configuration
+        val matches: (Distro) -> Boolean = { d ->
+            !d.comingSoon && if (chroot) d.chrootSupported else d.prootSupported
+        }
+        if (family != null) {
+            supportedDistros.firstOrNull { matches(it) && it.configuration == family }
+                ?.let { return it }
+        }
+        return supportedDistros.firstOrNull(matches)
+    }
 }

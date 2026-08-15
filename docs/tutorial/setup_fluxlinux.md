@@ -82,7 +82,7 @@ If you would like to support the ongoing development of FluxLinux, you can purch
 
 ## ⚙️ Step 2: Initialize the Embedded Environment
 
-FluxLinux now ships its **own embedded Linux host** (bootstrap + proot-distro + rootfs) inside the APK — a separate Termux app is **no longer required** to install Debian.
+FluxLinux now ships its **own embedded Linux host** (bootstrap + proot-distro) inside the APK — a separate Termux app is **no longer required** to install Debian. Distro rootfs archives are downloaded on demand from the GitHub release tag `rootfs` at install time.
 
 1. On the setup screen, tap **Initialize Environment**. FluxLinux extracts the embedded host prefix (first run takes a minute or two; a progress bar is shown).
 2. The host setup validates the bundled dependencies (`proot-distro`, `python`, `pulseaudio`, Termux:X11 loader).
@@ -193,14 +193,14 @@ If you are using a rooted device, you can download and install the BusyBox modul
 
 ## 📦 Step 7: Environment Setup
 
-FluxLinux will now extract and configure the core Linux file system (rootfs) on your device.
+FluxLinux will now extract and configure the core Linux host environment (bootstrap) on your device. Distro rootfs archives are fetched later, at install time.
 
 * This process may take a few minutes depending on your device's storage speed.
 * Please **do not close the app** or turn off the screen during this process.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
-| **Environment Setup Screen** | <img src="img/step-seven-step-up-environment-click-on-initialize-environemnt-open-in.png" width="500" /> | Tap **1. Initialize Environment (Required)** to trigger the extraction of the Linux rootfs. |
+| **Environment Setup Screen** | <img src="img/step-seven-step-up-environment-click-on-initialize-environemnt-open-in.png" width="500" /> | Tap **1. Initialize Environment (Required)** to trigger the extraction of the Linux host environment. |
 | **Termux Script Execution** | <img src="img/step-seven-termux-will-open-and-start-the-setup.png" width="500" /> | The app will launch Termux to run the automated setup script. Wait for all packages to install. |
 | **Environment Initialized** | <img src="img/step-seven-termux-initialized.png" width="500" /> | When Termux setup completes, return to FluxLinux. You will see **Environment Initialized ✔**. Click **Next**. |
 

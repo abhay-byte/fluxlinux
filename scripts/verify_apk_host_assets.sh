@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # verify_apk_host_assets.sh — unzip checks that the built APK contains the host
-# assets for the given flavor (bootstrap.tar STORED, rootfs, jniLibs).
+# assets for the given flavor (bootstrap.tar STORED, jniLibs) and — since rootfs
+# moved to GitHub release download — contains ZERO assets/rootfs/* entries
+# (negative gate, docs/plans/rootfs-github-release-no-apk-bloat.md P5-T3).
 #
 # Usage:
 #   ./scripts/verify_apk_host_assets.sh app/build/outputs/apk/ivarna/debug/app-ivarna-debug.apk
@@ -19,7 +21,6 @@ echo "=== verifying host assets in $APK ==="
 
 for entry in \
   "assets/bootstrap.tar" \
-  "assets/rootfs/debian_13_rootfs.tar.xz" \
   "lib/arm64-v8a/libbash.so" \
   "lib/arm64-v8a/libproot.so" \
   "lib/arm64-v8a/libloader.so" \
@@ -34,7 +35,7 @@ for entry in \
 done
 
 # noCompress gate: archives must be STORED, not DEFLATE
-for entry in "assets/bootstrap.tar" "assets/rootfs/debian_13_rootfs.tar.xz"; do
+for entry in "assets/bootstrap.tar"; do
   method=$(unzip -v "$APK" | grep " $entry$" | awk '{print $2}')
   if [ "$method" = "Stored" ]; then
     echo "  [OK] $entry stored uncompressed"
@@ -43,6 +44,17 @@ for entry in "assets/bootstrap.tar" "assets/rootfs/debian_13_rootfs.tar.xz"; do
     fail=1
   fi
 done
+
+# Negative rootfs gate: rootfs archives ship via the GitHub release tag `rootfs`,
+# never inside the APK.
+rootfs_entries=$(unzip -l "$APK" | grep -c "assets/rootfs/" || true)
+if [ "$rootfs_entries" -eq 0 ]; then
+  echo "  [OK] zero assets/rootfs/* entries (rootfs downloads at install time)"
+else
+  echo "  [FAIL] APK contains $rootfs_entries assets/rootfs/* entries — must be zero"
+  unzip -l "$APK" | grep "assets/rootfs/" || true
+  fail=1
+fi
 
 if [ "$fail" -eq 0 ]; then
   echo "PASS"

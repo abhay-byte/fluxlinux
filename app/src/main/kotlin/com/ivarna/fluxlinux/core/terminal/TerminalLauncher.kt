@@ -11,11 +11,13 @@ import java.util.concurrent.Executors
 
 /**
  * Entry point for card actions that need the embedded host before a terminal
- * session opens: extract bootstrap → deploy scripts/rootfs → setup_termux
- * validation (host gate). All heavy work runs on a background executor;
- * [onDone] is dispatched on the main thread.
+ * session opens: extract bootstrap → deploy scripts/loader → setup_termux
+ * validation (host gate). Rootfs archives are NOT part of host readiness —
+ * the selected distro's rootfs is downloaded at install time
+ * (RootfsDownloader). All heavy work runs on a background executor; [onDone]
+ * is dispatched on the main thread.
  *
- * Fail-closed: false unless extract AND rootfs deploy AND setup_termux succeed.
+ * Fail-closed: false unless extract AND scripts/loader deploy AND setup_termux succeed.
  * Recovery (B2): a failed setup_termux clears only the setup marker (never wipes
  * the prefix); re-extract happens on a later call only if the extract tree/marker
  * is invalid. Installed proot containers are preserved by [BootstrapInstaller].
@@ -145,8 +147,9 @@ object TerminalLauncher {
 
     /**
      * Ensure bootstrap extracted + scripts deployed + setup validated (async).
-     * Fail-closed: false unless extract AND rootfs/loader deploy AND setup_termux
-     * all succeed. Recovery (B2): a setup_termux failure NEVER wipes the prefix —
+     * Fail-closed: false unless extract AND script/loader deploy AND
+     * setup_termux all succeed (rootfs is NOT part of this gate — D6).
+     * Recovery (B2): a setup_termux failure NEVER wipes the prefix —
      * installed proot containers are preserved by [BootstrapInstaller]; a corrupt
      * tree (missing marker) re-extracts on the next call with containers preserved.
      *

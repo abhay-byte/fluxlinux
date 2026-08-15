@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -227,43 +232,58 @@ private fun OnboardingGetStartedButton(onGetStarted: () -> Unit) {
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun OnboardingFeatureCards(hazeState: HazeState) {
-    FeatureCard(
-        hazeState = hazeState,
-        icon = "🐧",
-        title = "Multiple Distros",
-        description = "Debian, Ubuntu, Arch and more"
+    val features = listOf(
+        Triple(
+            Icons.Filled.Storage,
+            "Multiple Distros",
+            "Debian, Ubuntu, Arch and more"
+        ),
+        Triple(
+            Icons.Filled.DesktopWindows,
+            "Full Desktop",
+            "XFCE4 with complete GUI support"
+        ),
+        Triple(
+            Icons.Filled.LockOpen,
+            "No Root Required",
+            "PRoot mode works on any device"
+        )
     )
 
-    Spacer(modifier = Modifier.height(16.dp))
+    features.chunked(2).forEach { rowFeatures ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            rowFeatures.forEach { (icon, title, description) ->
+                FeatureCard(
+                    hazeState = hazeState,
+                    icon = icon,
+                    title = title,
+                    description = description,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            if (rowFeatures.size == 1) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
 
-    FeatureCard(
-        hazeState = hazeState,
-        icon = "🖥️",
-        title = "Full Desktop Environment",
-        description = "XFCE4 with complete GUI support"
-    )
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    FeatureCard(
-        hazeState = hazeState,
-        icon = "⚡",
-        title = "No Root Required",
-        description = "PRoot mode works on any device"
-    )
+        Spacer(modifier = Modifier.height(16.dp))
+    }
 }
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun FeatureCard(
     hazeState: HazeState,
-    icon: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    description: String
+    description: String,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
+    Column(
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .hazeChild(
                 state = hazeState,
@@ -272,29 +292,30 @@ fun FeatureCard(
                     tint = null
                 )
             )
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(16.dp)
     ) {
-        // Icon
-        Text(
-            text = icon,
-            fontSize = 32.sp,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(end = 16.dp)
+        androidx.compose.material3.Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp)
         )
-        
-        Column {
-            Text(
-                text = title,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = description,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                fontSize = 14.sp
-            )
-        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = title,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = description,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            fontSize = 12.sp
+        )
     }
 }

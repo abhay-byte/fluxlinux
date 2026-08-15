@@ -259,7 +259,7 @@ object TerminalShellCatalog {
                     disabledReason = when {
                         enabled -> null
                         !installed -> "Chroot not installed"
-                        else -> "Root required"
+                        else -> "Installed · no root given to app"
                     }
                 )
             }

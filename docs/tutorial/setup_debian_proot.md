@@ -64,17 +64,17 @@ Before generating the installation commands, you need to set up the container co
 FluxLinux now ships its own embedded Linux host (bootstrap) inside the APK — no separate Termux app is required for Debian installs.
 
 1. On the configuration screen, tap **Install in Flux Terminal**.
-2. FluxLinux extracts the embedded host environment and opens an in-app terminal session running the install: the bundled Debian rootfs is installed locally via `proot-distro install <archive> --name debian` — **no network download of the rootfs and no paste-into-Termux**.
+2. FluxLinux extracts the embedded host environment and opens an in-app terminal session running the install: the pinned Debian rootfs is resolved **local-first** (a verified archive under `$HOME/debian_13_rootfs.tar.xz` needs no network) and otherwise downloaded on demand from the GitHub release tag `rootfs`, then installed via `proot-distro install <archive> --name debian` — no paste-into-Termux.
 3. Watch the progress in the terminal; the session stays alive even when you switch apps (foreground notification).
 4. On success the app marks Debian as installed automatically.
 
 > [!TIP]
-> The Debian rootfs is pinned (SHA256-verified) and identical for the PRoot and Rooted (chroot) install paths.
+> The Debian rootfs is pinned (SHA256-verified, `13e29f60…`) and identical for the PRoot and Rooted (chroot) install paths. The onboarding install shows a download phase with MiB progress; offline installs can pre-place the archive at `$HOME/debian_13_rootfs.tar.xz`.
 
 | Action / State | Screenshot | Description |
 | :--- | :---: | :--- |
 | **Install in Flux Terminal** | UI TBD | Review your selections, then tap **Install in Flux Terminal** to start the in-app install. |
-| **In-app install session** | UI TBD | The terminal runs `flux_install.sh debian` against the local rootfs archive. |
+| **In-app install session** | UI TBD | The terminal runs `flux_install.sh debian` against the verified rootfs archive (downloaded on demand if not already present). |
 
 ---
 

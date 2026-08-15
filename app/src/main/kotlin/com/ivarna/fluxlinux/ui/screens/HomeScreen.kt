@@ -49,11 +49,15 @@ import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 
 import com.ivarna.fluxlinux.core.desktop.DesktopLauncher
+import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.components.MethodTab
 import com.ivarna.fluxlinux.ui.components.MethodTabs
 import com.ivarna.fluxlinux.ui.components.isChrootCard
 import com.ivarna.fluxlinux.ui.theme.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
@@ -152,20 +156,50 @@ fun HomeScreen(
         val prootInstalled = installedDistros.filter { !it.isChrootCard() }
         val chrootInstalled = installedDistros.filter { it.isChrootCard() }
         var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
+        var rootAvailable by remember { mutableStateOf(false) }
         val visibleDistros = if (methodTab == MethodTab.CHROOT) {
             chrootInstalled
         } else {
             prootInstalled
         }
 
+        fun probeRoot(force: Boolean = false) {
+            RootShell.probeRootAvailable(forceClearCache = force) { ok ->
+                rootAvailable = ok
+            }
+        }
+        LaunchedEffect(Unit) { probeRoot() }
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) probeRoot(force = true)
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
 
         MethodTabs(
             selected = methodTab,
-            onSelected = { methodTab = it },
+            onSelected = { tab ->
+                methodTab = tab
+                if (tab == MethodTab.CHROOT) probeRoot(force = true)
+            },
             prootCount = prootInstalled.size,
             chrootCount = chrootInstalled.size
         )
+
+        if (methodTab == MethodTab.CHROOT && !rootAvailable && chrootInstalled.isNotEmpty()) {
+            Text(
+                text = "Installed, but no root given to the app. Grant superuser to FluxLinux to start these guests.",
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.92f),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -222,6 +256,8 @@ fun HomeScreen(
                         (desktopForThis && desktopUi.phase == DesktopLauncher.Phase.Running)
                 val logsOk =
                     desktopForThis && (desktopUi.logsAvailable || desktopUi.logText.isNotBlank())
+                val needsRoot = distro.isChrootCard()
+                val canStart = !needsRoot || rootAvailable
                 com.ivarna.fluxlinux.ui.components.DistroCard(
                     distro = distro,
                     isInstalled = true,
@@ -229,10 +265,27 @@ fun HomeScreen(
                     isGuiStarting = isStarting,
                     logsAvailable = logsOk ||
                         com.ivarna.fluxlinux.core.desktop.GuiDesktopLog.hasContent(context),
+                    startEnabled = canStart,
+                    statusMessage = if (needsRoot && !rootAvailable) {
+                        "Installed · no root given to app"
+                    } else {
+                        null
+                    },
+                    statusIsError = needsRoot && !rootAvailable,
                     onInstall = { onNavigateToInstall(distro) },
                     onUninstall = { /* Handled in Settings */ },
                     onNavigateToSettings = { onNavigateToSettings(distro) },
-                    onNavigateToStart = { distroToLaunch.value = distro },
+                    onNavigateToStart = {
+                        if (!canStart) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Grant superuser to FluxLinux first",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            distroToLaunch.value = distro
+                        }
+                    },
                     onOpenDisplay = {
                         DesktopLauncher.reopenDisplay(context)
                     },

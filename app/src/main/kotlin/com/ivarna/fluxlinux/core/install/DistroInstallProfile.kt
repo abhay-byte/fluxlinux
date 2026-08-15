@@ -16,13 +16,20 @@ data class DistroInstallProfile(
     val prootName: String,
     /** Install method: `proot` or `chroot`. */
     val method: String,
-    /** Asset path under `assets/rootfs/`. */
+    /**
+     * Legacy APK asset path under `assets/rootfs/`. Unused after rootfs left
+     * the APK (GitHub release download). Kept for test stability (aapt2
+     * `.gz`-rename contract). Not the manual-placement name — that is
+     * [rootfsFileName].
+     */
     val rootfsAsset: String,
     /** Deployed filename under `$HOME`. */
     val rootfsFileName: String,
     val rootfsSha256: String,
     /** Minimum accepted size after deploy (bytes). */
     val rootfsMinBytes: Long,
+    /** GitHub release download URL for the pinned rootfs archive (D1/D4). */
+    val rootfsUrl: String,
     /** Guest family setup asset (under `scripts/`). */
     val familyScript: String,
     /** Guest customization asset (under `scripts/`). */
@@ -45,37 +52,48 @@ data class DistroInstallProfile(
         get() = rootfsFileName
 
     companion object {
+        /** Base URL of the GitHub release tag that hosts all rootfs archives (D1). */
+        const val ROOTFS_RELEASE_BASE =
+            "https://github.com/abhay-byte/fluxlinux/releases/download/rootfs"
+
         // Debian 13 pinned rootfs (existing)
         const val DEBIAN_ROOTFS_NAME = "debian_13_rootfs.tar.xz"
         const val DEBIAN_ROOTFS_SHA256 =
             "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803"
         const val DEBIAN_ROOTFS_MIN_BYTES = 50L * 1024L * 1024L
+        const val DEBIAN_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$DEBIAN_ROOTFS_NAME"
 
         // Alpine 3.24.1 minirootfs aarch64
         // Deployed home name stays *.tar.gz (scripts / proot-distro / tar -xzf).
         // APK asset must NOT end in .gz — aapt2 auto-decompresses and renames
         // *.tar.gz → *.tar, breaking SHA and AssetManager.open(path).
+        // The release asset keeps the real .tar.gz name (D8); .minirootfs was
+        // APK-packaging-only and is never used on the runtime/release path.
         const val ALPINE_ROOTFS_NAME = "alpine_3.24_rootfs.tar.gz"
-        /** Packaged asset path (gzip bytes, non-.gz name). */
+        /** Packaged asset path (gzip bytes, non-.gz name) — legacy APK name. */
         const val ALPINE_ROOTFS_ASSET = "rootfs/alpine_3.24_rootfs.minirootfs"
         const val ALPINE_ROOTFS_SHA256 =
             "f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259"
         const val ALPINE_ROOTFS_MIN_BYTES = 1L * 1024L * 1024L
+        const val ALPINE_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$ALPINE_ROOTFS_NAME"
 
         const val FEDORA_ROOTFS_NAME = "fedora_44_rootfs.tar.xz"
         const val FEDORA_ROOTFS_SHA256 =
             "2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4"
         const val FEDORA_ROOTFS_MIN_BYTES = 20L * 1024L * 1024L
+        const val FEDORA_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$FEDORA_ROOTFS_NAME"
 
         const val VOID_ROOTFS_NAME = "void_20250202_rootfs.tar.xz"
         const val VOID_ROOTFS_SHA256 =
             "01a30f17ae06d4d5b322cd579ca971bc479e02cc284ec1e5a4255bea6bac3ce6"
         const val VOID_ROOTFS_MIN_BYTES = 20L * 1024L * 1024L
+        const val VOID_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$VOID_ROOTFS_NAME"
 
         const val OPENSUSE_ROOTFS_NAME = "opensuse_tumbleweed_rootfs.tar.xz"
         const val OPENSUSE_ROOTFS_SHA256 =
             "bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a"
         const val OPENSUSE_ROOTFS_MIN_BYTES = 15L * 1024L * 1024L
+        const val OPENSUSE_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$OPENSUSE_ROOTFS_NAME"
 
         // Chimera Linux 2025-12-20 bootstrap (aarch64, musl, apk v3).
         // Packaged as xz: aapt2 strips *.gz, so gzip bytes were recompressed.
@@ -83,18 +101,21 @@ data class DistroInstallProfile(
         const val CHIMERA_ROOTFS_SHA256 =
             "0900e3f2554faaf005c14a6850596dadae1e7d8a996138180eebb0b4694a4a6c"
         const val CHIMERA_ROOTFS_MIN_BYTES = 4L * 1024L * 1024L
+        const val CHIMERA_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$CHIMERA_ROOTFS_NAME"
 
         // Deepin 25 (crimson/beige) docker rootfs aarch64 (glibc, apt).
         const val DEEPIN_ROOTFS_NAME = "deepin_25_rootfs.tar.xz"
         const val DEEPIN_ROOTFS_SHA256 =
             "2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698"
         const val DEEPIN_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+        const val DEEPIN_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$DEEPIN_ROOTFS_NAME"
 
         // Manjaro ARM aarch64 rootfs (glibc, pacman).
         const val MANJARO_ROOTFS_NAME = "manjaro_arm_rootfs.tar.xz"
         const val MANJARO_ROOTFS_SHA256 =
             "b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156"
         const val MANJARO_ROOTFS_MIN_BYTES = 80L * 1024L * 1024L
+        const val MANJARO_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$MANJARO_ROOTFS_NAME"
 
         // Ubuntu 26.04 LTS (Resolute) arm64 base — gzip recompressed to xz
         // (aapt2 auto-decompresses *.gz). SHA is of the packaged xz.
@@ -102,24 +123,28 @@ data class DistroInstallProfile(
         const val UBUNTU_ROOTFS_SHA256 =
             "e648a5302dd273c476e5658e652f88d1e66ece69b487431521c5caef4b960efc"
         const val UBUNTU_ROOTFS_MIN_BYTES = 15L * 1024L * 1024L
+        const val UBUNTU_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$UBUNTU_ROOTFS_NAME"
 
         // Kali Rolling 2026.2 (NetHunter-minimal, flattened — no kali-arm64/).
         const val KALI_ROOTFS_NAME = "kali_2026_2_rootfs.tar.xz"
         const val KALI_ROOTFS_SHA256 =
             "01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689"
         const val KALI_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+        const val KALI_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$KALI_ROOTFS_NAME"
 
         // Parrot Security 7.2 (flattened — no parrot-arm64/).
         const val PARROT_ROOTFS_NAME = "parrot_7.2_rootfs.tar.xz"
         const val PARROT_ROOTFS_SHA256 =
             "49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4"
         const val PARROT_ROOTFS_MIN_BYTES = 30L * 1024L * 1024L
+        const val PARROT_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$PARROT_ROOTFS_NAME"
 
         // Arch Linux ARM slim userspace (already in tree).
         const val ARCH_ROOTFS_NAME = "archlinux_arm_rootfs.tar.xz"
         const val ARCH_ROOTFS_SHA256 =
             "40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75"
         const val ARCH_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
+        const val ARCH_ROOTFS_URL = "$ROOTFS_RELEASE_BASE/$ARCH_ROOTFS_NAME"
 
         private const val XFCE_CUSTOM = "common/setup/setup_customization_xfce.sh"
         private const val HW_ACCEL_GUEST = "common/setup/setup_hw_accel_guest.sh"
@@ -134,6 +159,7 @@ data class DistroInstallProfile(
             rootfsFileName = DEBIAN_ROOTFS_NAME,
             rootfsSha256 = DEBIAN_ROOTFS_SHA256,
             rootfsMinBytes = DEBIAN_ROOTFS_MIN_BYTES,
+            rootfsUrl = DEBIAN_ROOTFS_URL,
             familyScript = "debian/common/setup/setup_debian_family.sh",
             customizationScript = "debian/common/setup/setup_customization_debian.sh",
             hwAccelScript = HW_ACCEL_GUEST,
@@ -148,6 +174,7 @@ data class DistroInstallProfile(
             rootfsFileName = DEBIAN_ROOTFS_NAME,
             rootfsSha256 = DEBIAN_ROOTFS_SHA256,
             rootfsMinBytes = DEBIAN_ROOTFS_MIN_BYTES,
+            rootfsUrl = DEBIAN_ROOTFS_URL,
             familyScript = "debian/common/setup/setup_debian_family.sh",
             customizationScript = "debian/common/setup/setup_customization_debian.sh",
             hwAccelScript = HW_ACCEL_GUEST,
@@ -167,6 +194,7 @@ data class DistroInstallProfile(
             rootfsFileName = ALPINE_ROOTFS_NAME,
             rootfsSha256 = ALPINE_ROOTFS_SHA256,
             rootfsMinBytes = ALPINE_ROOTFS_MIN_BYTES,
+            rootfsUrl = ALPINE_ROOTFS_URL,
             familyScript = "alpine/common/setup/setup_alpine_family.sh",
             customizationScript = "alpine/common/setup/setup_customization_alpine.sh",
             hwAccelScript = HW_ACCEL_GUEST,
@@ -181,6 +209,7 @@ data class DistroInstallProfile(
             rootfsFileName = ALPINE_ROOTFS_NAME,
             rootfsSha256 = ALPINE_ROOTFS_SHA256,
             rootfsMinBytes = ALPINE_ROOTFS_MIN_BYTES,
+            rootfsUrl = ALPINE_ROOTFS_URL,
             familyScript = "alpine/common/setup/setup_alpine_family.sh",
             customizationScript = "alpine/common/setup/setup_customization_alpine.sh",
             hwAccelScript = HW_ACCEL_GUEST,
@@ -200,6 +229,7 @@ data class DistroInstallProfile(
             rootfsFileName = FEDORA_ROOTFS_NAME,
             rootfsSha256 = FEDORA_ROOTFS_SHA256,
             rootfsMinBytes = FEDORA_ROOTFS_MIN_BYTES,
+            rootfsUrl = FEDORA_ROOTFS_URL,
             familyScript = "fedora/common/setup/setup_fedora_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -214,6 +244,7 @@ data class DistroInstallProfile(
             rootfsFileName = FEDORA_ROOTFS_NAME,
             rootfsSha256 = FEDORA_ROOTFS_SHA256,
             rootfsMinBytes = FEDORA_ROOTFS_MIN_BYTES,
+            rootfsUrl = FEDORA_ROOTFS_URL,
             familyScript = "fedora/common/setup/setup_fedora_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -233,6 +264,7 @@ data class DistroInstallProfile(
             rootfsFileName = VOID_ROOTFS_NAME,
             rootfsSha256 = VOID_ROOTFS_SHA256,
             rootfsMinBytes = VOID_ROOTFS_MIN_BYTES,
+            rootfsUrl = VOID_ROOTFS_URL,
             familyScript = "void/common/setup/setup_void_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -247,6 +279,7 @@ data class DistroInstallProfile(
             rootfsFileName = VOID_ROOTFS_NAME,
             rootfsSha256 = VOID_ROOTFS_SHA256,
             rootfsMinBytes = VOID_ROOTFS_MIN_BYTES,
+            rootfsUrl = VOID_ROOTFS_URL,
             familyScript = "void/common/setup/setup_void_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -266,6 +299,7 @@ data class DistroInstallProfile(
             rootfsFileName = OPENSUSE_ROOTFS_NAME,
             rootfsSha256 = OPENSUSE_ROOTFS_SHA256,
             rootfsMinBytes = OPENSUSE_ROOTFS_MIN_BYTES,
+            rootfsUrl = OPENSUSE_ROOTFS_URL,
             familyScript = "opensuse/common/setup/setup_opensuse_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -280,6 +314,7 @@ data class DistroInstallProfile(
             rootfsFileName = OPENSUSE_ROOTFS_NAME,
             rootfsSha256 = OPENSUSE_ROOTFS_SHA256,
             rootfsMinBytes = OPENSUSE_ROOTFS_MIN_BYTES,
+            rootfsUrl = OPENSUSE_ROOTFS_URL,
             familyScript = "opensuse/common/setup/setup_opensuse_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -299,6 +334,7 @@ data class DistroInstallProfile(
             rootfsFileName = DEEPIN_ROOTFS_NAME,
             rootfsSha256 = DEEPIN_ROOTFS_SHA256,
             rootfsMinBytes = DEEPIN_ROOTFS_MIN_BYTES,
+            rootfsUrl = DEEPIN_ROOTFS_URL,
             familyScript = "deepin/common/setup/setup_deepin_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -313,6 +349,7 @@ data class DistroInstallProfile(
             rootfsFileName = DEEPIN_ROOTFS_NAME,
             rootfsSha256 = DEEPIN_ROOTFS_SHA256,
             rootfsMinBytes = DEEPIN_ROOTFS_MIN_BYTES,
+            rootfsUrl = DEEPIN_ROOTFS_URL,
             familyScript = "deepin/common/setup/setup_deepin_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -332,6 +369,7 @@ data class DistroInstallProfile(
             rootfsFileName = CHIMERA_ROOTFS_NAME,
             rootfsSha256 = CHIMERA_ROOTFS_SHA256,
             rootfsMinBytes = CHIMERA_ROOTFS_MIN_BYTES,
+            rootfsUrl = CHIMERA_ROOTFS_URL,
             familyScript = "chimera/common/setup/setup_chimera_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -346,6 +384,7 @@ data class DistroInstallProfile(
             rootfsFileName = CHIMERA_ROOTFS_NAME,
             rootfsSha256 = CHIMERA_ROOTFS_SHA256,
             rootfsMinBytes = CHIMERA_ROOTFS_MIN_BYTES,
+            rootfsUrl = CHIMERA_ROOTFS_URL,
             familyScript = "chimera/common/setup/setup_chimera_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -365,6 +404,7 @@ data class DistroInstallProfile(
             rootfsFileName = MANJARO_ROOTFS_NAME,
             rootfsSha256 = MANJARO_ROOTFS_SHA256,
             rootfsMinBytes = MANJARO_ROOTFS_MIN_BYTES,
+            rootfsUrl = MANJARO_ROOTFS_URL,
             familyScript = "manjaro/common/setup/setup_manjaro_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -379,6 +419,7 @@ data class DistroInstallProfile(
             rootfsFileName = MANJARO_ROOTFS_NAME,
             rootfsSha256 = MANJARO_ROOTFS_SHA256,
             rootfsMinBytes = MANJARO_ROOTFS_MIN_BYTES,
+            rootfsUrl = MANJARO_ROOTFS_URL,
             familyScript = "manjaro/common/setup/setup_manjaro_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -398,6 +439,7 @@ data class DistroInstallProfile(
             rootfsFileName = UBUNTU_ROOTFS_NAME,
             rootfsSha256 = UBUNTU_ROOTFS_SHA256,
             rootfsMinBytes = UBUNTU_ROOTFS_MIN_BYTES,
+            rootfsUrl = UBUNTU_ROOTFS_URL,
             familyScript = "ubuntu/common/setup/setup_ubuntu_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -412,6 +454,7 @@ data class DistroInstallProfile(
             rootfsFileName = UBUNTU_ROOTFS_NAME,
             rootfsSha256 = UBUNTU_ROOTFS_SHA256,
             rootfsMinBytes = UBUNTU_ROOTFS_MIN_BYTES,
+            rootfsUrl = UBUNTU_ROOTFS_URL,
             familyScript = "ubuntu/common/setup/setup_ubuntu_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -431,6 +474,7 @@ data class DistroInstallProfile(
             rootfsFileName = KALI_ROOTFS_NAME,
             rootfsSha256 = KALI_ROOTFS_SHA256,
             rootfsMinBytes = KALI_ROOTFS_MIN_BYTES,
+            rootfsUrl = KALI_ROOTFS_URL,
             familyScript = "kali/common/setup/setup_kali_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -445,6 +489,7 @@ data class DistroInstallProfile(
             rootfsFileName = KALI_ROOTFS_NAME,
             rootfsSha256 = KALI_ROOTFS_SHA256,
             rootfsMinBytes = KALI_ROOTFS_MIN_BYTES,
+            rootfsUrl = KALI_ROOTFS_URL,
             familyScript = "kali/common/setup/setup_kali_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -464,6 +509,7 @@ data class DistroInstallProfile(
             rootfsFileName = PARROT_ROOTFS_NAME,
             rootfsSha256 = PARROT_ROOTFS_SHA256,
             rootfsMinBytes = PARROT_ROOTFS_MIN_BYTES,
+            rootfsUrl = PARROT_ROOTFS_URL,
             familyScript = "parrot/common/setup/setup_parrot_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -478,6 +524,7 @@ data class DistroInstallProfile(
             rootfsFileName = PARROT_ROOTFS_NAME,
             rootfsSha256 = PARROT_ROOTFS_SHA256,
             rootfsMinBytes = PARROT_ROOTFS_MIN_BYTES,
+            rootfsUrl = PARROT_ROOTFS_URL,
             familyScript = "parrot/common/setup/setup_parrot_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -497,6 +544,7 @@ data class DistroInstallProfile(
             rootfsFileName = ARCH_ROOTFS_NAME,
             rootfsSha256 = ARCH_ROOTFS_SHA256,
             rootfsMinBytes = ARCH_ROOTFS_MIN_BYTES,
+            rootfsUrl = ARCH_ROOTFS_URL,
             familyScript = "arch/common/setup/setup_arch_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,
@@ -511,6 +559,7 @@ data class DistroInstallProfile(
             rootfsFileName = ARCH_ROOTFS_NAME,
             rootfsSha256 = ARCH_ROOTFS_SHA256,
             rootfsMinBytes = ARCH_ROOTFS_MIN_BYTES,
+            rootfsUrl = ARCH_ROOTFS_URL,
             familyScript = "arch/common/setup/setup_arch_family.sh",
             customizationScript = XFCE_CUSTOM,
             hwAccelScript = HW_ACCEL_GUEST,

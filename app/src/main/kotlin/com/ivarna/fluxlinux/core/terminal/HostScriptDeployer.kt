@@ -2,26 +2,24 @@ package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
 import android.util.Log
-import com.ivarna.fluxlinux.core.install.DistroInstallProfile
 import java.io.File
 import java.io.FileOutputStream
-import java.security.MessageDigest
 
 /**
- * Deploys host + distro shell scripts from assets into `$HOME` and copies
- * pinned rootfs archives into `$HOME` for proot/chroot installs.
+ * Deploys host + distro shell scripts from assets into `$HOME` and the
+ * termux-x11 loader APK.
  *
- * Fail-closed: missing/corrupt **any** required rootfs or [HostScript.required]
- * asset makes [deployScripts] return false so [TerminalLauncher.prepareHost] fails.
+ * Host readiness (D6) = scripts + loader + bootstrap only. Rootfs archives are
+ * **not** owned here anymore — [com.ivarna.fluxlinux.core.install.RootfsDownloader]
+ * fetches the selected distro's rootfs on demand from the GitHub release tag
+ * `rootfs` (see docs/plans/rootfs-github-release-no-apk-bloat.md).
+ *
+ * Fail-closed: a missing [HostScript.required] asset or loader makes
+ * [deployScripts] return false so [TerminalLauncher.prepareHost] fails.
  */
 object HostScriptDeployer {
 
     private const val TAG = "HostScriptDeployer"
-
-    /** @deprecated Use [DistroInstallProfile.DEBIAN_ROOTFS_SHA256]. */
-    const val ROOTFS_SHA256 = DistroInstallProfile.DEBIAN_ROOTFS_SHA256
-    /** @deprecated Use [DistroInstallProfile.DEBIAN_ROOTFS_MIN_BYTES]. */
-    const val ROOTFS_MIN_BYTES = DistroInstallProfile.DEBIAN_ROOTFS_MIN_BYTES
 
     private data class HostScript(
         val name: String,
@@ -160,11 +158,9 @@ object HostScriptDeployer {
                 }
             } catch (_: Exception) {
             }
-            val rootfsOk = deployAllRootfsFromAssets(ctx)
-            if (!rootfsOk) Log.w(TAG, "rootfs deploy failed — host not ready")
             val loaderOk = deployLoaderApk(ctx)
             if (!loaderOk) Log.w(TAG, "loader.apk deploy failed — host not ready")
-            ok && rootfsOk && loaderOk
+            ok && loaderOk
         } catch (e: Exception) {
             Log.e(TAG, "Failed to deploy scripts", e)
             false
@@ -186,79 +182,5 @@ object HostScriptDeployer {
             Log.w(TAG, "loader.apk deploy failed (GUI helpers will warn)", e)
             false
         }
-    }
-
-    /**
-     * Deploy every pinned rootfs (Debian + Alpine). Fail-closed if any fails.
-     */
-    fun deployAllRootfsFromAssets(ctx: Context): Boolean {
-        var allOk = true
-        for (profile in DistroInstallProfile.allRootfsProfiles()) {
-            if (!deployRootfsProfile(ctx, profile)) {
-                allOk = false
-            }
-        }
-        return allOk
-    }
-
-    /**
-     * Copy `assets/rootfs/debian_13_rootfs.tar.xz` → `$HOME` (legacy single-path API).
-     */
-    fun deployRootfsFromAssets(ctx: Context): Boolean =
-        deployRootfsProfile(ctx, DistroInstallProfile.require("debian"))
-
-    fun deployRootfsProfile(ctx: Context, profile: DistroInstallProfile): Boolean {
-        val homeDir = TermuxHostPaths.homeDir(ctx).also { it.mkdirs() }
-        val out = File(homeDir, profile.rootfsFileName)
-        if (
-            out.isFile &&
-            out.length() > profile.rootfsMinBytes &&
-            sha256(out) == profile.rootfsSha256
-        ) {
-            Log.i(TAG, "Rootfs already deployed and verified: ${out.absolutePath}")
-            return true
-        }
-        return try {
-            ctx.assets.open(profile.rootfsAsset).use { input ->
-                FileOutputStream(out).use { input.copyTo(it) }
-            }
-            val sizeOk = out.length() > profile.rootfsMinBytes
-            val shaOk = sha256(out) == profile.rootfsSha256
-            if (sizeOk && shaOk) {
-                Log.i(
-                    TAG,
-                    "Deployed rootfs: ${out.absolutePath} (${out.length()} bytes, SHA OK)"
-                )
-                true
-            } else {
-                Log.e(
-                    TAG,
-                    "Rootfs deploy failed gate for ${profile.rootfsFileName}: " +
-                        "size=${out.length()} sha=${sha256(out)}"
-                )
-                out.delete()
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to deploy ${profile.rootfsAsset}", e)
-            out.delete()
-            false
-        }
-    }
-
-    private fun sha256(file: File): String = try {
-        val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val r = input.read(buf)
-                if (r == -1) break
-                md.update(buf, 0, r)
-            }
-        }
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (e: Exception) {
-        Log.w(TAG, "sha256 failed: ${e.message}")
-        ""
     }
 }

@@ -114,7 +114,8 @@ is the task's implementation; use it directly only for offline staging / debuggi
 ```
 
 Staged files are gitignored (`app/src/*/assets/bootstrap.tar`, `app/src/*/jniLibs/`);
-rootfs `assets/rootfs/debian_13_rootfs.tar.xz` is shared and kept in git (SHA pinned).
+rootfs is NOT packaged and NOT in git — distributed via the GitHub release tag
+`rootfs` and downloaded at install time (`RootfsDownloader`).
 
 ### Force rebuild
 

@@ -114,7 +114,7 @@ class TerminalShellCatalogTest {
         assertEquals(2, chroot.size)
         chroot.forEach { card ->
             assertFalse(card.enabled)
-            assertEquals("Root required", card.disabledReason)
+            assertEquals("Installed · no root given to app", card.disabledReason)
             assertEquals("chroot", card.def.method)
         }
     }
@@ -276,7 +276,7 @@ class TerminalShellCatalogTest {
         ).first { it.title == "MANJARO SHELL" && it.subtitle == "CHROOT" }.cards
         chroot.forEach { card ->
             assertFalse(card.enabled)
-            assertEquals("Root required", card.disabledReason)
+            assertEquals("Installed · no root given to app", card.disabledReason)
         }
     }
 

@@ -10,18 +10,16 @@
 #   1. Verify native/bootstrap/<id>/{bootstrap.tar,jniLibs/arm64-v8a/*.so}
 #   2. Copy bootstrap.tar   → app/src/<flavor>/assets/bootstrap.tar
 #   3. Copy jniLibs         → app/src/<flavor>/jniLibs/arm64-v8a/
-#   4. Ensure rootfs asset  → app/src/main/assets/rootfs/debian_13_rootfs.tar.xz
-#   5. Print sizes + SHA256 for CI logs.
+#   4. Print sizes + SHA256 for CI logs.
 #
-# See docs/plans/embedded-terminal-bootstrap-proot-chroot.md §Phase 0.
+# Rootfs archives are NOT packaged anymore — they ship via the GitHub release
+# tag `rootfs` and are downloaded at install time
+# (docs/plans/rootfs-github-release-no-apk-bloat.md).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BOOTSTRAP_ROOT="$ROOT/native/bootstrap"
 APP_SRC="$ROOT/app/src"
-MAIN_ASSETS="$APP_SRC/main/assets"
-ROOTFS_SRC="$ROOT/assets/rootfs/debian_13_rootfs.tar.xz"
-ROOTFS_SHA256="13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803"
 
 declare -A FLAVOR_FOR_ID=(
   [com.ivarna.fluxlinux]=ivarna
@@ -70,28 +68,15 @@ stage_app_id() {
   cp -f "$src/bootstrap.tar" "$flavor_assets/bootstrap.tar"
   cp -f "$src/jniLibs/arm64-v8a/"*.so "$flavor_jni/arm64-v8a/"
 
-  # 4. Rootfs (shared, main source set)
-  if [ ! -f "$MAIN_ASSETS/rootfs/debian_13_rootfs.tar.xz" ]; then
-    mkdir -p "$MAIN_ASSETS/rootfs"
-    cp -f "$ROOTFS_SRC" "$MAIN_ASSETS/rootfs/debian_13_rootfs.tar.xz"
-  fi
-
-  # 5. Report
-  local bootstrap_sha rootfs_sha
+  # 4. Report
+  local bootstrap_sha bootstrap_size
   bootstrap_sha="$(sha256_of "$flavor_assets/bootstrap.tar")"
-  rootfs_sha="$(sha256_of "$MAIN_ASSETS/rootfs/debian_13_rootfs.tar.xz")"
-  local bootstrap_size rootfs_size
   bootstrap_size="$(du -h "$flavor_assets/bootstrap.tar" | awk '{print $1}')"
-  rootfs_size="$(du -h "$MAIN_ASSETS/rootfs/debian_13_rootfs.tar.xz" | awk '{print $1}')"
 
   echo "=== packaged host assets for $app_id (flavor: $flavor) ==="
   echo "  app/src/$flavor/assets/bootstrap.tar  $bootstrap_size  sha256=$bootstrap_sha"
   echo "  app/src/$flavor/jniLibs/arm64-v8a/    $(ls "$flavor_jni/arm64-v8a" | tr '\n' ' ')"
-  echo "  app/src/main/assets/rootfs/debian_13_rootfs.tar.xz  $rootfs_size  sha256=$rootfs_sha (expect $ROOTFS_SHA256)"
-
-  if [ "$rootfs_sha" != "$ROOTFS_SHA256" ]; then
-    echo "WARNING: rootfs SHA256 mismatch — expected $ROOTFS_SHA256" >&2
-  fi
+  echo "  rootfs: NOT packaged — downloaded at install time from GitHub release tag 'rootfs'"
 }
 
 main() {

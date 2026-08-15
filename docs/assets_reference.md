@@ -30,8 +30,9 @@ assets/
 ├── me.png                   # Developer avatar
 ├── onboarding/              # Onboarding screen images
 │   └── onboarding-1.webp    # First onboarding slide
-├── rootfs/                  # Pre-built root filesystems
-│   └── debian_13_rootfs.tar.xz  # Debian 13 Trixie rootfs (85 MB)
+├── rootfs/                  # Local rootfs sources (gitignored; NOT packaged —
+│   │                        #   uploaded to the GitHub release tag `rootfs`)
+│   └── <12 distro tarballs>
 ├── screenshots/             # App screenshots
 │   └── hardware_acceleration/
 │       ├── 1.png            # GPU selection
@@ -76,28 +77,46 @@ These images are displayed during the first-run onboarding experience.
 
 ## Rootfs Archives
 
-**Location:** `assets/rootfs/`
+**Location:** local sources under `assets/rootfs/` (gitignored, release-build only)
 
-Pre-built root filesystem archives for distro installation.
+Pre-built root filesystem archives for distro installation. **Rootfs archives are
+NOT packaged inside the APK anymore** — the selected distro's archive is
+downloaded on demand from the GitHub release tag `rootfs` at install time, with
+SHA256 + minimum-size verification and HTTP Range resume
+(`RootfsDownloader`, plan `rootfs-github-release-no-apk-bloat.md`).
 
-| File | Size | Architecture | Description |
-|------|------|--------------|-------------|
-| `debian_13_rootfs.tar.xz` | 85 MB | ARM64 | Debian 13 (Trixie) base system |
+| Release filename | ~Size | SHA256 | Used by |
+|------------------|-------|--------|---------|
+| `debian_13_rootfs.tar.xz` | 81 MiB | `13e29f60…e6803` | Debian (proot + chroot) |
+| `alpine_3.24_rootfs.tar.gz` | 3.8 MiB | `f55a90f6…721259` | Alpine (proot + chroot) |
+| `fedora_44_rootfs.tar.xz` | 29.5 MiB | `2d89fe43…db1bd4` | Fedora |
+| `void_20250202_rootfs.tar.xz` | 43.7 MiB | `01a30f17…ac3ce6` | Void |
+| `opensuse_tumbleweed_rootfs.tar.xz` | 21.1 MiB | `bdcb8522…85a12a` | openSUSE |
+| `deepin_25_rootfs.tar.xz` | 53.1 MiB | `2c7abfe8…193698` | Deepin |
+| `chimera_20251220_rootfs.tar.xz` | 5.1 MiB | `0900e3f2…a4a6c` | Chimera |
+| `manjaro_arm_rootfs.tar.xz` | 126.9 MiB | `b7339bcc…0170156` | Manjaro |
+| `ubuntu_26.04_rootfs.tar.xz` | 19.8 MiB | `e648a530…960efc` | Ubuntu |
+| `kali_2026_2_rootfs.tar.xz` | 117.5 MiB | `01c48a29…670689` | Kali |
+| `parrot_7.2_rootfs.tar.xz` | 106.7 MiB | `49f4c289…094d4` | Parrot |
+| `archlinux_arm_rootfs.tar.xz` | 110.9 MiB | `40209ef6…31d75` | Arch |
 
-### Debian 13 Rootfs Contents
+**Download URL (GitHub Release tag `rootfs`):**
 
-The Debian 13 rootfs is a minimal base system containing:
-- Core system utilities
-- apt package manager
-- Networking tools
-- Basic shell environment
-
-**Used by:** `setup_debian13_chroot.sh`
-
-**Download URL (GitHub Release):**
 ```
-https://github.com/abhay-byte/fluxlinux/releases/download/debian-v1/debian_arm64_rootfs.tar.xz
+https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/<filename>
 ```
+
+### Rootfs lookup order (install time)
+
+1. Verified archive under `$HOME/<rootfsFileName>` (the supported offline path —
+   `adb push` the archive there and installs proceed with zero network).
+2. Verified local candidates (`$HOME/rootfs/`, proot cache, Download dirs —
+   `/sdcard/Download` is best-effort only, no storage permission is requested).
+3. Network download from the release tag above, streamed to `<name>.partial`
+   with Range resume, then SHA256 + min-size verified and atomically renamed.
+
+The full SHA256 pins live in `DistroInstallProfile.kt` (Kotlin SSOT);
+`scripts/verify_rootfs_shas.sh` cross-checks every copy.
 
 ---
 
@@ -243,7 +262,12 @@ All theming assets are bundled and hosted on GitHub Releases for download during
 | Icons | `icons.zip` | ~32 MB | Papirus icon pack |
 | Cursors | `cursor.zip` | 380 KB | Vimix cursor themes |
 | Wallpapers | `wallpaper.zip` | 6.9 MB | Desktop backgrounds |
-| Rootfs | `debian_arm64_rootfs.tar.xz` | 85 MB | Debian 13 base system |
+
+Rootfs archives live on a **separate** tag:
+
+| Tag | Contents | Description |
+|-----|----------|-------------|
+| `rootfs` | 12 distro tarballs + `sha256sums.txt` | Downloaded at install time by `RootfsDownloader` / script fallback |
 
 ### Download Script Example
 

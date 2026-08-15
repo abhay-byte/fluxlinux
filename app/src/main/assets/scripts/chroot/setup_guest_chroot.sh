@@ -4,7 +4,8 @@
 # XFCE is installed later by the family script (onboarding XFCE phase).
 #
 # Env (from DistroInstallProfile / OnboardingInstallRunner):
-#   FLUX_CHROOT, FLUX_ROOTFS_PATH, FLUX_ROOTFS_SHA256, FLUX_ROOTFS_NAME
+#   FLUX_CHROOT, FLUX_ROOTFS_PATH, FLUX_ROOTFS_SHA256, FLUX_ROOTFS_NAME,
+#   FLUX_ROOTFS_URL (GitHub release download fallback)
 #   TERMUX_APP__PACKAGE_NAME, TERMUX__HOME
 
 GUESTPATH="${FLUX_CHROOT:-/data/local/tmp/chrootGuest}"
@@ -16,6 +17,7 @@ APP_HOME="${TERMUX__HOME:-/data/data/${PKG}/files/home}"
 APP_PREFIX="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 ROOTFS_NAME="${FLUX_ROOTFS_NAME:-rootfs.tar.xz}"
 ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
+ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
 
 progress() { printf "\033[1;36m[+] %s\033[0m\n" "$1"; }
 success()  { printf "\033[1;32m[✓] %s\033[0m\n" "$1"; }
@@ -63,6 +65,24 @@ resolve_rootfs_archive() {
         fi
     done
     return 1
+}
+
+# Download Helper (fallback only — prefer app-local archive). Same pattern as
+# setup_debian13_chroot.sh / setup_alpine_chroot.sh.
+download_file() {
+    # $1=dir $2=filename $3=url
+    progress "Downloading file..."
+    if [ -e "$1/$2" ] && [ -s "$1/$2" ]; then
+        printf "\033[1;33m[!] File already exists: %s\033[0m\n" "$2"
+        return 0
+    fi
+    mkdir -p "$1" 2>/dev/null || true
+    if command -v wget >/dev/null 2>&1; then
+        wget -O "$1/$2" "$3" && success "File downloaded: $2" && return 0
+    fi
+    progress "Trying Busybox wget..."
+    $BB wget -O "$1/$2" "$3" && success "File downloaded (Fallback)" && return 0
+    goodbye
 }
 
 extract_file() {
@@ -274,8 +294,14 @@ main() {
     mkdir -p "$GUESTPATH" || goodbye
 
     if ! resolve_rootfs_archive; then
-        error "No local rootfs (expected $APP_HOME/$ROOTFS_NAME)"
-        goodbye
+        if [ -n "$ROOTFS_URL" ]; then
+            progress "No local rootfs — downloading $ROOTFS_URL"
+            download_file "$APP_PREFIX/var/lib/proot-distro/cache/rootfs" "$ROOTFS_NAME" "$ROOTFS_URL"
+            ROOTFS_ARCHIVE="$APP_PREFIX/var/lib/proot-distro/cache/rootfs/$ROOTFS_NAME"
+        else
+            error "No local rootfs (expected $APP_HOME/$ROOTFS_NAME)"
+            goodbye
+        fi
     fi
 
     if [ -n "$ROOTFS_SHA256" ] && command -v sha256sum >/dev/null 2>&1; then

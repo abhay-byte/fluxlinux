@@ -56,7 +56,7 @@ class BaseDesktopInstallPlanTest {
     @Test
     fun phasesFor_proot_hasHostRootfsCustom() {
         val phases = BaseDesktopInstallPlan.phasesFor("proot")
-        assertEquals(listOf("HOST", "ROOTFS", "CUSTOM"), phases.map { it.id })
+        assertEquals(listOf("HOST", "DL", "ROOTFS", "CUSTOM"), phases.map { it.id })
         assertTrue(phases.all { it.weight > 0 })
         assertEquals(100, phases.sumOf { it.weight })
     }
@@ -64,7 +64,7 @@ class BaseDesktopInstallPlanTest {
     @Test
     fun phasesFor_chroot_hasRootCheckFirst() {
         val phases = BaseDesktopInstallPlan.phasesFor("chroot")
-        assertEquals(listOf("R0", "HOST", "ROOTFS", "XFCE", "CUSTOM"), phases.map { it.id })
+        assertEquals(listOf("R0", "HOST", "DL", "ROOTFS", "XFCE", "CUSTOM"), phases.map { it.id })
         assertEquals(100, phases.sumOf { it.weight })
     }
 
@@ -72,7 +72,7 @@ class BaseDesktopInstallPlanTest {
     fun phasesFor_unknownMethod_treatedAsProotFamily() {
         // Non-chroot methods use proot phase list (install runner only branches on "chroot").
         val phases = BaseDesktopInstallPlan.phasesFor("something-else")
-        assertEquals(listOf("HOST", "ROOTFS", "CUSTOM"), phases.map { it.id })
+        assertEquals(listOf("HOST", "DL", "ROOTFS", "CUSTOM"), phases.map { it.id })
     }
 
     @Test

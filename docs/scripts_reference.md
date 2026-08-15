@@ -318,10 +318,13 @@ bash ~/install.sh
 
 **Key Operations:**
 1. Check if distro already installed
-2. Run `proot-distro install <distro>`
-3. Decode and execute setup script inside distro
-4. Create marker file for tracking
-5. Send callback intent to app
+2. Resolve rootfs local-first, then download from the GitHub release tag
+   `rootfs` (all 12 distros have pinned `ROOTFS_URL` defaults; `FLUX_ROOTFS_URL`
+   from the app always wins)
+3. SHA256-check the archive, then `proot-distro install <archive> --name <distro>`
+4. Decode and execute setup script inside distro
+5. Create marker file for tracking
+6. Send callback intent to app
 
 **Callback Intent:** `fluxlinux://callback?result=success&name=distro_install_<distro>`
 
@@ -596,7 +599,7 @@ export PATH=$PATH:/opt/gradle/bin
 
 **Key Operations:**
 1. Detect root-capable Busybox (non-Termux paths)
-2. Download rootfs from GitHub release
+2. Resolve rootfs local-first (`$HOME/$ROOTFS_NAME`, `$HOME/rootfs/`, proot cache, Download), then download from the GitHub release tag `rootfs` when `FLUX_ROOTFS_URL` is set (app always exports it)
 3. Extract rootfs with xz support
 4. Mount filesystems:
    - `/dev`, `/sys`, `/proc`, `/dev/pts`
@@ -610,9 +613,33 @@ export PATH=$PATH:/opt/gradle/bin
 9. Install XFCE4
 10. Generate launcher scripts
 
+**Rootfs source:** Kotlin `RootfsDownloader` is the primary path (progress/cancel/resume
+in onboarding); this script's download fallback exists for terminal-session
+installs. Offline: place the archive at `$HOME/debian_13_rootfs.tar.xz`.
+
 **Marker File:** `$DEBIANPATH/.flux_configured`
 
 **Callback Intent:** `fluxlinux://callback?result=success&name=distro_install_debian13_chroot`
+
+---
+
+#### setup_guest_chroot.sh
+
+**Purpose:** Install Fedora / Void / openSUSE / Deepin / Chimera / Manjaro /
+Ubuntu / Kali / Parrot / Arch chroot environments (generic guest chroot).
+
+**Execution Context:** Root shell
+
+**Key Operations:**
+1. Detect root-capable Busybox
+2. Resolve rootfs local-first (`$APP_HOME/$ROOTFS_NAME`, `$APP_HOME/rootfs/`, proot cache, Download)
+3. Download fallback: honors `FLUX_ROOTFS_URL` (exported by the app inside the
+   `su -c` command string), caches into `$PREFIX/var/lib/proot-distro/cache/rootfs/`,
+   then SHA256-checks against `FLUX_ROOTFS_SHA256`
+4. Extract rootfs (xz/gzip), mount filesystems, configure network + user `flux`
+
+Offline: place the archive at `$HOME/<rootfsFileName>`; `/sdcard/Download` is
+best-effort only (no storage permission requested).
 
 ---
 

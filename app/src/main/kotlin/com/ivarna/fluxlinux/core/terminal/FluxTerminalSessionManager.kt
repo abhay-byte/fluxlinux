@@ -41,6 +41,7 @@ object FluxTerminalSessionManager {
 
     fun isOpen(): Boolean = SessionRegistry.isOpen()
     fun titles(): List<String> = SessionRegistry.titles()
+    fun sessions(): List<SessionRegistry.ManagedSession> = SessionRegistry.sessions()
 
     fun switchSession(index: Int) = SessionRegistry.switchSession(index)
     fun closeSession(ctx: Context, index: Int) = SessionRegistry.closeSession(ctx, index)

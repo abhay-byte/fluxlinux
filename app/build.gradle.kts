@@ -19,8 +19,8 @@ android {
         applicationId = "com.ivarna.fluxlinux"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.8.0"
+        versionCode = 12
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -50,10 +50,11 @@ android {
         // Disable PNG crunching for reproducible builds
         @Suppress("UnstableApiUsage")
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~"
-        // Critical — do not recompress archives; they must stay STORED in the APK
+        // Critical — do not recompress archives; they must stay STORED in the APK.
+        // Rootfs archives are no longer packaged (GitHub release download) —
+        // only bootstrap.tar and the xfce theme assets remain.
         @Suppress("UnstableApiUsage")
-        // .minirootfs = Alpine gzip payload under non-.gz name (aapt2 strips *.gz).
-        noCompress += listOf("xz", "tar", "minirootfs")
+        noCompress += listOf("xz", "tar")
     }
 
     // Disable dependency metadata block for F-Droid
@@ -140,85 +141,17 @@ tasks.withType<AbstractArchiveTask>().configureEach {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Package host assets per flavor (Pass 2 fail-closed gate, plan P0-T6/T7)
-//   :app:stageHostRootfs             — shared rootfs asset (once)
 //   :app:packageHostAssetsIvarna     — stages native/bootstrap/com.ivarna.fluxlinux
 //   :app:packageHostAssetsZenithblue — stages native/bootstrap/com.zenithblue.fluxlinux
 // Fails assemble with a clear error when bootstrap.tar / jniLibs are missing.
-// The shared rootfs lives in its own task so two flavor tasks never write the
-// same output concurrently.
+// Rootfs archives are NOT packaged: the selected distro's rootfs is downloaded
+// on demand from the GitHub release tag `rootfs` at install time
+// (docs/plans/rootfs-github-release-no-apk-bloat.md).
 // ─────────────────────────────────────────────────────────────────────────────
 val flavorAppIds = mapOf(
     "ivarna" to "com.ivarna.fluxlinux",
     "zenithblue" to "com.zenithblue.fluxlinux"
 )
-
-val stageHostRootfs = tasks.register<Exec>("stageHostRootfs") {
-    group = "build"
-    description =
-        "Copy pinned Debian + Alpine + Fedora + Void + openSUSE + Deepin + " +
-            "Chimera + Manjaro + Ubuntu + Kali + Parrot + Arch rootfs into " +
-            "app/src/main/assets/rootfs " +
-            "(Alpine as .minirootfs so aapt2 does not strip .gz)"
-    workingDir = rootProject.projectDir
-    // Alpine must not be packaged as *.tar.gz: aapt2 auto-decompresses and
-    // renames to *.tar, breaking SHA + AssetManager.open("….tar.gz").
-    commandLine(
-        "bash", "-c",
-        """
-        set -euo pipefail
-        mkdir -p app/src/main/assets/rootfs
-        if [ ! -f app/src/main/assets/rootfs/debian_13_rootfs.tar.xz ] && \
-           [ -f assets/rootfs/debian_13_rootfs.tar.xz ]; then
-          cp -f assets/rootfs/debian_13_rootfs.tar.xz app/src/main/assets/rootfs/debian_13_rootfs.tar.xz
-        fi
-        if [ -f assets/rootfs/alpine_3.24_rootfs.tar.gz ]; then
-          # Always refresh packaged name (gzip bytes, non-.gz extension).
-          cp -f assets/rootfs/alpine_3.24_rootfs.tar.gz \
-            app/src/main/assets/rootfs/alpine_3.24_rootfs.minirootfs
-          # Remove legacy name so aapt never sees *.tar.gz
-          rm -f app/src/main/assets/rootfs/alpine_3.24_rootfs.tar.gz
-        fi
-        for rf in fedora_44_rootfs.tar.xz void_20250202_rootfs.tar.xz \
-                 opensuse_tumbleweed_rootfs.tar.xz \
-                 deepin_25_rootfs.tar.xz chimera_20251220_rootfs.tar.xz \
-                 manjaro_arm_rootfs.tar.xz \
-                 ubuntu_26.04_rootfs.tar.xz kali_2026_2_rootfs.tar.xz \
-                 parrot_7.2_rootfs.tar.xz archlinux_arm_rootfs.tar.xz; do
-          if [ -f "assets/rootfs/${'$'}rf" ]; then
-            cp -f "assets/rootfs/${'$'}rf" "app/src/main/assets/rootfs/${'$'}rf"
-          fi
-        done
-        """.trimIndent()
-    )
-    inputs.files(
-        rootProject.file("assets/rootfs/debian_13_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/alpine_3.24_rootfs.tar.gz"),
-        rootProject.file("assets/rootfs/fedora_44_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/void_20250202_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/deepin_25_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/chimera_20251220_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/manjaro_arm_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/ubuntu_26.04_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/kali_2026_2_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/parrot_7.2_rootfs.tar.xz"),
-        rootProject.file("assets/rootfs/archlinux_arm_rootfs.tar.xz")
-    )
-    outputs.files(
-        file("src/main/assets/rootfs/debian_13_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/alpine_3.24_rootfs.minirootfs"),
-        file("src/main/assets/rootfs/fedora_44_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/void_20250202_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/opensuse_tumbleweed_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/deepin_25_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/chimera_20251220_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/manjaro_arm_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/ubuntu_26.04_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/kali_2026_2_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/parrot_7.2_rootfs.tar.xz"),
-        file("src/main/assets/rootfs/archlinux_arm_rootfs.tar.xz")
-    )
-}
 
 for ((flavorName, appId) in flavorAppIds) {
     val taskName = "packageHostAssets" + flavorName.replaceFirstChar { it.uppercase() }
@@ -227,7 +160,6 @@ for ((flavorName, appId) in flavorAppIds) {
         description = "Stage host bootstrap + jniLibs for flavor '$flavorName' from native/bootstrap/$appId"
         workingDir = rootProject.projectDir
         commandLine("bash", "scripts/package_host_assets.sh", appId)
-        dependsOn(stageHostRootfs)
 
         val bootstrapTree = fileTree(rootProject.file("native/bootstrap/$appId"))
         inputs.files(bootstrapTree)
@@ -298,6 +230,7 @@ dependencies {
     implementation(project(":termux-x11"))
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

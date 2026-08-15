@@ -31,14 +31,14 @@ FluxLinux historically acted as an **orchestrator** (external `com.termux` + `co
 | Host runtime | External `com.termux` APK | `bootstrap.tar` + W^X jniLibs inside the APK (per flavor) |
 | Paths | Hardcoded `/data/data/com.termux/...` | `TermuxHostPaths` SSOT from `BuildConfig.APPLICATION_ID` |
 | Install UX | Copy & Open Termux → paste | **Install in Flux Terminal** / **Install in Root Shell** (in-app) |
-| Debian rootfs | Network download in Termux | Same pinned rootfs asset (`SHA 13e29f60…`) for proot + chroot |
+| Debian rootfs | Network download in Termux | On-demand download from the GitHub release tag `rootfs` (`RootfsDownloader`; SHA `13e29f60…`) for proot + chroot |
 | Terminal UI | Termux app | In-app `TerminalSession`/`TerminalView` (termux-app v0.118.0, GPLv3) |
 | `termux` Native card | Shipped as a "distro" | **Removed** — no product path |
 
 ### Why embedding works here (vs. the old concern)
 *   **W^X / targetSdk 36:** Host ELFs ship as `libbash.so`/`libproot.so`/`libloader{,32}.so` under jniLibs with `useLegacyPackaging = true` — extracted to `nativeLibraryDir` by the package manager (executable app data, no W^X violation), and run via the system linker (`ShellCommandRunner.adjustHostCmd`).
 *   **Path hardcoding:** Packages are **rebuilt** for each application id (`native/` tree, `assemble_bootstrap.py`) instead of reusing stock `com.termux` binaries; residual stock paths are rewritten post-extract (`applyPackageToExtractedPrefix`).
-*   **Play/F-Droid size:** Each flavor ships one ~122 MB bootstrap + ~82 MB rootfs; documented in the release notes.
+*   **Play/F-Droid size:** Each flavor ships one ~122 MB bootstrap; distro rootfs archives are downloaded on demand from the GitHub release tag `rootfs` (APK ~147 MiB instead of ~866 MiB).
 
 ## 4. Components (product)
 

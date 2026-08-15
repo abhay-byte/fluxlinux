@@ -7,8 +7,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,10 +19,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -28,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -47,7 +58,12 @@ import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.install.OnboardingInstallRunner
+import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.ui.components.CompactDistroCard
+import com.ivarna.fluxlinux.ui.components.MethodChip
+import com.ivarna.fluxlinux.ui.components.MethodTab
+import com.ivarna.fluxlinux.ui.components.MethodTabs
+import com.ivarna.fluxlinux.ui.components.isChrootCard
 import com.ivarna.fluxlinux.ui.install.InstallProgressPanel
 import com.ivarna.fluxlinux.ui.install.InstallThemePickRow
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
@@ -163,7 +179,7 @@ private fun WelcomePage(onNext: () -> Unit) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(32.dp))
         Text(
             "FluxLinux",
             fontSize = 32.sp,
@@ -177,39 +193,90 @@ private fun WelcomePage(onNext: () -> Unit) {
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(20.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            FeatureGrid()
+        }
+        Spacer(Modifier.height(12.dp))
         Image(
             painter = painterResource(id = R.drawable.onboarding_bg_1),
             contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentScale = ContentScale.Fit
+            modifier = Modifier.fillMaxWidth(),
+            contentScale = ContentScale.FillWidth
         )
-        Spacer(Modifier.height(16.dp))
-        FeatureLine("🐧", "Debian PRoot or rooted Chroot")
-        Spacer(Modifier.height(10.dp))
-        FeatureLine("🖥️", "XFCE desktop + Flux themes")
-        Spacer(Modifier.height(10.dp))
-        FeatureLine("⚡", "Embedded terminal & X11 display")
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         PrimaryButton("Get Started", onNext)
     }
 }
 
 @Composable
-private fun FeatureLine(icon: String, text: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+private fun FeatureGrid() {
+    val features = listOf(
+        Triple(Icons.Filled.Storage, "PRoot or Chroot", "Debian, no root required"),
+        Triple(Icons.Filled.DesktopWindows, "XFCE Desktop", "Flux themes included"),
+        Triple(Icons.Filled.Terminal, "Terminal & X11", "Embedded display built in")
+    )
+    features.chunked(2).forEach { row ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            row.forEach { (icon, title, description) ->
+                FeatureCell(
+                    icon = icon,
+                    title = title,
+                    description = description,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
+            if (row.size == 1) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun FeatureCell(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(16.dp)
     ) {
-        Text(icon, fontSize = 22.sp)
-        Spacer(Modifier.width(12.dp))
-        Text(text, color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = FluxAccentMagenta,
+            modifier = Modifier.size(26.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            title,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            description,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            fontSize = 13.sp
+        )
     }
 }
 
@@ -220,9 +287,39 @@ private fun DistroPickPage(
     onBack: () -> Unit,
     onNext: () -> Unit
 ) {
-    val installable = DistroRepository.supportedDistros.filter { !it.comingSoon }
-    val comingSoon = DistroRepository.supportedDistros.filter { it.comingSoon }
-        .sortedBy { it.name }
+    var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
+    var rootAvailable by remember { mutableStateOf(false) }
+    var probingRoot by remember { mutableStateOf(false) }
+    var showRootHint by remember { mutableStateOf(false) }
+
+    fun applyTab(tab: MethodTab) {
+        methodTab = tab
+        val next = DistroRepository.installableVariant(selectedId, chroot = tab == MethodTab.CHROOT)
+        if (next != null && next.id != selectedId) onSelect(next.id)
+    }
+
+    fun probeRoot(openChrootIfGranted: Boolean) {
+        probingRoot = true
+        RootShell.probeRootAvailable(forceClearCache = openChrootIfGranted) { ok ->
+            rootAvailable = ok
+            probingRoot = false
+            if (ok) {
+                showRootHint = false
+                if (openChrootIfGranted) applyTab(MethodTab.CHROOT)
+            } else if (openChrootIfGranted) {
+                showRootHint = true
+                if (methodTab == MethodTab.CHROOT) applyTab(MethodTab.PROOT)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { probeRoot(openChrootIfGranted = false) }
+
+    val forTab = DistroRepository.supportedDistros.filter { distro ->
+        if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
+    }
+    val installable = forTab.filter { !it.comingSoon }
+    val comingSoon = forTab.filter { it.comingSoon }.sortedBy { it.name }
 
     Column(
         modifier = Modifier
@@ -237,10 +334,44 @@ private fun DistroPickPage(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Installable now, or coming soon",
+            if (methodTab == MethodTab.CHROOT) {
+                "Chroot guests — requires superuser granted to FluxLinux"
+            } else {
+                "PRoot guests — no root required"
+            },
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
             fontSize = 14.sp
         )
+        Spacer(Modifier.height(12.dp))
+
+        MethodTabs(
+            selected = methodTab,
+            onSelected = { tab ->
+                if (tab == MethodTab.CHROOT && !rootAvailable) {
+                    showRootHint = true
+                    probeRoot(openChrootIfGranted = true)
+                } else {
+                    applyTab(tab)
+                }
+            },
+            chrootLabel = "Chroot (Rooted)",
+            chrootEnabled = rootAvailable,
+            horizontalPadding = 0.dp
+        )
+
+        if (showRootHint && !rootAvailable) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (probingRoot) {
+                    "Checking superuser access…"
+                } else {
+                    "Grant superuser to FluxLinux in Magisk or KernelSU, then tap Chroot again."
+                },
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
+                fontSize = 13.sp
+            )
+        }
+
         Spacer(Modifier.height(16.dp))
 
         Column(
@@ -263,16 +394,18 @@ private fun DistroPickPage(
                 )
                 Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Coming soon",
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.secondary,
-                fontSize = 14.sp
-            )
-            Spacer(Modifier.height(8.dp))
-            comingSoon.forEach { distro ->
-                CompactDistroCard(distro = distro)
+            if (comingSoon.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Coming soon",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                comingSoon.forEach { distro ->
+                    CompactDistroCard(distro = distro)
+                }
             }
         }
 
@@ -289,6 +422,7 @@ private fun DistroPickPage(
             }
             Button(
                 onClick = onNext,
+                enabled = installable.any { it.id == selectedId },
                 modifier = Modifier.weight(1f).height(48.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary,
@@ -502,48 +636,112 @@ private fun DonePage(
     onTerminal: () -> Unit,
     onDesktop: () -> Unit
 ) {
+    val distro = DistroRepository.supportedDistros.find { it.id == distroId }
+    val displayName = distro?.name?.removeSuffix(" (Rooted)") ?: distroId
+    val isChroot = distro?.isChrootCard() == true
+    val methodColor = if (isChroot) Color(0xFFE040FB) else Color(0xFF00B8D4)
+    val colors = MaterialTheme.colorScheme
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("✅", fontSize = 56.sp)
-        Spacer(Modifier.height(16.dp))
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier
+                    .size(104.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(colors.surfaceVariant.copy(alpha = 0.45f))
+                    .border(1.dp, colors.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(28.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (distro?.iconRes != null) {
+                    Image(
+                        painter = painterResource(id = distro.iconRes),
+                        contentDescription = displayName,
+                        modifier = Modifier.size(68.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = FluxAccentMagenta,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(colors.background)
+                    .padding(2.dp)
+                    .clip(CircleShape)
+                    .background(FluxAccentMagenta),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = colors.onBackground,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(22.dp))
         Text(
             "You're ready",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = colors.onBackground
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Debian base desktop is installed. Open a shell or start XFCE.",
+            "$displayName base desktop is installed. Open a shell or start XFCE.",
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            color = colors.onBackground.copy(alpha = 0.7f),
+            fontSize = 15.sp,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
-        Spacer(Modifier.height(32.dp))
-        PrimaryButton("Go to Home", onHome)
         Spacer(Modifier.height(12.dp))
+        MethodChip(
+            label = if (isChroot) "CHROOT" else "PROOT",
+            color = methodColor
+        )
+
+        Spacer(Modifier.height(28.dp))
+        PrimaryButton("Go to Home", onHome)
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = onTerminal,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = FluxAccentMagenta),
-            shape = RoundedCornerShape(12.dp)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = FluxAccentMagenta,
+                contentColor = colors.onBackground
+            ),
+            shape = RoundedCornerShape(14.dp)
         ) {
+            Icon(Icons.Filled.Terminal, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
             Text("Open Terminal", fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = onDesktop,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = colors.surfaceVariant,
+                contentColor = colors.onSurface
             ),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Start Desktop", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Icon(Icons.Filled.DesktopWindows, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Start Desktop", fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -18,7 +18,7 @@ Complete reference for **Alpine Linux** support in FluxLinux: identity, install 
 | **Default login shell (after customization)** | **zsh** + Oh My Zsh (when staged) |
 | **App cards** | `alpine` (proot) · `alpine_chroot` (rooted) |
 
-Alpine is the lightweight FluxLinux distro: small rootfs in the APK, fast boot, musl/`apk` instead of Debian’s glibc/`apt`. It is a **first-class** install path alongside Debian—not a “coming soon” stub.
+Alpine is the lightweight FluxLinux distro: small rootfs downloaded on demand, fast boot, musl/`apk` instead of Debian’s glibc/`apt`. It is a **first-class** install path alongside Debian—not a “coming soon” stub.
 
 ### Why Alpine on Android
 
@@ -59,22 +59,22 @@ Defined in `DistroInstallProfile` (Kotlin):
 | Field | Value |
 |-------|--------|
 | **Upstream-style name (home deploy)** | `alpine_3.24_rootfs.tar.gz` |
-| **Asset path (in APK)** | `assets/rootfs/alpine_3.24_rootfs.minirootfs` |
+| **Release asset (GitHub tag `rootfs`)** | `alpine_3.24_rootfs.tar.gz` |
+| **Legacy APK asset path (unused)** | `assets/rootfs/alpine_3.24_rootfs.minirootfs` |
 | **SHA-256** | `f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259` |
 | **Min size check** | ≥ 1 MiB |
 | **Arch** | aarch64 |
 | **Source** | Official Alpine minirootfs 3.24.1 |
 
-### Packaging note (critical)
+### Rootfs distribution (current)
 
-Android **aapt2** auto-decompresses assets named `*.tar.gz` and renames them to `*.tar`, breaking SHA and open paths.
-
-| Layer | Name |
-|-------|------|
-| **In APK assets** | `alpine_3.24_rootfs.minirootfs` (gzip payload, **no** `.gz` suffix) |
-| **Deployed under app `$HOME`** | `alpine_3.24_rootfs.tar.gz` (scripts / proot-distro / `tar -xzf`) |
-
-Gradle stages the asset and marks it `noCompress` as needed (`stageHostRootfs` / packaging rules). Do **not** ship the rootfs as a plain `*.tar.gz` asset without the minirootfs rename strategy.
+Rootfs archives are **not packaged in the APK**. The Alpine archive ships as
+`alpine_3.24_rootfs.tar.gz` on the GitHub release tag `rootfs` and is
+downloaded by `RootfsDownloader` at install time (local-first: a verified
+`$HOME/alpine_3.24_rootfs.tar.gz` short-circuits the network). The `.minirootfs`
+name existed only to dodge aapt2 `*.gz` auto-decompression inside the APK —
+with no packaging, there is no rename (D8). The runtime/release name is always
+the real `.tar.gz`.
 
 ### On-device locations
 
@@ -125,7 +125,7 @@ Bare `apk` **without** privileges is expected to fail (needs root for DB lock).
 Typical path matches Debian-style Flux onboarding / Distro install:
 
 1. **Host ready** — embedded Termux-class bootstrap, scripts deployed (`HostScriptDeployer`).
-2. **Rootfs** — copy/extract minirootfs into proot container or chroot path.
+2. **Rootfs** — download/verify `alpine_3.24_rootfs.tar.gz` (`RootfsDownloader`), then extract into the proot container or chroot path.
 3. **Family (XFCE)** — `setup_alpine_family.sh` as root inside guest (`apk` base + XFCE).
 4. **Customization** — themes/icons (host-staged when possible) + zsh/OMZ/fastfetch profile via `setup_customization_alpine.sh`.
 5. **Use** — Terminal cards + **Start** desktop (XFCE via shared `start_gui.sh` / chroot `start_alpine_gui.sh`).
@@ -336,7 +336,7 @@ Device report: `docs/plans/results/alpine-apk-sudo-device-report.md`.
 |---|--------|--------|
 | libc | musl | glibc |
 | packages | apk | apt |
-| rootfs in APK | ~few MiB minirootfs | large tar.xz (~tens of MiB+) |
+| rootfs distribution | download at install (GitHub tag `rootfs`, ~3.8 MiB `.tar.gz`) | download at install (GitHub tag `rootfs`, ~81 MiB `.tar.xz`) |
 | cards | `alpine`, `alpine_chroot` | `debian`, `debian13_chroot` |
 | proot path | `…/containers/alpine/rootfs` | `…/containers/debian/rootfs` |
 | chroot path | `/data/local/tmp/chrootAlpine` | `/data/local/tmp/chrootDebian13` |
@@ -352,7 +352,7 @@ Device report: `docs/plans/results/alpine-apk-sudo-device-report.md`.
 When changing Alpine support:
 
 1. Update **`DistroInstallProfile`** constants if rootfs version/SHA changes.  
-2. Keep asset name **`.minirootfs`** strategy if packaging gzip.  
+2. Pin the new `ROOTFS_URL` / upload the archive to the GitHub release tag `rootfs` — **do not** package it in the APK and do **not** rename it (the `.minirootfs` aapt2 dodge is obsolete).  
 3. Do not hardcode `debian` only for OMZ/theme staging — always pass **`prootName`** (`alpine`).  
 4. Guest scripts must remain **POSIX sh-friendly** where minirootfs is ash-only until bash is installed.  
 5. After apk operations that might run as real host root into the tree, re-run **apk ownership fix**.  

@@ -101,7 +101,7 @@ Once you finish setting up your preferences, FluxLinux will prepare the Root She
 
 FluxLinux opens an in-app Root Shell session and runs the setup with root privileges (`su`).
 
-1. The Root Shell session uses the same pinned Debian rootfs asset as the PRoot path (no re-download).
+1. The Root Shell session uses the same pinned Debian rootfs as the PRoot path (already in `$HOME` from onboarding, or downloaded on demand from the GitHub release tag `rootfs`).
 2. `setup_debian13_chroot.sh` mounts the native filesystems (idempotently, via the SSOT helper), extracts the rootfs to `/data/local/tmp/chrootDebian13`, and sets up the desktop.
 3. When it finishes, FluxLinux marks Debian (Rooted) as installed.
 

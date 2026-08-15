@@ -229,6 +229,30 @@ val baseScriptName = when (distro.id) {
 
 ---
 
+### Step 5.5 — Distribute the Rootfs (GitHub release, NOT the APK)
+
+Rootfs archives are **never packaged into the APK** (see plan
+`rootfs-github-release-no-apk-bloat.md`). A new distro's rootfs:
+
+1. **Pin identity** in `DistroInstallProfile.kt` — add
+   `<DISTRO>_ROOTFS_NAME / <DISTRO>_ROOTFS_SHA256 / <DISTRO>_ROOTFS_MIN_BYTES /
+   <DISTRO>_ROOTFS_URL` constants (URL = `ROOTFS_RELEASE_BASE/<name>`), and set
+   `rootfsUrl` on the proot **and** chroot profiles.
+2. **Upload** the archive to the GitHub release tag `rootfs`:
+   - add a `name|sha256` entry to the `PINS` array in
+     `scripts/upload_rootfs_release.sh` and run it (`--check` first).
+   - never overwrite an existing release asset whose bytes changed — new bytes
+     need a **new filename** (old APKs pin the old SHA).
+3. **Script fallback** — add the `ROOTFS_URL` default for the distro id in
+   `flux_install.sh` (and a download fallback in the chroot setup script when
+   the distro adds a rooted mode).
+
+Do **not** add rootfs entries to `app/src/main/assets/rootfs/` (gitignored,
+no longer packaged) and do **not** resurrect `stageHostRootfs` in
+`app/build.gradle.kts`.
+
+---
+
 ### Step 6 — Wire Start / Stop / CLI Intents
 
 The `HomeScreen` uses these `TermuxIntentFactory` functions for launch/stop. Each function dispatches based on `distro.id`:

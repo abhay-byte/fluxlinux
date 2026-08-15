@@ -22,12 +22,14 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeChild
 
-/** Bottom tabs — matches termux-lib global nav: Home · Distros · Terminal. */
+/** Bottom tabs: Home · Distros. Terminal lives on the global top bar. */
 enum class BottomTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
     DISTROS("Distros", Icons.Default.List),
     TERMINAL("Terminal", Icons.Default.Terminal)
 }
+
+private val BottomNavItems = listOf(BottomTab.HOME, BottomTab.DISTROS)
 
 @Composable
 fun GlassBottomNavigation(
@@ -68,7 +70,7 @@ fun GlassBottomNavigation(
             containerColor = Color.Transparent,
             modifier = Modifier.fillMaxSize()
         ) {
-            BottomTab.values().forEach { tab ->
+            BottomNavItems.forEach { tab ->
                 val isSelected = selectedTab == tab
                 NavigationBarItem(
                     selected = isSelected,

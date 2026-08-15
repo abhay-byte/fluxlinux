@@ -125,10 +125,19 @@ object InstallSessionFactory {
         title: String = "Root Shell",
         onFinished: (() -> Unit)? = null,
         rootfsFileName: String = DistroInstallProfile.DEBIAN_ROOTFS_NAME,
-        chrootPath: String? = null
+        chrootPath: String? = null,
+        rootfsProfile: DistroInstallProfile? = null
     ): Boolean {
         val extra = mutableMapOf<String, String>()
         if (chrootPath != null) extra["FLUX_CHROOT"] = chrootPath
+        // `su -c` does NOT inherit the TerminalSession env map — export the
+        // rootfs identity inside the command string so the chroot setup script
+        // can resolve / download / SHA-check the archive (P4-T4).
+        if (rootfsProfile != null) {
+            extra["FLUX_ROOTFS_URL"] = rootfsProfile.rootfsUrl
+            extra["FLUX_ROOTFS_SHA256"] = rootfsProfile.rootfsSha256
+            extra["FLUX_ROOTFS_NAME"] = rootfsProfile.rootfsFileName
+        }
         val exports = extra.entries.joinToString(" ") { (k, v) ->
             "$k='${v.replace("'", "'\\''")}'"
         }
@@ -163,7 +172,8 @@ object InstallSessionFactory {
             extraEnv = mapOf(
                 "FLUX_ROOTFS_PATH" to "${TermuxHostPaths.HOME}/${profile.rootfsFileName}",
                 "FLUX_ROOTFS_NAME" to profile.rootfsFileName,
-                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256
+                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256,
+                "FLUX_ROOTFS_URL" to profile.rootfsUrl
             )
         )
     }
@@ -184,7 +194,8 @@ object InstallSessionFactory {
             title = "${profile.displayName} Install",
             onFinished = onFinished,
             rootfsFileName = profile.rootfsFileName,
-            chrootPath = profile.chrootPath
+            chrootPath = profile.chrootPath,
+            rootfsProfile = profile
         )
     }
 

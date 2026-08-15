@@ -32,14 +32,16 @@ object BaseDesktopInstallPlan {
             listOf(
                 Phase("R0", "Checking root access…", 5),
                 Phase("HOST", "Preparing host environment…", 15),
-                Phase("ROOTFS", "Installing $displayName chroot rootfs…", 35),
+                Phase("DL", "Downloading $displayName rootfs…", 10),
+                Phase("ROOTFS", "Installing $displayName chroot rootfs…", 30),
                 Phase("XFCE", "Installing XFCE desktop…", 25),
-                Phase("CUSTOM", "Applying Flux customization…", 20),
+                Phase("CUSTOM", "Applying Flux customization…", 15),
             )
         } else {
             listOf(
                 Phase("HOST", "Preparing host environment…", 20),
-                Phase("ROOTFS", "Installing $displayName rootfs + XFCE…", 50),
+                Phase("DL", "Downloading $displayName rootfs…", 15),
+                Phase("ROOTFS", "Installing $displayName rootfs + XFCE…", 35),
                 Phase("CUSTOM", "Applying Flux customization…", 30),
             )
         }

@@ -152,6 +152,12 @@ class OnboardingInstallRunner(private val ctx: Context) {
     private fun isStale(gen: Int): Boolean =
         cancelled.get() || generation.get() != gen
 
+    /** Phase index by [Phase.id] — never a hardcoded numeric index (D10). */
+    private fun phaseIdx(phases: List<BaseDesktopInstallPlan.Phase>, id: String): Int =
+        phases.indexOfFirst { it.id == id }.also { i ->
+            require(i >= 0) { "install plan missing phase '$id'" }
+        }
+
     private fun abortIfCancelled(
         gen: Int,
         phases: List<BaseDesktopInstallPlan.Phase>,
@@ -169,16 +175,21 @@ class OnboardingInstallRunner(private val ctx: Context) {
         onProgress: (Progress) -> Unit,
         gen: Int
     ) {
-        enter(phases, 0, onProgress, "Extracting bootstrap + deploying scripts…")
+        val hostIdx = phaseIdx(phases, "HOST")
+        val dlIdx = phaseIdx(phases, "DL")
+        val rootfsIdx = phaseIdx(phases, "ROOTFS")
+        val customIdx = phaseIdx(phases, "CUSTOM")
+
+        enter(phases, hostIdx, onProgress, "Extracting bootstrap + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
             if (isStale(gen)) return@prepareHostBlocking
             val frac = if (total > 0) done.toFloat() / total else 0f
-            updateFraction(phases, 0, frac, onProgress, phase)
+            updateFraction(phases, hostIdx, frac, onProgress, phase)
             if (phase.isNotBlank() && phase != lastHostPhase) {
                 lastHostPhase = phase
-                log(phases, 0, onProgress, phase)
+                log(phases, hostIdx, onProgress, phase)
             }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
@@ -186,10 +197,36 @@ class OnboardingInstallRunner(private val ctx: Context) {
             postFail(onProgress, phases, "Host bootstrap failed")
             return
         }
-        completePhase(phases, 0, onProgress, "Host ready")
+        completePhase(phases, hostIdx, onProgress, "Host ready")
 
         val profile = DistroInstallProfile.require(distroId)
-        enter(phases, 1, onProgress, "Installing ${profile.displayName} via proot-distro…")
+        enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        val destDir = TermuxHostPaths.homeDir(appCtx)
+        val dlOk = RootfsDownloader.ensurePresent(
+            destDir, profile, RootfsDownloader.defaultClient,
+            isCancelled = { isStale(gen) }
+        ) { p ->
+            if (isStale(gen)) return@ensurePresent
+            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+            updateFraction(
+                phases, dlIdx, frac, onProgress,
+                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
+                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+            )
+        }
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        if (!dlOk) {
+            postFail(
+                onProgress, phases,
+                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
+                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+            )
+            return
+        }
+        completePhase(phases, dlIdx, onProgress, "Rootfs ready (${profile.rootfsFileName})")
+
+        enter(phases, rootfsIdx, onProgress, "Installing ${profile.displayName} via proot-distro…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val bash = TermuxHostPaths.libBash(appCtx).absolutePath
         val installScript = TermuxHostPaths.hostScript(appCtx, "flux_install.sh").absolutePath
@@ -199,6 +236,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             put("FLUX_ROOTFS_PATH", "${TermuxHostPaths.HOME}/${profile.rootfsFileName}")
             put("FLUX_ROOTFS_NAME", profile.rootfsFileName)
             put("FLUX_ROOTFS_SHA256", profile.rootfsSha256)
+            put("FLUX_ROOTFS_URL", profile.rootfsUrl)
         }
         // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
         // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
@@ -209,7 +247,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             env,
             processHolder = activeProcess,
             onLine = { line ->
-                if (!isStale(gen) && line.isNotBlank()) log(phases, 1, onProgress, line)
+                if (!isStale(gen) && line.isNotBlank()) log(phases, rootfsIdx, onProgress, line)
             }
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
@@ -228,36 +266,36 @@ class OnboardingInstallRunner(private val ctx: Context) {
             )
             return
         }
-        completePhase(phases, 1, onProgress, "${profile.displayName} + XFCE installed")
+        completePhase(phases, rootfsIdx, onProgress, "${profile.displayName} + XFCE installed")
 
-        enter(phases, 2, onProgress, "Themes, wallpapers, fonts…")
+        enter(phases, customIdx, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         // Native host extract into proot rootfs (avoids proot thrashing on Papirus).
         // Skip guest re-extract when this succeeds or assets are already present.
-        log(phases, 2, onProgress, "Staging XFCE theme/icons on host (native tar)…")
+        log(phases, customIdx, onProgress, "Staging XFCE theme/icons on host (native tar)…")
         val hostThemeOk = try {
             ProotXfceAssetInstaller.install(appCtx, theme, profile.prootName) { line ->
-                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+                if (!isStale(gen) && line.isNotBlank()) log(phases, customIdx, onProgress, line)
             }
         } catch (e: Exception) {
-            log(phases, 2, onProgress, "Host theme stage error: ${e.message}")
+            log(phases, customIdx, onProgress, "Host theme stage error: ${e.message}")
             false
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
-        log(phases, 2, onProgress, "Staging Oh My Zsh on host (avoids proot hang)…")
+        log(phases, customIdx, onProgress, "Staging Oh My Zsh on host (avoids proot hang)…")
         val hostOmzOk = try {
             ProotZshBootstrap.install(appCtx, profile.prootName) { line ->
-                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+                if (!isStale(gen) && line.isNotBlank()) log(phases, customIdx, onProgress, line)
             }
         } catch (e: Exception) {
-            log(phases, 2, onProgress, "Host Oh My Zsh stage error: ${e.message}")
+            log(phases, customIdx, onProgress, "Host Oh My Zsh stage error: ${e.message}")
             false
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
         val skipAssets = if (hostThemeOk) "1" else "0"
         val skipOmz = if (hostOmzOk) "1" else "0"
         val customOk = runProotGuestScript(
-            phases, 2, onProgress, gen,
+            phases, customIdx, onProgress, gen,
             prootName = profile.prootName,
             scriptAssetPath = profile.customizationScript,
             envPrefix = "FLUX_THEME=$theme " +
@@ -268,15 +306,15 @@ class OnboardingInstallRunner(private val ctx: Context) {
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!customOk) {
-            log(phases, 2, onProgress, "Customization failed or partial — you can retry from Distro Settings")
+            log(phases, customIdx, onProgress, "Customization failed or partial — you can retry from Distro Settings")
         }
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         val hwOk = runHwAccelIfPresent(
-            profile, method = "proot", phases, 2, onProgress, gen, chrootPath = null
+            profile, method = "proot", phases, customIdx, onProgress, gen, chrootPath = null
         )
 
-        completePhase(phases, 2, onProgress, "Customization done")
+        completePhase(phases, customIdx, onProgress, "Customization done")
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)
@@ -298,7 +336,14 @@ class OnboardingInstallRunner(private val ctx: Context) {
         onProgress: (Progress) -> Unit,
         gen: Int
     ) {
-        enter(phases, 0, onProgress, "Probing KernelSU / Magisk…")
+        val r0Idx = phaseIdx(phases, "R0")
+        val hostIdx = phaseIdx(phases, "HOST")
+        val dlIdx = phaseIdx(phases, "DL")
+        val rootfsIdx = phaseIdx(phases, "ROOTFS")
+        val xfceIdx = phaseIdx(phases, "XFCE")
+        val customIdx = phaseIdx(phases, "CUSTOM")
+
+        enter(phases, r0Idx, onProgress, "Probing KernelSU / Magisk…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!RootShell.isRootAvailable()) {
             postFail(
@@ -307,18 +352,18 @@ class OnboardingInstallRunner(private val ctx: Context) {
             )
             return
         }
-        completePhase(phases, 0, onProgress, "Root OK")
+        completePhase(phases, r0Idx, onProgress, "Root OK")
 
-        enter(phases, 1, onProgress, "Extracting bootstrap + deploying scripts…")
+        enter(phases, hostIdx, onProgress, "Extracting bootstrap + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
             if (isStale(gen)) return@prepareHostBlocking
             val frac = if (total > 0) done.toFloat() / total else 0f
-            updateFraction(phases, 1, frac, onProgress, phase)
+            updateFraction(phases, hostIdx, frac, onProgress, phase)
             if (phase.isNotBlank() && phase != lastHostPhase) {
                 lastHostPhase = phase
-                log(phases, 1, onProgress, phase)
+                log(phases, hostIdx, onProgress, phase)
             }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
@@ -326,16 +371,45 @@ class OnboardingInstallRunner(private val ctx: Context) {
             postFail(onProgress, phases, "Host bootstrap failed")
             return
         }
-        completePhase(phases, 1, onProgress, "Host ready")
+        completePhase(phases, hostIdx, onProgress, "Host ready")
 
         val profile = DistroInstallProfile.require(distroId)
+
+        // DL after HOST only — R0 stays first so non-rooted devices fail
+        // before any download (R6).
+        enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        val destDir = TermuxHostPaths.homeDir(appCtx)
+        val dlOk = RootfsDownloader.ensurePresent(
+            destDir, profile, RootfsDownloader.defaultClient,
+            isCancelled = { isStale(gen) }
+        ) { p ->
+            if (isStale(gen)) return@ensurePresent
+            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+            updateFraction(
+                phases, dlIdx, frac, onProgress,
+                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
+                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+            )
+        }
+        if (abortIfCancelled(gen, phases, onProgress)) return
+        if (!dlOk) {
+            postFail(
+                onProgress, phases,
+                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
+                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+            )
+            return
+        }
+        completePhase(phases, dlIdx, onProgress, "Rootfs ready (${profile.rootfsFileName})")
+
         val chrootPath = profile.chrootPath
             ?: com.ivarna.fluxlinux.core.root.ChrootPaths.CHROOT_PATH
         val setupAsset = profile.chrootSetupAsset
             ?: "scripts/chroot/setup_debian13_chroot.sh"
         val setupName = File(setupAsset).name
 
-        enter(phases, 2, onProgress, "Extracting chroot rootfs (may take several minutes)…")
+        enter(phases, rootfsIdx, onProgress, "Extracting chroot rootfs (may take several minutes)…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val staged = RootShell.stageAsset(appCtx, setupAsset)
             ?: TermuxHostPaths.hostScript(appCtx, setupName).absolutePath
@@ -346,6 +420,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +
+                "export FLUX_ROOTFS_URL='${profile.rootfsUrl}'; " +
                 "export FLUX_CHROOT='$chrootPath'; " +
                 "export FLUX_DISTRO_LABEL='$label'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +
@@ -356,7 +431,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             rootCmd,
             timeoutMs = 0L,
             onLine = { line ->
-                if (!isStale(gen) && line.isNotBlank()) log(phases, 2, onProgress, line)
+                if (!isStale(gen) && line.isNotBlank()) log(phases, rootfsIdx, onProgress, line)
             },
             processHolder = activeProcess
         )
@@ -369,21 +444,21 @@ class OnboardingInstallRunner(private val ctx: Context) {
         TerminalLauncher.invalidateChrootInstalledCache()
         val installed = TerminalLauncher.isChrootInstalled(chrootPath)
         if (!installed) {
-            log(phases, 2, onProgress, "Root probe: chroot missing at $chrootPath")
+            log(phases, rootfsIdx, onProgress, "Root probe: chroot missing at $chrootPath")
             postFail(
                 onProgress, phases,
                 "Chroot rootfs missing after install (check root grant + $chrootPath)"
             )
             return
         }
-        log(phases, 2, onProgress, "Chroot rootfs verified (root probe)")
-        completePhase(phases, 2, onProgress, "Chroot rootfs ready")
+        log(phases, rootfsIdx, onProgress, "Chroot rootfs verified (root probe)")
+        completePhase(phases, rootfsIdx, onProgress, "Chroot rootfs ready")
 
-        enter(phases, 3, onProgress, "Installing XFCE packages…")
+        enter(phases, xfceIdx, onProgress, "Installing XFCE packages…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val familyPayload = BaseDesktopInstallPlan.familySetupPayload(appCtx, theme, distroId)
         val familyExit = runChrootGuestBlocking(
-            familyPayload, user = "root", phases, 3, onProgress, chrootPath
+            familyPayload, user = "root", phases, xfceIdx, onProgress, chrootPath
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (familyExit != 0) {
@@ -397,38 +472,38 @@ class OnboardingInstallRunner(private val ctx: Context) {
             )
             return
         }
-        completePhase(phases, 3, onProgress, "XFCE installed")
+        completePhase(phases, xfceIdx, onProgress, "XFCE installed")
 
-        enter(phases, 4, onProgress, "Themes, wallpapers, fonts…")
+        enter(phases, customIdx, onProgress, "Themes, wallpapers, fonts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         // Stage theme/icon/cursor/wallpaper into the chroot guest /tmp (root copy).
         // The customization script extracts from /tmp/flux_xfce_assets with guest
         // tar; icons have no download fallback, so this staging is mandatory.
-        log(phases, 4, onProgress, "Staging XFCE theme/icons into chroot…")
+        log(phases, customIdx, onProgress, "Staging XFCE theme/icons into chroot…")
         try {
             com.ivarna.fluxlinux.core.install.ProotXfceAssetInstaller.installToChroot(
                 appCtx, theme, chrootPath
             ) { line ->
-                if (!isStale(gen) && line.isNotBlank()) log(phases, 4, onProgress, line)
+                if (!isStale(gen) && line.isNotBlank()) log(phases, customIdx, onProgress, line)
             }
         } catch (e: Exception) {
-            log(phases, 4, onProgress, "chroot theme stage error: ${e.message}")
+            log(phases, customIdx, onProgress, "chroot theme stage error: ${e.message}")
         }
         val customPayload = BaseDesktopInstallPlan.customizationPayload(appCtx, theme, distroId)
         val customExit = runChrootGuestBlocking(
-            customPayload, user = "root", phases, 4, onProgress, chrootPath
+            customPayload, user = "root", phases, customIdx, onProgress, chrootPath
         )
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (customExit != 0) {
-            log(phases, 4, onProgress, "Customization failed or partial (exit $customExit)")
+            log(phases, customIdx, onProgress, "Customization failed or partial (exit $customExit)")
         }
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         val hwOk = runHwAccelIfPresent(
-            profile, method = "chroot", phases, 4, onProgress, gen, chrootPath = chrootPath
+            profile, method = "chroot", phases, customIdx, onProgress, gen, chrootPath = chrootPath
         )
 
-        completePhase(phases, 4, onProgress, "Customization done")
+        completePhase(phases, customIdx, onProgress, "Customization done")
 
         if (abortIfCancelled(gen, phases, onProgress)) return
         StateManager.setDistroInstalled(appCtx, distroId, true)

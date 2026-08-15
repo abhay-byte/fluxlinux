@@ -1,7 +1,9 @@
 package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
+import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.core.data.Distro
+import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
 import com.termux.terminal.TerminalSession
 
@@ -44,7 +46,14 @@ object GuestSessionFactory {
         val session = TerminalSession(sessionExec, cwd, args, env, 10000, SessionRegistry.sessionClient())
         return SessionRegistry.add(
             ctx,
-            SessionRegistry.ManagedSession(session, type, title, method)
+            SessionRegistry.ManagedSession(
+                session,
+                type,
+                title,
+                method,
+                distroId = distroId,
+                iconRes = DistroRepository.iconResFor(distroId) ?: R.drawable.ic_terminal
+            )
         )
     }
 
@@ -76,7 +85,13 @@ object GuestSessionFactory {
         )
         return SessionRegistry.add(
             ctx,
-            SessionRegistry.ManagedSession(session, "host", title, "host")
+            SessionRegistry.ManagedSession(
+                session,
+                "host",
+                title,
+                "host",
+                iconRes = R.drawable.ic_terminal
+            )
         )
     }
 
@@ -131,7 +146,15 @@ object GuestSessionFactory {
         val session = TerminalSession(sessionExec, cwd, args, env, 10000, SessionRegistry.sessionClient())
         return SessionRegistry.add(
             ctx,
-            SessionRegistry.ManagedSession(session, "component", title, method, onFinished)
+            SessionRegistry.ManagedSession(
+                session,
+                "component",
+                title,
+                method,
+                onFinished,
+                distroId = distro.id,
+                iconRes = DistroRepository.iconResFor(distro.id) ?: R.drawable.ic_terminal
+            )
         )
     }
 }

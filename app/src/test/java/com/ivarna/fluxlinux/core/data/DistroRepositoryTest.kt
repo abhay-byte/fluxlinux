@@ -147,4 +147,36 @@ class DistroRepositoryTest {
         val alpineChroot = DistroRepository.supportedDistros.first { it.id == "alpine_chroot" }
         assertEquals(3, alpineChroot.components.size)
     }
+
+    @Test
+    fun installableVariant_mapsFamilyAcrossMethods() {
+        assertEquals(
+            "debian13_chroot",
+            DistroRepository.installableVariant("debian", chroot = true)?.id
+        )
+        assertEquals(
+            "debian",
+            DistroRepository.installableVariant("debian13_chroot", chroot = false)?.id
+        )
+        assertEquals(
+            "alpine_chroot",
+            DistroRepository.installableVariant("alpine", chroot = true)?.id
+        )
+        assertEquals(
+            "fedora",
+            DistroRepository.installableVariant("fedora_chroot", chroot = false)?.id
+        )
+        assertEquals(
+            "archlinux_chroot",
+            DistroRepository.installableVariant("archlinux", chroot = true)?.id
+        )
+    }
+
+    @Test
+    fun installableCards_splitEvenlyBetweenProotAndChroot() {
+        val available = DistroRepository.supportedDistros.filter { !it.comingSoon }
+        assertEquals(12, available.count { it.prootSupported })
+        assertEquals(12, available.count { it.chrootSupported })
+        assertTrue(available.none { it.prootSupported && it.chrootSupported })
+    }
 }

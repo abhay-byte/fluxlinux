@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.data.Distro
@@ -70,6 +71,9 @@ fun DistroCard(
     onOpenDisplay: () -> Unit = {},
     onViewLogs: () -> Unit = {},
     logsAvailable: Boolean = false,
+    startEnabled: Boolean = true,
+    statusMessage: String? = null,
+    statusIsError: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isChroot = distro.isChrootCard()
@@ -141,6 +145,13 @@ fun DistroCard(
                                 label = if (isChroot) "CHROOT" else "PROOT",
                                 color = methodColor
                             )
+                            if (isInstalled && isChroot && !startEnabled) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                MethodChip(
+                                    label = "NO ROOT",
+                                    color = colors.error
+                                )
+                            }
                             if (isInstalled && (isGuiRunning || isGuiStarting)) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 MethodChip(
@@ -157,8 +168,8 @@ fun DistroCard(
                             }
                         }
                         Text(
-                            text = distro.id,
-                            color = colors.onSurfaceVariant,
+                            text = statusMessage ?: distro.id,
+                            color = if (statusIsError) colors.error else colors.onSurfaceVariant,
                             fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -250,9 +261,10 @@ fun DistroCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         CompactAction(
-                            label = "Start",
+                            label = if (!startEnabled && isChroot) "Need root" else "Start",
                             icon = Icons.Default.PlayArrow,
                             onClick = onNavigateToStart,
+                            enabled = startEnabled,
                             containerColor = colors.secondary,
                             contentColor = colors.onSecondary,
                             modifier = Modifier.weight(1.2f)
@@ -282,30 +294,37 @@ fun MethodTabs(
     onSelected: (MethodTab) -> Unit,
     modifier: Modifier = Modifier,
     prootCount: Int? = null,
-    chrootCount: Int? = null
+    chrootCount: Int? = null,
+    prootLabel: String = "PRoot",
+    chrootLabel: String = "Chroot",
+    chrootEnabled: Boolean = true,
+    horizontalPadding: Dp = 16.dp,
 ) {
     val shape = RoundedCornerShape(12.dp)
     val colors = MaterialTheme.colorScheme
+    val prootText = if (prootCount != null) "$prootLabel  $prootCount" else prootLabel
+    val chrootText = if (chrootCount != null) "$chrootLabel  $chrootCount" else chrootLabel
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = horizontalPadding)
             .height(40.dp)
             .clip(shape)
             .background(colors.surface.copy(alpha = 0.72f))
             .border(BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)), shape)
     ) {
         MethodTabSegment(
-            label = if (prootCount != null) "PRoot  $prootCount" else "PRoot",
+            label = prootText,
             selected = selected == MethodTab.PROOT,
             accent = MethodProot,
             onClick = { onSelected(MethodTab.PROOT) },
             modifier = Modifier.weight(1f)
         )
         MethodTabSegment(
-            label = if (chrootCount != null) "Chroot  $chrootCount" else "Chroot",
+            label = chrootText,
             selected = selected == MethodTab.CHROOT,
             accent = MethodChroot,
+            enabled = chrootEnabled,
             onClick = { onSelected(MethodTab.CHROOT) },
             modifier = Modifier.weight(1f)
         )
@@ -318,9 +337,15 @@ private fun MethodTabSegment(
     selected: Boolean,
     accent: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(11.dp)
+    val labelColor = when {
+        selected -> accent
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = modifier
             .fillMaxHeight()
@@ -332,10 +357,11 @@ private fun MethodTabSegment(
     ) {
         Text(
             text = label,
-            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = labelColor,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             fontSize = 13.sp,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

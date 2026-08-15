@@ -11,6 +11,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -619,11 +620,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         BottomTab.TERMINAL -> {
-                            // Terminal as first-class bottom-nav page (like termux-lib).
-                            // Hide scaffold top bar chrome for max terminal area — content owns title.
                             com.ivarna.fluxlinux.ui.screens.TerminalScreen(
-                                onBack = null,
-                                embeddedInBottomNav = true
+                                onBack = { currentTab = BottomTab.HOME },
+                                embeddedInBottomNav = false
                             )
                         }
                     }
@@ -633,7 +632,8 @@ class MainActivity : ComponentActivity() {
                 @Composable
                 fun TopBar(
                     hazeState: HazeState,
-                    onSettingsClick: () -> Unit
+                    onSettingsClick: () -> Unit,
+                    onTerminalClick: () -> Unit
                 ) {
                     Box(
                         modifier = Modifier
@@ -676,10 +676,17 @@ class MainActivity : ComponentActivity() {
                                        text = "Host: embedded",
                                        style = MaterialTheme.typography.labelSmall,
                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                       modifier = Modifier.padding(end = 8.dp)
+                                       modifier = Modifier.padding(end = 4.dp)
                                    )
                                 }
-                                
+
+                                IconButton(onClick = onTerminalClick) {
+                                    Icon(
+                                        imageVector = Icons.Default.Terminal,
+                                        contentDescription = "Terminal",
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
                                 IconButton(onClick = onSettingsClick) {
                                     Icon(
                                         imageVector = Icons.Default.Settings,
@@ -726,16 +733,19 @@ class MainActivity : ComponentActivity() {
                                 if (showTopBar) {
                                     TopBar(
                                         hazeState = hazeState,
-                                        onSettingsClick = { currentScreen = Screen.SETTINGS }
+                                        onSettingsClick = { currentScreen = Screen.SETTINGS },
+                                        onTerminalClick = { currentTab = BottomTab.TERMINAL }
                                     )
                                 }
                             },
                             bottomBar = {
-                                GlassBottomNavigation(
-                                    selectedTab = currentTab,
-                                    onTabSelected = { currentTab = it },
-                                    hazeState = hazeState
-                                )
+                                if (currentTab != BottomTab.TERMINAL) {
+                                    GlassBottomNavigation(
+                                        selectedTab = currentTab,
+                                        onTabSelected = { currentTab = it },
+                                        hazeState = hazeState
+                                    )
+                                }
                             }
                         ) {
                             MainScreenContent(
