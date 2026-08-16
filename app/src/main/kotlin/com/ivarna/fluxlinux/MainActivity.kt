@@ -59,6 +59,7 @@ enum class Screen {
     SETTINGS_CHROOT_DETAIL,
     SETTINGS_PROOT,
     SETTINGS_PROOT_DETAIL,
+    SETTINGS_LEGACY_TERMUX,
     TROUBLESHOOTING,
     ROOT_ACCESS,
     INSTALL_WIZARD,
@@ -101,6 +102,12 @@ class MainActivity : ComponentActivity() {
             
             android.util.Log.d("FluxLinux", "Deep Link received: result=$result, scriptName=$scriptName")
             
+            if (scriptName.startsWith("legacy_termux_")) {
+                com.ivarna.fluxlinux.core.legacy.LegacyTermuxCallbacks.handle(this, result, scriptName, uri)
+                consumeCallbackIntent()
+                return
+            }
+
             if (result == "success") {
                  // Check Queue first
                  val queueManager = com.ivarna.fluxlinux.core.utils.InstallationQueueManager
@@ -451,9 +458,28 @@ class MainActivity : ComponentActivity() {
         com.ivarna.fluxlinux.core.utils.InstallationQueueManager.clear()
     }
 
+    private fun consumeCallbackIntent() {
+        setIntent(android.content.Intent(this, MainActivity::class.java).apply { action = android.content.Intent.ACTION_MAIN })
+    }
+
+    private fun dispatchLegacyTermuxCallback(intent: android.content.Intent?) {
+        if (intent?.action == android.content.Intent.ACTION_VIEW && intent.data?.scheme == "fluxlinux") {
+            val uri = intent.data
+            val scriptName = uri?.getQueryParameter("name") ?: return
+            if (scriptName.startsWith("legacy_termux_")) {
+                val result = uri.getQueryParameter("result")
+                com.ivarna.fluxlinux.core.legacy.LegacyTermuxCallbacks.handle(this, result, scriptName, uri)
+                consumeCallbackIntent()
+            }
+        }
+    }
+
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            dispatchLegacyTermuxCallback(intent)
+        }
         requestNotificationPermissionIfNeeded()
         setContent {
             // Force Permanent Dark Mode
@@ -504,6 +530,7 @@ class MainActivity : ComponentActivity() {
                         || currentScreen == Screen.SETTINGS_X11
                         || currentScreen == Screen.SETTINGS_CHROOT
                         || currentScreen == Screen.SETTINGS_PROOT
+                        || currentScreen == Screen.SETTINGS_LEGACY_TERMUX
                         || currentScreen == Screen.TROUBLESHOOTING
                         || currentScreen == Screen.ROOT_ACCESS) {
                         currentScreen = Screen.SETTINGS
@@ -859,6 +886,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToProotSettings = {
                                 currentScreen = Screen.SETTINGS_PROOT
+                            },
+                            onNavigateToLegacyTermuxSettings = {
+                                currentScreen = Screen.SETTINGS_LEGACY_TERMUX
                             }
                         )
                     }
@@ -943,6 +973,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                    }
+                    Screen.SETTINGS_LEGACY_TERMUX -> {
+                        com.ivarna.fluxlinux.ui.screens.LegacyTermuxSettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS },
+                            permissionState = permissionState
+                        )
                     }
                     Screen.TROUBLESHOOTING -> {
                         com.ivarna.fluxlinux.ui.screens.TroubleshootingScreen(
