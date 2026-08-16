@@ -30,6 +30,9 @@ import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 import dev.chrisbanes.haze.HazeState
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun DistroScreen(
@@ -58,81 +61,92 @@ fun DistroScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Available Distros",
-            color = MaterialTheme.colorScheme.secondary,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
-        
-        Spacer(modifier = Modifier.height(10.dp))
-        
-        // Distro List — installed state = filesystem truth (plan P4-T13); stale
-        // prefs without a rootfs on disk keep the card available for Install.
-        val installedDistroIds = remember(refreshKey.value, stateRefresh) {
-            DistroRepository.supportedDistros
-                .filter { com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id) }
-                .map { it.id }
-                .toSet()
-        }
-        
-        val availableDistros = DistroRepository.supportedDistros.filter { 
-            !installedDistroIds.contains(it.id)
-        }.sortedWith(compareBy<Distro> { it.comingSoon }.thenBy { it.name })
+    // Distro List — installed state = filesystem truth (plan P4-T13); stale
+    // prefs without a rootfs on disk keep the card available for Install.
+    val installedDistroIds = remember(refreshKey.value, stateRefresh) {
+        DistroRepository.supportedDistros
+            .filter { com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id) }
+            .map { it.id }
+            .toSet()
+    }
+    
+    val availableDistros = DistroRepository.supportedDistros.filter { 
+        !installedDistroIds.contains(it.id)
+    }
 
-        var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
-        val visibleDistros = availableDistros.filter { distro ->
+    var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
+    val visibleDistros = DistroRepository.sortForDistroPage(
+        availableDistros.filter { distro ->
             if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
         }
-        val prootCount = availableDistros.count { it.prootSupported }
-        val chrootCount = availableDistros.count { it.chrootSupported }
+    )
+    val prootCount = availableDistros.count { it.prootSupported }
+    val chrootCount = availableDistros.count { it.chrootSupported }
 
-        MethodTabs(
-            selected = methodTab,
-            onSelected = { methodTab = it },
-            prootCount = prootCount,
-            chrootCount = chrootCount
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-        
-        if (visibleDistros.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        contentPadding = PaddingValues(bottom = 128.dp)
+    ) {
+        item(key = "title") {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = if (availableDistros.isEmpty()) {
-                        "All available distros are installed!"
-                    } else if (methodTab == MethodTab.CHROOT) {
-                        "No chroot distros left to install"
-                    } else {
-                        "No PRoot distros left to install"
-                    },
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "Available Distros",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                 )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+
+        item(key = "tabs") {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                MethodTabs(
+                    selected = methodTab,
+                    onSelected = { methodTab = it },
+                    prootCount = prootCount,
+                    chrootCount = chrootCount
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+
+        if (visibleDistros.isEmpty()) {
+            item(key = "empty") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (availableDistros.isEmpty()) {
+                            "All available distros are installed!"
+                        } else if (methodTab == MethodTab.CHROOT) {
+                            "No chroot distros left to install"
+                        } else {
+                            "No PRoot distros left to install"
+                        },
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
         } else {
-            visibleDistros.forEach { distro ->
+            items(
+                items = visibleDistros,
+                key = { it.id },
+                contentType = { if (it.comingSoon) "soon" else "full" }
+            ) { distro ->
                 if (distro.comingSoon) {
-                    // Use compact card for coming soon distros
                     com.ivarna.fluxlinux.ui.components.CompactDistroCard(
                         distro = distro
                     )
                 } else {
-                    // Use full card for available distros
                     com.ivarna.fluxlinux.ui.components.DistroCard(
                         distro = distro,
                         isInstalled = false,
@@ -142,18 +156,15 @@ fun DistroScreen(
                             if (installState.isInstalling && installState.currentDistroId != distro.id) {
                                 Toast.makeText(context, "Installation already in progress for another distro", Toast.LENGTH_LONG).show()
                             } else {
-                                // Embedded host — no external Termux / RUN_COMMAND required
                                 onNavigateToInstall(distro)
                             }
                         },
-                        onUninstall = {}, // Not used
-                        onNavigateToSettings = {}, // Not used
-                        onNavigateToStart = {} // Not used
+                        onUninstall = {},
+                        onNavigateToSettings = {},
+                        onNavigateToStart = {}
                     )
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(128.dp))
     }
 }

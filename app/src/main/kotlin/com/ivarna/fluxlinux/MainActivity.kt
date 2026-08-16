@@ -5,17 +5,23 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +74,10 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch { }
             currentScreenRef?.value = Screen.HOME
             currentTabRef?.value = BottomTab.TERMINAL
+        } else if (intent.getStringExtra("EXTRA_TARGET_PAGE") == "home" || intent.getStringExtra("target_page") == "home") {
+            setIntent(intent)
+            currentScreenRef?.value = Screen.HOME
+            currentTabRef?.value = BottomTab.HOME
         }
     }
 
@@ -481,6 +491,30 @@ class MainActivity : ComponentActivity() {
                     currentScreen = Screen.HOME
                     currentTab = BottomTab.TERMINAL
                 }
+
+                BackHandler {
+                    if (currentScreen == Screen.SETTINGS_TERMINAL
+                        || currentScreen == Screen.SETTINGS_X11
+                        || currentScreen == Screen.SETTINGS_CHROOT
+                        || currentScreen == Screen.TROUBLESHOOTING
+                        || currentScreen == Screen.ROOT_ACCESS) {
+                        currentScreen = Screen.SETTINGS
+                    } else if (currentScreen == Screen.SETTINGS
+                        || currentScreen == Screen.DISTRO_SETTINGS
+                        || currentScreen == Screen.INSTALL_WIZARD) {
+                        currentScreen = Screen.HOME
+                        currentTab = BottomTab.HOME
+                    } else if (currentScreen == Screen.ONBOARDING || currentScreen == Screen.PREREQUISITES) {
+                        finish()
+                    } else if (currentScreen == Screen.HOME && currentTab != BottomTab.HOME) {
+                        if (currentTab == BottomTab.TERMINAL) {
+                            com.ivarna.fluxlinux.ui.terminal.hideIme(window.decorView)
+                        }
+                        currentTab = BottomTab.HOME
+                    } else {
+                        finish()
+                    }
+                }
                 
                 // Selected Distro for Wizard/Settings
                 var selectedDistro by remember { mutableStateOf<com.ivarna.fluxlinux.core.data.Distro?>(null) }
@@ -633,7 +667,9 @@ class MainActivity : ComponentActivity() {
                 fun TopBar(
                     hazeState: HazeState,
                     onSettingsClick: () -> Unit,
-                    onTerminalClick: () -> Unit
+                    onTerminalClick: () -> Unit,
+                    onOpenDisplay: () -> Unit,
+                    displayLive: Boolean,
                 ) {
                     Box(
                         modifier = Modifier
@@ -671,13 +707,32 @@ class MainActivity : ComponentActivity() {
                             }
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isBootstrapExtracted(LocalContext.current)) {
+                                if (!displayLive && com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isBootstrapExtracted(LocalContext.current)) {
                                    Text(
                                        text = "Host: embedded",
                                        style = MaterialTheme.typography.labelSmall,
                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                                        modifier = Modifier.padding(end = 4.dp)
                                    )
+                                }
+
+                                IconButton(onClick = onOpenDisplay) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.DesktopWindows,
+                                            contentDescription = if (displayLive) "Open X11 display — desktop running" else "Open X11 display",
+                                            tint = MaterialTheme.colorScheme.onBackground
+                                        )
+                                        if (displayLive) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF69F0AE))
+                                            )
+                                        }
+                                    }
                                 }
 
                                 IconButton(onClick = onTerminalClick) {
@@ -727,14 +782,31 @@ class MainActivity : ComponentActivity() {
                     Screen.HOME -> {
                         val hazeState = remember { HazeState() }
                         val showTopBar = currentTab != BottomTab.TERMINAL
+                        val desktopUi by com.ivarna.fluxlinux.core.desktop.DesktopLauncher.uiState.collectAsState()
+                        val stateRefresh by com.ivarna.fluxlinux.core.utils.StateManager.refreshTrigger.collectAsState()
+                        val session = remember(desktopUi, stateRefresh) {
+                            com.ivarna.fluxlinux.core.desktop.DesktopSessionQuery.current(this@MainActivity, desktopUi)
+                        }
+
+                        LaunchedEffect(currentTab) {
+                            if (currentTab != BottomTab.TERMINAL) {
+                                com.ivarna.fluxlinux.ui.terminal.hideIme(window.decorView)
+                            }
+                        }
+
                         GlassScaffold(
                             hazeState = hazeState,
+                            blurContent = currentTab == BottomTab.HOME,
                             topBar = {
                                 if (showTopBar) {
                                     TopBar(
                                         hazeState = hazeState,
                                         onSettingsClick = { currentScreen = Screen.SETTINGS },
-                                        onTerminalClick = { currentTab = BottomTab.TERMINAL }
+                                        onTerminalClick = { currentTab = BottomTab.TERMINAL },
+                                        onOpenDisplay = {
+                                            com.ivarna.fluxlinux.core.desktop.DesktopLauncher.reopenDisplay(this@MainActivity)
+                                        },
+                                        displayLive = session != null
                                     )
                                 }
                             },

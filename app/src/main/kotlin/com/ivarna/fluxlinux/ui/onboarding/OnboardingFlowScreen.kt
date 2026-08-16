@@ -560,13 +560,15 @@ private fun OptionsPage(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+                .border(1.dp, com.ivarna.fluxlinux.ui.theme.FluxHairline, RoundedCornerShape(16.dp))
                 .padding(14.dp)
         ) {
             Column {
-                Text("Includes", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text("Includes", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(6.dp))
+                val bulletColor = com.ivarna.fluxlinux.ui.theme.fluxMutedText()
                 Text(
                     when {
                         distroId.startsWith("alpine") -> "• Alpine 3.24 minirootfs"
@@ -575,21 +577,21 @@ private fun OptionsPage(
                         distroId.startsWith("opensuse") -> "• openSUSE Tumbleweed rootfs"
                         else -> "• Debian 13 rootfs"
                     },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = bulletColor,
                     fontSize = 13.sp
                 )
-                Text("• XFCE4 desktop", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Text("• XFCE4 desktop", color = bulletColor, fontSize = 13.sp)
                 if (distroId.startsWith("fedora") || distroId.startsWith("void") ||
                     distroId.startsWith("opensuse")
                 ) {
                     Text(
                         "• Mesa / VirGL hardware acceleration",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = bulletColor,
                         fontSize = 13.sp
                     )
                 }
-                Text("• Flux theme, wallpapers, fonts", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Text("• Embedded terminal + X11 display", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Text("• Flux theme, wallpapers, fonts", color = bulletColor, fontSize = 13.sp)
+                Text("• Embedded terminal + X11 display", color = bulletColor, fontSize = 13.sp)
             }
         }
 

@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,9 +22,11 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -34,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -43,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.terminal.GuestLoginShell
 import com.ivarna.fluxlinux.core.utils.TerminalPreferences
+import com.ivarna.fluxlinux.ui.components.FluxSwitch
 import com.ivarna.fluxlinux.ui.components.GlassSettingCard
+import com.ivarna.fluxlinux.ui.theme.fluxMutedText
 
 /**
  * Terminal font zoom + ExtraKeys toolbar + guest login shell (nativecode settings parity).
@@ -51,7 +57,7 @@ import com.ivarna.fluxlinux.ui.components.GlassSettingCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalSettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var fontSize by remember {
@@ -104,13 +110,14 @@ fun TerminalSettingsScreen(
                         "Global terminal zoom",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "Font size for the embedded terminal (pinch zoom also updates this).",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                        color = fluxMutedText()
                     )
                     Spacer(Modifier.height(16.dp))
                     Row(
@@ -118,35 +125,56 @@ fun TerminalSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        val canDecrease = fontSize > TerminalPreferences.FONT_MIN
                         IconButton(
                             onClick = {
                                 val next = (fontSize - 2).coerceAtLeast(TerminalPreferences.FONT_MIN)
                                 fontSize = next
                                 TerminalPreferences.setFontSize(context, next)
-                            }
+                            },
+                            enabled = canDecrease,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
                         ) {
                             Icon(Icons.Default.Remove, contentDescription = "Smaller")
                         }
                         Text(
                             "${fontSize} pt",
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        val canIncrease = fontSize < TerminalPreferences.FONT_MAX
                         IconButton(
                             onClick = {
                                 val next = (fontSize + 2).coerceAtMost(TerminalPreferences.FONT_MAX)
                                 fontSize = next
                                 TerminalPreferences.setFontSize(context, next)
-                            }
+                            },
+                            enabled = canIncrease,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Larger")
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         "Range ${TerminalPreferences.FONT_MIN}–${TerminalPreferences.FONT_MAX}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        color = fluxMutedText(),
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                 }
@@ -169,12 +197,13 @@ fun TerminalSettingsScreen(
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "Show CTRL, ALT, ESC, arrows and symbols under the terminal.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            color = fluxMutedText()
                         )
                     }
                     Spacer(Modifier.width(12.dp))
-                    Switch(
+                    FluxSwitch(
                         checked = showExtraKeys,
                         onCheckedChange = {
                             showExtraKeys = it
@@ -201,17 +230,28 @@ fun TerminalSettingsScreen(
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "On = zsh, off = bash. New proot/chroot Terminal sessions only; live tabs keep their shell.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            color = fluxMutedText()
                         )
                     }
                     Spacer(Modifier.width(12.dp))
-                    Text(
-                        if (guestShellZsh) "zsh" else "bash",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                    Switch(
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (guestShellZsh) "zsh" else "bash",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    FluxSwitch(
                         checked = guestShellZsh,
                         onCheckedChange = { on ->
                             guestShellZsh = on

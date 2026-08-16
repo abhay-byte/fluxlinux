@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -89,23 +88,25 @@ fun DistroCard(
             .background(colors.surface.copy(alpha = 0.72f))
             .border(BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)), CardShape)
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
+                .align(Alignment.CenterStart)
+                .matchParentSize()
         ) {
             Box(
                 modifier = Modifier
-                    .width(3.dp)
+                    .align(Alignment.CenterStart)
                     .fillMaxHeight()
+                    .width(3.dp)
                     .background(methodColor)
             )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 15.dp, end = 12.dp, top = 10.dp, bottom = 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                     if (distro.iconRes != null) {
                         androidx.compose.foundation.Image(
                             painter = androidx.compose.ui.res.painterResource(id = distro.iconRes),
@@ -284,7 +285,6 @@ fun DistroCard(
             }
         }
     }
-}
 
 enum class MethodTab { PROOT, CHROOT }
 
@@ -390,7 +390,7 @@ fun MethodChip(
 }
 
 @Composable
-private fun CompactAction(
+internal fun CompactAction(
     label: String,
     onClick: () -> Unit,
     containerColor: Color,
@@ -443,15 +443,14 @@ fun GlassSettingCard(
         modifier = modifier
             .clip(shape)
             .background(
-                // Use surface variant or surface with opacity, adaptive to theme
-                androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                androidx.compose.material3.MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
             ) 
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             )
             .border(
                 1.dp,
-                androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
+                com.ivarna.fluxlinux.ui.theme.FluxHairline,
                 shape
             )
     ) {

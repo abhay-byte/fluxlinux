@@ -210,7 +210,10 @@ fun TerminalScreen(
         ) {
             if (onBack != null) {
                 FilledTonalIconButton(
-                    onClick = onBack,
+                    onClick = {
+                        terminalViewRef?.let { com.ivarna.fluxlinux.ui.terminal.hideIme(it) }
+                        onBack.invoke()
+                    },
                     modifier = Modifier.size(36.dp),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -412,6 +415,7 @@ fun TerminalScreen(
             }
             DisposableEffect(Unit) {
                 onDispose {
+                    terminalViewRef?.let { com.ivarna.fluxlinux.ui.terminal.hideIme(it) }
                     FluxTerminalSessionManager.detachView()
                     terminalViewRef = null
                 }

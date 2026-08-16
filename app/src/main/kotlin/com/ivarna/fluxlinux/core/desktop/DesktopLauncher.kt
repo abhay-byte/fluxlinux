@@ -58,9 +58,41 @@ object DesktopLauncher {
     @Volatile private var guiShellJob: ShellJob? = null
     @Volatile private var guiUserStopping: Boolean = false
     @Volatile private var guiX11Launched: Boolean = false
+    @Volatile private var startInFlight: Boolean = false
     private val healthyLineSeen = AtomicBoolean(false)
     /** Ensures [onResult] is invoked at most once per start. */
     private val startResultDelivered = AtomicBoolean(false)
+
+    enum class StartDecision {
+        ALLOW,
+        REOPEN_SAME,
+        REFUSE_DIFFERENT
+    }
+
+    fun evaluateStartAttempt(
+        existingSession: DesktopSession?,
+        isSessionActive: Boolean,
+        activeDistroId: String?,
+        requestedDistroId: String
+    ): StartDecision {
+        if (existingSession != null) {
+            return if (existingSession.distroId == requestedDistroId) {
+                StartDecision.REOPEN_SAME
+            } else {
+                StartDecision.REFUSE_DIFFERENT
+            }
+        }
+        if (isSessionActive) {
+            return if (activeDistroId == requestedDistroId) {
+                StartDecision.REOPEN_SAME
+            } else {
+                StartDecision.REFUSE_DIFFERENT
+            }
+        }
+        return StartDecision.ALLOW
+    }
+
+    fun isSessionActive(): Boolean = _ui.value.phase != Phase.Idle || startInFlight
 
     /**
      * @param onResult main-thread; true when desktop readiness marker seen
@@ -68,8 +100,32 @@ object DesktopLauncher {
      */
     fun start(ctx: Context, distroId: String, onResult: ((Boolean) -> Unit)? = null) {
         val app = ctx.applicationContext
+
+        val existing = DesktopSessionQuery.current(app, _ui.value)
+        if (existing != null && existing.distroId != distroId) {
+            toast(app, "Stop ${existing.distroName} ${existing.type} first")
+            onResult?.invoke(false)
+            return
+        }
+        if (existing != null && existing.distroId == distroId) {
+            toast(app, "Desktop already running")
+            reopenDisplay(ctx)
+            onResult?.invoke(true)
+            return
+        }
+
+        // Claim slot before async prepareHost
+        startInFlight = true
+        _ui.update {
+            it.copy(
+                phase = Phase.Starting,
+                distroId = distroId
+            )
+        }
+
         TerminalLauncher.prepareHost(app) { ok ->
             if (!ok) {
+                startInFlight = false
                 toast(app, "Host not ready — open Settings to initialize")
                 finishStart(app, distroId, false, "Host not ready", onResult)
                 return@prepareHost
@@ -90,6 +146,7 @@ object DesktopLauncher {
                     val installed = TerminalLauncher.isChrootInstalled(path)
                     main.post {
                         if (!installed) {
+                            startInFlight = false
                             toast(app, "Chroot not installed. Complete install first.")
                             finishStart(app, distroId, false, "Chroot not installed", onResult)
                         } else {
@@ -101,6 +158,7 @@ object DesktopLauncher {
             } else {
                 val prootName = profile?.prootName ?: "debian"
                 if (!TerminalLauncher.isProotInstalled(app, prootName)) {
+                    startInFlight = false
                     toast(app, "Distro not installed. Complete onboarding first.")
                     finishStart(app, distroId, false, "Distro not installed", onResult)
                     return@prepareHost
@@ -118,9 +176,18 @@ object DesktopLauncher {
         profile: com.ivarna.fluxlinux.core.install.DistroInstallProfile?,
         onResult: ((Boolean) -> Unit)?
     ) {
+        val currentSession = DesktopSessionQuery.current(app, _ui.value)
+        if (currentSession != null && currentSession.distroId != distroId) {
+            startInFlight = false
+            toast(app, "Stop ${currentSession.distroName} ${currentSession.type} first")
+            onResult?.invoke(false)
+            return
+        }
+
         val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
         val script = File(TermuxHostPaths.HOME, scriptName)
         if (!script.isFile) {
+            startInFlight = false
             GuiDesktopLog.header(app, "START", scriptName, method)
             GuiDesktopLog.append(app, "ERROR: missing host script ${script.absolutePath}")
             pushLog(app, forceShow = true)
@@ -132,6 +199,7 @@ object DesktopLauncher {
             val guestName = profile?.chrootStartGuiScript ?: "start_debian13_gui.sh"
             val guest = File(TermuxHostPaths.HOME, guestName)
             if (!guest.isFile) {
+                startInFlight = false
                 toast(app, "Chroot desktop launcher missing — re-run host initialize")
                 finishStart(app, distroId, false, "Missing $guestName", onResult)
                 return
@@ -219,6 +287,7 @@ object DesktopLauncher {
         val app = ctx.applicationContext
         val method = methodFor(distroId)
         guiUserStopping = true
+        startInFlight = false
 
         try {
             val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
@@ -411,6 +480,7 @@ object DesktopLauncher {
         error: String?,
         showLogs: Boolean
     ) {
+        startInFlight = false
         stopFgs(app)
         StateManager.setGuiRunning(app, distroId, false)
         StateManager.setGuiRunningType(app, distroId, "")

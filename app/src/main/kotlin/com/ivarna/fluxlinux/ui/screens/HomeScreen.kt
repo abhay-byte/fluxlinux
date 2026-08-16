@@ -49,8 +49,11 @@ import com.ivarna.fluxlinux.core.data.ScriptManager
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 
 import com.ivarna.fluxlinux.core.desktop.DesktopLauncher
+import com.ivarna.fluxlinux.core.desktop.DesktopSession
+import com.ivarna.fluxlinux.core.desktop.DesktopSessionQuery
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.ui.components.ActiveDesktopCard
 import com.ivarna.fluxlinux.ui.components.MethodTab
 import com.ivarna.fluxlinux.ui.components.MethodTabs
 import com.ivarna.fluxlinux.ui.components.isChrootCard
@@ -121,6 +124,11 @@ fun HomeScreen(
     LaunchedEffect(desktopUi.phase, desktopUi.displayReady) {
         refreshKey.value++
     }
+
+    val stateRefresh by StateManager.refreshTrigger.collectAsState()
+    val session = remember(desktopUi, stateRefresh, refreshKey.value) {
+        DesktopSessionQuery.current(context, desktopUi)
+    }
     
     Column(
         modifier = Modifier
@@ -136,9 +144,44 @@ fun HomeScreen(
         // Installed Distros Detection — filesystem truth (plan P4-T13): a stale
         // "installed" pref without a rootfs on disk must show Install, not a broken shell.
         val installedDistros = remember(refreshKey.value) {
-            DistroRepository.supportedDistros.filter {
-                com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id)
-            }
+            DistroRepository.sortForDistroPage(
+                DistroRepository.supportedDistros.filter {
+                    com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id)
+                }
+            )
+        }
+
+        if (session != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            ActiveDesktopCard(
+                session = session,
+                onOpen = { DesktopLauncher.reopenDisplay(context) },
+                onStop = {
+                    val runningType = StateManager.getGuiRunningType(context, session.distroId)
+                    try {
+                        if (session.type == DesktopSession.Type.KDE || runningType == "kde") {
+                            if (StateManager.canRunCommands(context)) {
+                                val intent = TermuxIntentFactory.buildStopKdeGuiIntent(context, session.distroId)
+                                onStartService(intent)
+                                StateManager.setGuiRunning(context, session.distroId, false)
+                                StateManager.setGuiRunningType(context, session.distroId, "")
+                                android.widget.Toast.makeText(context, "Stopping KDE Plasma...", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                permissionState.launchPermissionRequest()
+                            }
+                        } else {
+                            DesktopLauncher.stop(context, session.distroId) {
+                                refreshKey.value++
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Stop failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onLogs = { showDesktopLogs = true },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -280,6 +323,12 @@ fun HomeScreen(
                             android.widget.Toast.makeText(
                                 context,
                                 "Grant superuser to FluxLinux first",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        } else if (session != null && session.distroId != distro.id) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Stop ${session.distroName} ${session.type} first",
                                 android.widget.Toast.LENGTH_SHORT
                             ).show()
                         } else {
@@ -457,36 +506,49 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(10.dp))
 
+                    val isCurrentSessionXfce = session != null && session.distroId == distro.id && session.type == DesktopSession.Type.XFCE4
                     LaunchModeAction(
                         icon = Icons.Filled.DesktopWindows,
-                        label = "Launch XFCE4",
-                        subtitle = "Graphical desktop",
+                        label = if (isCurrentSessionXfce) "Open XFCE4" else "Launch XFCE4",
+                        subtitle = if (isCurrentSessionXfce) "Running on :0" else "Graphical desktop",
                         containerColor = Color(0xFF6A1B9A),
                         contentColor = Color.White,
                         onClick = {
-                            try {
-                                DesktopLauncher.start(context, distro.id) { ok ->
-                                    refreshKey.value++
-                                    if (!ok) showDesktopLogs = true
-                                }
-                                showDesktopLogs = true
-                                distroToLaunch.value = null
-                            } catch (e: Exception) {
+                            if (session != null && session.distroId != distro.id) {
                                 android.widget.Toast.makeText(
                                     context,
-                                    "Launch failed: ${e.message}",
+                                    "Stop ${session.distroName} ${session.type} first",
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
+                            } else if (isCurrentSessionXfce) {
+                                DesktopLauncher.reopenDisplay(context)
+                                distroToLaunch.value = null
+                            } else {
+                                try {
+                                    DesktopLauncher.start(context, distro.id) { ok ->
+                                        refreshKey.value++
+                                        if (!ok) showDesktopLogs = true
+                                    }
+                                    showDesktopLogs = true
+                                    distroToLaunch.value = null
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Launch failed: ${e.message}",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         }
                     )
 
                     Spacer(Modifier.height(10.dp))
 
+                    val isCurrentSessionKde = session != null && session.distroId == distro.id && session.type == DesktopSession.Type.KDE
                     LaunchModeAction(
                         icon = Icons.Filled.Widgets,
-                        label = if (kdeInstalled) "Launch KDE Plasma" else "Launch KDE",
-                        subtitle = if (kdeInstalled) "GPU mode picker" else "Not installed",
+                        label = if (isCurrentSessionKde) "Open KDE Plasma" else if (kdeInstalled) "Launch KDE Plasma" else "Launch KDE",
+                        subtitle = if (isCurrentSessionKde) "Running on :0" else if (kdeInstalled) "GPU mode picker" else "Not installed",
                         containerColor = if (kdeInstalled) {
                             Color(0xFF283593)
                         } else {
@@ -499,7 +561,22 @@ fun HomeScreen(
                         },
                         enabled = true,
                         onClick = {
-                            if (kdeInstalled && StateManager.canRunCommands(context)) {
+                            if (session != null && session.distroId != distro.id) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Stop ${session.distroName} ${session.type} first",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } else if (isCurrentSessionKde) {
+                                DesktopLauncher.reopenDisplay(context)
+                                distroToLaunch.value = null
+                            } else if (session != null || DesktopLauncher.isSessionActive()) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Stop ${session?.distroName ?: "active desktop"} ${session?.type ?: ""} first",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } else if (kdeInstalled && StateManager.canRunCommands(context)) {
                                 showKdeGpuPicker.value = distro
                             } else if (!kdeInstalled) {
                                 android.widget.Toast.makeText(
@@ -591,43 +668,82 @@ fun HomeScreen(
             distro = distro,
             onDismiss = { showKdeGpuPicker.value = null },
             onSelectVirGL = {
-                val intent = TermuxIntentFactory.buildLaunchKdeGuiIntent(context, distro.id)
-                try {
-                    onStartService(intent)
-                    StateManager.setGuiRunning(context, distro.id, true)
-                    StateManager.setGuiRunningType(context, distro.id, "kde")
-                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
-                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                val curr = DesktopSessionQuery.current(context, DesktopLauncher.uiState.value)
+                if (curr != null || DesktopLauncher.isSessionActive()) {
+                    if (curr?.distroId == distro.id && curr.type == DesktopSession.Type.KDE) {
+                        DesktopLauncher.reopenDisplay(context)
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Stop ${curr?.distroName ?: "active desktop"} first",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    val intent = TermuxIntentFactory.buildLaunchKdeGuiIntent(context, distro.id)
+                    try {
+                        onStartService(intent)
+                        StateManager.setGuiRunning(context, distro.id, true)
+                        StateManager.setGuiRunningType(context, distro.id, "kde")
+                        DesktopLauncher.reopenDisplay(context)
+                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
                 showKdeGpuPicker.value = null
                 distroToLaunch.value = null
             },
             onSelectTurnip = {
-                val intent = TermuxIntentFactory.buildLaunchKdeGuiTurnipIntent(context, distro.id)
-                try {
-                    onStartService(intent)
-                    StateManager.setGuiRunning(context, distro.id, true)
-                    StateManager.setGuiRunningType(context, distro.id, "kde")
-                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
-                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                val curr = DesktopSessionQuery.current(context, DesktopLauncher.uiState.value)
+                if (curr != null || DesktopLauncher.isSessionActive()) {
+                    if (curr?.distroId == distro.id && curr.type == DesktopSession.Type.KDE) {
+                        DesktopLauncher.reopenDisplay(context)
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Stop ${curr?.distroName ?: "active desktop"} first",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    val intent = TermuxIntentFactory.buildLaunchKdeGuiTurnipIntent(context, distro.id)
+                    try {
+                        onStartService(intent)
+                        StateManager.setGuiRunning(context, distro.id, true)
+                        StateManager.setGuiRunningType(context, distro.id, "kde")
+                        DesktopLauncher.reopenDisplay(context)
+                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
                 showKdeGpuPicker.value = null
                 distroToLaunch.value = null
             },
             onSelectSoftware = {
-                val intent = TermuxIntentFactory.buildLaunchKdeGuiSoftwareIntent(context, distro.id)
-                try {
-                    onStartService(intent)
-                    StateManager.setGuiRunning(context, distro.id, true)
-                    StateManager.setGuiRunningType(context, distro.id, "kde")
-                    com.ivarna.fluxlinux.core.utils.EmbeddedX11.launchDisplay(context)
-                    com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                val curr = DesktopSessionQuery.current(context, DesktopLauncher.uiState.value)
+                if (curr != null || DesktopLauncher.isSessionActive()) {
+                    if (curr?.distroId == distro.id && curr.type == DesktopSession.Type.KDE) {
+                        DesktopLauncher.reopenDisplay(context)
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Stop ${curr?.distroName ?: "active desktop"} first",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    val intent = TermuxIntentFactory.buildLaunchKdeGuiSoftwareIntent(context, distro.id)
+                    try {
+                        onStartService(intent)
+                        StateManager.setGuiRunning(context, distro.id, true)
+                        StateManager.setGuiRunningType(context, distro.id, "kde")
+                        DesktopLauncher.reopenDisplay(context)
+                        com.ivarna.fluxlinux.core.utils.TermuxX11Preferences.applyToTermux(context)
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Launch failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
                 showKdeGpuPicker.value = null
                 distroToLaunch.value = null

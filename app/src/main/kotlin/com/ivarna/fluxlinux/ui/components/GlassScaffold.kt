@@ -22,6 +22,7 @@ import dev.chrisbanes.haze.haze
 @Composable
 fun GlassScaffold(
     hazeState: HazeState,
+    blurContent: Boolean = true,
     topBar: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit
@@ -41,7 +42,7 @@ fun GlassScaffold(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .haze(state = hazeState)
+                        .then(if (blurContent) Modifier.haze(state = hazeState) else Modifier)
                         .padding(top = paddingValues.calculateTopPadding()) // Only respect top padding from Scaffold
                 ) {
                     content()

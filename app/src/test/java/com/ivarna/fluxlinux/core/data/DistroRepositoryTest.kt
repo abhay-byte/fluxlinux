@@ -179,4 +179,21 @@ class DistroRepositoryTest {
         assertEquals(12, available.count { it.chrootSupported })
         assertTrue(available.none { it.prootSupported && it.chrootSupported })
     }
+
+    @Test
+    fun distroPageSort_isCaseInsensitiveAndComingSoonLast() {
+        val sorted = DistroRepository.sortForDistroPage(DistroRepository.supportedDistros)
+        val available = sorted.filter { !it.comingSoon }.map { it.name }
+        assertEquals("Alpine", available.first())
+        assertTrue(available.indexOf("openSUSE") < available.indexOf("Parrot"))
+        assertTrue(available.indexOf("openSUSE") < available.indexOf("Void"))
+        assertTrue(sorted.indexOfFirst { it.comingSoon } > sorted.indexOfLast { !it.comingSoon })
+        val prootSorted = DistroRepository.sortForDistroPage(
+            DistroRepository.supportedDistros.filter { it.prootSupported }
+        )
+        assertTrue(prootSorted.none { it.id == "adelie" })
+        assertTrue(prootSorted.any { it.id == "artix" && it.comingSoon })
+        assertTrue(prootSorted.any { it.id == "rocky" && it.comingSoon })
+    }
 }
+

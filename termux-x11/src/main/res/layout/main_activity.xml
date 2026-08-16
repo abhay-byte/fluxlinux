@@ -34,7 +34,7 @@
             android:layout_marginEnd="8dp"
             android:orientation="vertical"
             android:gravity="center_horizontal"
-            android:alpha="0.5"
+            android:alpha="0.92"
             android:elevation="4dp">
 
             <ImageButton
@@ -77,12 +77,11 @@
 
             <ImageView
                 android:id="@+id/x11_image"
-                android:layout_width="130dp"
-                android:layout_height="130dp"
+                android:layout_width="160dp"
+                android:layout_height="160dp"
                 android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_x11_icon"
-                android:contentDescription="X Logo"
-                tools:ignore="HardcodedText" />
+                app:srcCompat="@drawable/x11_idle_mascot"
+                android:contentDescription="@string/x11_idle_mascot_cd" />
 
             <Space
                 android:layout_width="match_parent"
@@ -97,51 +96,6 @@
                 android:text="@string/not_connected"
                 android:textColor="@color/nc_on_surface"
                 android:textSize="20sp"
-                android:fontFamily="monospace" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="40dp" />
-
-            <Button
-                android:id="@+id/preferences_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/preferences_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
-                android:background="@drawable/bg_nc_stub_btn"
-                android:fontFamily="monospace" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="10dp" />
-
-            <Button
-                android:id="@+id/help_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/help_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
-                android:background="@drawable/bg_nc_stub_btn"
-                android:fontFamily="monospace" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="10dp" />
-
-            <Button
-                android:id="@+id/exit_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/exit_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
-                android:background="@drawable/bg_nc_stub_btn"
                 android:fontFamily="monospace" />
         </LinearLayout>
 

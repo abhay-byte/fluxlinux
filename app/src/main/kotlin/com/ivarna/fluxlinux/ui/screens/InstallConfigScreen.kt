@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,12 +229,19 @@ fun InstallConfigScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+                        .border(1.dp, com.ivarna.fluxlinux.ui.theme.FluxHairline, RoundedCornerShape(16.dp))
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text("Includes", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Includes",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(Modifier.height(6.dp))
+                        val bulletColor = com.ivarna.fluxlinux.ui.theme.fluxMutedText()
                         Text(
                             when {
                                 distro.id.startsWith("alpine") ->
@@ -248,21 +256,21 @@ fun InstallConfigScreen(
                                     "• ${profile?.displayName ?: distro.name} rootfs"
                             },
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = bulletColor
                         )
-                        Text("• XFCE4 desktop", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("• XFCE4 desktop", fontSize = 13.sp, color = bulletColor)
                         if (distro.id.startsWith("fedora") || distro.id.startsWith("void") ||
                             distro.id.startsWith("opensuse")
                         ) {
                             Text(
                                 "• Mesa / VirGL hardware acceleration",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = bulletColor
                             )
                         }
-                        Text("• Flux theme / wallpapers / fonts", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("• Flux theme / wallpapers / fonts", fontSize = 13.sp, color = bulletColor)
                         if (distro.id.contains("chroot")) {
-                            Text("• Requires root (KernelSU / Magisk)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("• Requires root (KernelSU / Magisk)", fontSize = 13.sp, color = bulletColor)
                         }
                     }
                 }

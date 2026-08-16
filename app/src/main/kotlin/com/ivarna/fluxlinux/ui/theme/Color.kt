@@ -1,6 +1,9 @@
 package com.ivarna.fluxlinux.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 // Brand Colors
 val FluxCream = Color(0xFFFDFCF0) // Soft Cream Background/Surface
@@ -26,3 +29,23 @@ val GlassBorder = Color(0x4DFFFFFF)
 val TextWhite = Color(0xFFFFFFFF)
 val TextGrey = Color(0xFFDDDDDD)
 val Seed = Color(0xFF00E5FF)
+
+// Contrast-safe on #121212 / #1A1C1E
+val FluxBodyMuted = Color(0xFFC8C8C8)          // ~10:1 on #121212
+val FluxHairline = Color(0x33FFFFFF)
+val FluxCardFill = Color(0xE61A1C1E)           // 90% surface
+val FluxSwitchCheckedTrack = BrandCream        // #F5E6CA
+val FluxSwitchCheckedThumb = FluxDarkGrey
+val FluxSwitchUncheckedTrack = Color(0xFF3A3A3A)
+val FluxSwitchUncheckedThumb = Color(0xFFE8E8E8)
+val FluxSwitchUncheckedBorder = Color(0xFF6B6B6B)
+
+@Composable
+fun fluxMutedText(): Color {
+    return if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        FluxBodyMuted
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+

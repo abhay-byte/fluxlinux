@@ -1,6 +1,7 @@
 package com.ivarna.fluxlinux.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -27,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -44,7 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.utils.TermuxX11Preferences
+import com.ivarna.fluxlinux.ui.components.FluxSwitch
 import com.ivarna.fluxlinux.ui.components.GlassSettingCard
+import com.ivarna.fluxlinux.ui.theme.FluxCardFill
+import com.ivarna.fluxlinux.ui.theme.FluxHairline
+import com.ivarna.fluxlinux.ui.theme.FluxSwitchUncheckedTrack
+import com.ivarna.fluxlinux.ui.theme.fluxMutedText
 
 /**
  * Embedded X11 display prefs — writes Lorie keys and broadcasts live updates.
@@ -110,8 +117,8 @@ fun X11SettingsScreen(
         ) {
             Text(
                 "Changes apply to the embedded X11 display immediately (no external Termux:X11).",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                fontSize = 13.sp,
+                color = fluxMutedText()
             )
 
             GlassSettingCard {
@@ -128,11 +135,12 @@ fun X11SettingsScreen(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Display scale", fontWeight = FontWeight.Medium)
+                        Text("Display scale", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 15.sp)
                         Text(
                             "${displayScale.toInt()}%",
                             color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
                         )
                     }
                     Slider(
@@ -144,8 +152,9 @@ fun X11SettingsScreen(
                         valueRange = 30f..300f,
                         steps = 26,
                         colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
+                            thumbColor = MaterialTheme.colorScheme.secondary,
+                            activeTrackColor = MaterialTheme.colorScheme.secondary,
+                            inactiveTrackColor = FluxSwitchUncheckedTrack
                         )
                     )
 
@@ -249,14 +258,28 @@ fun X11SettingsScreen(
                     TermuxX11Preferences.openTermuxX11Preferences(context)
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = FluxCardFill,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
+                border = BorderStroke(1.dp, FluxHairline),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Icon(Icons.Default.OpenInNew, null, Modifier.size(18.dp))
+                Icon(
+                    Icons.Default.OpenInNew,
+                    null,
+                    Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
                 Spacer(Modifier.width(8.dp))
-                Text("Open full X11 preferences", fontWeight = FontWeight.Bold)
+                Text(
+                    "Open full X11 preferences",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
+
+            Spacer(Modifier.height(16.dp))
 
             Button(
                 onClick = {
@@ -264,11 +287,17 @@ fun X11SettingsScreen(
                     Toast.makeText(context, "Applied to embedded X11", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
                 ),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Text("Re-apply to running display", fontWeight = FontWeight.Bold)
+                Text(
+                    "Re-apply to running display",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondary
+                )
             }
 
             Spacer(Modifier.height(40.dp))
@@ -279,8 +308,8 @@ fun X11SettingsScreen(
 @Composable
 private fun PrefDivider() {
     HorizontalDivider(
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-        modifier = Modifier.padding(vertical = 12.dp)
+        color = FluxHairline,
+        modifier = Modifier.padding(vertical = 8.dp)
     )
 }
 
@@ -292,18 +321,21 @@ private fun PrefSwitch(
     onChange: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 15.sp)
             Text(
                 subtitle,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                fontSize = 12.sp
+                color = fluxMutedText(),
+                fontSize = 13.sp
             )
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        FluxSwitch(checked = checked, onCheckedChange = onChange)
     }
 }

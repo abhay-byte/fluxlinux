@@ -5,9 +5,18 @@ import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 import com.ivarna.fluxlinux.ui.theme.FluxAccentCyan
 import androidx.compose.ui.graphics.Color
 import com.ivarna.fluxlinux.R
+import java.util.Locale
 
 
 object DistroRepository {
+
+    fun sortForDistroPage(distros: List<Distro>): List<Distro> =
+        distros.sortedWith(
+            compareBy<Distro> { it.comingSoon }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+
     
     // Shared Components for Debian-based distros
     private val debianComponents = listOf(

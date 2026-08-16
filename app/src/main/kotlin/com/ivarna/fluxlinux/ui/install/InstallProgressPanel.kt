@@ -189,14 +189,22 @@ fun InstallThemePickRow(
     selected: Boolean,
     onSelect: () -> Unit
 ) {
+    val shape = RoundedCornerShape(14.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(shape)
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.10f)
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
+                }
+            )
             .border(
-                1.dp,
-                if (selected) FluxAccentMagenta else MaterialTheme.colorScheme.outlineVariant,
-                RoundedCornerShape(14.dp)
+                if (selected) 1.5.dp else 1.dp,
+                if (selected) FluxAccentMagenta else com.ivarna.fluxlinux.ui.theme.FluxHairline,
+                shape
             )
             .clickable(onClick = onSelect)
             .padding(12.dp),
@@ -205,7 +213,10 @@ fun InstallThemePickRow(
         RadioButton(
             selected = selected,
             onClick = onSelect,
-            colors = RadioButtonDefaults.colors(selectedColor = FluxAccentMagenta)
+            colors = RadioButtonDefaults.colors(
+                selectedColor = FluxAccentMagenta,
+                unselectedColor = Color(0xFF9A9A9A)
+            )
         )
         Column {
             Text(
@@ -216,7 +227,7 @@ fun InstallThemePickRow(
             Text(
                 desc,
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                color = com.ivarna.fluxlinux.ui.theme.fluxMutedText()
             )
         }
     }

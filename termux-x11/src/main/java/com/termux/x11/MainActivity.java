@@ -52,10 +52,13 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.math.MathUtils;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.viewpager.widget.ViewPager;
 
 import com.termux.x11.input.InputEventSender;
@@ -170,9 +173,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.main_activity);
 
         frm = findViewById(R.id.frame);
-        findViewById(R.id.preferences_button).setOnClickListener((l) -> startActivity(new Intent(this, LoriePreferences.class) {{ setAction(Intent.ACTION_MAIN); }}));
-        findViewById(R.id.help_button).setOnClickListener((l) -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/termux/termux-x11/blob/master/README.md#running-graphical-applications"))));
-        findViewById(R.id.exit_button).setOnClickListener((l) -> finish());
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                goToNativeCodeHome();
+            }
+        });
 
         LorieView lorieView = findViewById(R.id.lorieView);
         View lorieParent = (View) lorieView.getParent();
@@ -680,7 +686,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Right-edge Back+Keyboard cluster: vertical stack, 50% alpha, drag Y only as a group.
+     * Right-edge Back+Keyboard cluster: vertical stack, rounded dark pills, cream hairline, 0.92 alpha, drag Y only as a group.
      * Tap still fires each button click; horizontal position stays pinned to end.
      */
     @SuppressLint("ClickableViewAccessibility")
@@ -694,15 +700,13 @@ public class MainActivity extends AppCompatActivity {
         if (backBtn != null)
             backBtn.setOnClickListener(v -> goToNativeCodeHome());
         if (kbdBtn != null)
-            kbdBtn.setOnClickListener(v -> toggleKeyboardVisibility(this));
+            kbdBtn.setOnClickListener(v -> toggleChromeKeyboard());
 
         final int touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        final int tapTimeout = ViewConfiguration.getTapTimeout();
 
         View.OnTouchListener dragY = new View.OnTouchListener() {
             float downRawY;
             float startTranslationY;
-            long downTime;
             boolean dragging;
 
             @Override
@@ -711,7 +715,6 @@ public class MainActivity extends AppCompatActivity {
                     case MotionEvent.ACTION_DOWN:
                         downRawY = e.getRawY();
                         startTranslationY = cluster.getTranslationY();
-                        downTime = SystemClock.uptimeMillis();
                         dragging = false;
                         v.setPressed(true);
                         return true;
@@ -740,7 +743,7 @@ public class MainActivity extends AppCompatActivity {
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         v.setPressed(false);
-                        if (!dragging && SystemClock.uptimeMillis() - downTime <= tapTimeout)
+                        if (!dragging)
                             v.performClick();
                         dragging = false;
                         return true;
@@ -758,14 +761,40 @@ public class MainActivity extends AppCompatActivity {
         cluster.setOnTouchListener(dragY);
     }
 
+    /** Toggle soft keyboard specifically for the X11 chrome button on LorieView. */
+    public void toggleChromeKeyboard() {
+        if (inputMethodManager == null)
+            return;
+        LorieView lorieView = getLorieView();
+        if (lorieView == null)
+            return;
+
+        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(getWindow().getDecorView());
+        boolean isImeVisible = insets != null && insets.isVisible(WindowInsetsCompat.Type.ime());
+
+        if (isImeVisible) {
+            inputMethodManager.hideSoftInputFromWindow(lorieView.getWindowToken(), 0);
+        } else {
+            lorieView.requestFocus();
+            boolean shown = inputMethodManager.showSoftInput(lorieView, InputMethodManager.SHOW_FORCED);
+            if (!shown) {
+                inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+            }
+        }
+    }
+
     /** Return to FluxLinux host MainActivity; leave X session running. */
     public void goToNativeCodeHome() {
         try {
             Intent intent = new Intent(this, Class.forName(getPackageName() + ".MainActivity"));
-            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra("EXTRA_TARGET_PAGE", "home");
+            intent.putExtra("target_page", "home");
             startActivity(intent);
+            finish();
         } catch (Exception e) {
             Log.e("MainActivity", "Failed to launch FluxLinux MainActivity", e);
+            finish();
         }
     }
 
