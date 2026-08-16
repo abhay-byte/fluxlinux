@@ -9,7 +9,10 @@ import java.io.File
  * Minimal Context for [TerminalPreferences] JVM tests: in-memory
  * SharedPreferences (no Robolectric). Extends the builders' [FakeContext].
  */
-class FakePrefsContext : FakeContext(File("."), "/fake/jni") {
+class FakePrefsContext(
+    filesDir: File = File("."),
+    nativeLibDir: String = "/fake/jni"
+) : FakeContext(filesDir, nativeLibDir) {
 
     val prefs = InMemoryPrefs()
 

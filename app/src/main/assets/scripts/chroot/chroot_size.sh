@@ -17,6 +17,16 @@
 
 CHROOT_PATH="${1:-/data/local/tmp/chrootDebian13}"
 
+case "$CHROOT_PATH" in
+  ""|"/"|"/data"|"/data/"|"/data/local"|"/data/local/"|"/data/local/tmp"|"/data/local/tmp/")
+    printf '%s\n' "# chroot_size v1"
+    printf '%s\n' "# path=$CHROOT_PATH"
+    printf '%s\n' "# error=refused_path"
+    printf '%s\n' "SIZE_BYTES=-1"
+    exit 1
+    ;;
+esac
+
 printf '%s\n' "# chroot_size v1"
 printf '%s\n' "# path=$CHROOT_PATH"
 

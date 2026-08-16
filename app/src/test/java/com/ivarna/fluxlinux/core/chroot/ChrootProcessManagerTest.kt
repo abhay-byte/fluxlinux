@@ -40,4 +40,55 @@ class ChrootProcessManagerTest {
         assertEquals(99, r.remaining[0].pid)
         assertTrue(!r.verifiedClean)
     }
+
+    @Test
+    fun mergeRemaining_mergesAndDeduplicatesProductionKillResults() {
+        val res1 = ChrootProcessManager.KillResult(
+            killed = 2,
+            failed = 0,
+            remaining = listOf(
+                ChrootProcessManager.Proc(101, "bash", "/bin/bash"),
+                ChrootProcessManager.Proc(102, "sleep", "/bin/sleep 100")
+            ),
+            verifiedClean = false,
+            raw = "",
+            rootOk = true
+        )
+        val res2 = ChrootProcessManager.KillResult(
+            killed = 1,
+            failed = 0,
+            remaining = listOf(
+                ChrootProcessManager.Proc(102, "sleep", "/bin/sleep 100"), // duplicate PID across paths
+                ChrootProcessManager.Proc(103, "python", "/usr/bin/python")
+            ),
+            verifiedClean = false,
+            raw = "",
+            rootOk = true
+        )
+
+        val merged = ChrootProcessManager.mergeRemaining(listOf(res1, res2))
+
+        assertEquals(3, merged.size)
+        assertEquals(listOf(101, 102, 103), merged.map { it.pid })
+        assertEquals("bash", merged[0].comm)
+        assertEquals("sleep", merged[1].comm)
+        assertEquals("python", merged[2].comm)
+    }
+
+    @Test
+    fun mergeProcs_mergesAndDeduplicatesProductionProcLists() {
+        val list1 = listOf(
+            ChrootProcessManager.Proc(201, "zsh", "/bin/zsh"),
+            ChrootProcessManager.Proc(202, "tmux", "/usr/bin/tmux")
+        )
+        val list2 = listOf(
+            ChrootProcessManager.Proc(202, "tmux", "/usr/bin/tmux"),
+            ChrootProcessManager.Proc(203, "top", "/usr/bin/top")
+        )
+
+        val merged = ChrootProcessManager.mergeProcs(listOf(list1, list2))
+
+        assertEquals(3, merged.size)
+        assertEquals(listOf(201, 202, 203), merged.map { it.pid })
+    }
 }

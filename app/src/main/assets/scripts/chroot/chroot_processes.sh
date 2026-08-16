@@ -11,6 +11,16 @@
 CMD="${1:-list}"
 CHROOT_PATH="${2:-/data/local/tmp/chrootDebian13}"
 
+case "$CHROOT_PATH" in
+  ""|"/"|"/data"|"/data/"|"/data/local"|"/data/local/"|"/data/local/tmp"|"/data/local/tmp/")
+    printf '%s\n' "# chroot_processes v1"
+    printf '%s\n' "# path=$CHROOT_PATH"
+    printf '%s\n' "# error=refused_path"
+    printf '%s\n' "# count=0"
+    exit 1
+    ;;
+esac
+
 if [ "$(id -u)" != "0" ]; then
     printf '%s\n' "# chroot_processes v1"
     printf '%s\n' "# path=$CHROOT_PATH"
@@ -22,21 +32,17 @@ fi
 # Collect matching PIDs (space-separated). Skip PID 1 and self.
 collect_pids() {
     _pids=""
-    for pid_dir in /proc/[0-9]*; do
-        [ -d "$pid_dir" ] || continue
-        _pid=$(basename "$pid_dir")
-        [ "$_pid" = "1" ] && continue
-        [ "$_pid" = "$$" ] && continue
-        _root=$(readlink "$pid_dir/root" 2>/dev/null) || continue
-        if [ "$_root" = "$CHROOT_PATH" ]; then
-            if [ -z "$_pids" ]; then
-                _pids="$_pid"
-            else
-                _pids="$_pids $_pid"
-            fi
+    # Fast single-pass scan via ls -l /proc/[0-9]*/root (sub-100ms)
+    _fast_list=$(ls -l /proc/[0-9]*/root 2>/dev/null | while read -r _perm _links _owner _group _size _date _time _link _arrow _target; do
+        if [ "$_arrow" = "->" ] && [ "$_target" = "$CHROOT_PATH" ]; then
+            _p="${_link#/proc/}"
+            _p="${_p%/root}"
+            [ "$_p" = "1" ] && continue
+            [ "$_p" = "$$" ] && continue
+            printf '%s ' "$_p"
         fi
-    done
-    printf '%s' "$_pids"
+    done)
+    printf '%s' "${_fast_list% }"
 }
 
 emit_proc_line() {

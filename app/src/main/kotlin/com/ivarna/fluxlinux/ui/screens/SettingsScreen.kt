@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DisplaySettings
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -74,6 +75,7 @@ fun SettingsScreen(
     onNavigateToTerminalSettings: (() -> Unit)? = null,
     onNavigateToX11Settings: (() -> Unit)? = null,
     onNavigateToChrootSettings: (() -> Unit)? = null,
+    onNavigateToProotSettings: (() -> Unit)? = null,
     onThemeChanged: ((ThemeMode) -> Unit)? = null,
     currentTheme: ThemeMode = ThemeMode.SYSTEM
 ) {
@@ -150,8 +152,14 @@ fun SettingsScreen(
             SettingsNavCard(
                 icon = Icons.Default.Storage,
                 title = "Chroot",
-                subtitle = "Auto-detect, rootfs size, kill orphan processes",
+                subtitle = "Installed roots, size, kill orphan processes",
                 onClick = { onNavigateToChrootSettings?.invoke() }
+            )
+            SettingsNavCard(
+                icon = Icons.Default.Folder,
+                title = "PRoot",
+                subtitle = "Installed containers and app-storage size",
+                onClick = { onNavigateToProotSettings?.invoke() }
             )
 
             Text(

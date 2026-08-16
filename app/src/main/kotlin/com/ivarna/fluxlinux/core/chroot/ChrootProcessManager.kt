@@ -244,4 +244,32 @@ object ChrootProcessManager {
             error = error
         )
     }
+
+    /**
+     * Pure production helper: merges remaining processes across multiple kill results,
+     * deduplicating by PID and returning them sorted by PID.
+     */
+    fun mergeRemaining(results: List<KillResult>): List<Proc> {
+        val map = mutableMapOf<Int, Proc>()
+        for (res in results) {
+            for (proc in res.remaining) {
+                map[proc.pid] = proc
+            }
+        }
+        return map.values.sortedBy { it.pid }
+    }
+
+    /**
+     * Pure production helper: merges process lists across multiple paths,
+     * deduplicating by PID and returning them sorted by PID.
+     */
+    fun mergeProcs(procLists: List<List<Proc>>): List<Proc> {
+        val map = mutableMapOf<Int, Proc>()
+        for (list in procLists) {
+            for (proc in list) {
+                map[proc.pid] = proc
+            }
+        }
+        return map.values.sortedBy { it.pid }
+    }
 }

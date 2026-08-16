@@ -27,7 +27,7 @@ object SessionRegistry {
     const val MAX_TABS = 10
 
     data class ManagedSession(
-        val session: TerminalSession,
+        val session: TerminalSession? = null,
         val type: String,      // "shell" | "shell-root" | "host" | "install" | "component"
         val title: String,
         val method: String,    // "proot" | "chroot" | "host"
@@ -39,6 +39,14 @@ object SessionRegistry {
     )
 
     private val sessionsList = ArrayList<ManagedSession>()
+
+    internal fun addForTest(managed: ManagedSession) {
+        sessionsList.add(managed)
+    }
+
+    internal fun clearForTest() {
+        sessionsList.clear()
+    }
 
     private val _activeIndex = MutableStateFlow(-1)
     val activeIndex: StateFlow<Int> = _activeIndex
@@ -93,11 +101,13 @@ object SessionRegistry {
         _activeIndex.value = index
         attachedView?.let { view ->
             val session = sessionsList[index].session
-            try {
-                view.attachSession(session)
-                view.onScreenUpdated()
-            } catch (e: Exception) {
-                Log.w(TAG, "attachSession failed on switch: ${e.message}")
+            if (session != null) {
+                try {
+                    view.attachSession(session)
+                    view.onScreenUpdated()
+                } catch (e: Exception) {
+                    Log.w(TAG, "attachSession failed on switch: ${e.message}")
+                }
             }
             // T3: focus parity — TerminalView must take touch + IME focus, never stay blank.
             view.isFocusable = true
@@ -110,7 +120,7 @@ object SessionRegistry {
         if (index < 0 || index >= sessionsList.size) return
         val managed = sessionsList[index]
         try {
-            managed.session.finishIfRunning()
+            managed.session?.finishIfRunning()
         } catch (_: Exception) {
         }
         sessionsList.removeAt(index)
@@ -125,7 +135,7 @@ object SessionRegistry {
     fun closeAll(ctx: Context) {
         for (m in sessionsList) {
             try {
-                m.session.finishIfRunning()
+                m.session?.finishIfRunning()
             } catch (_: Exception) {
             }
         }
@@ -140,11 +150,14 @@ object SessionRegistry {
         attachedView = view
         val idx = _activeIndex.value
         if (idx in sessionsList.indices) {
-            try {
-                view.attachSession(sessionsList[idx].session)
-                view.onScreenUpdated()
-            } catch (e: Exception) {
-                Log.w(TAG, "attachSession failed on attach: ${e.message}")
+            val session = sessionsList[idx].session
+            if (session != null) {
+                try {
+                    view.attachSession(session)
+                    view.onScreenUpdated()
+                } catch (e: Exception) {
+                    Log.w(TAG, "attachSession failed on attach: ${e.message}")
+                }
             }
         }
         // T3: focus parity — TerminalView must take touch + IME focus, never stay blank.

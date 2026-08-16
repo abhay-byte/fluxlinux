@@ -56,6 +56,9 @@ enum class Screen {
     SETTINGS_TERMINAL,
     SETTINGS_X11,
     SETTINGS_CHROOT,
+    SETTINGS_CHROOT_DETAIL,
+    SETTINGS_PROOT,
+    SETTINGS_PROOT_DETAIL,
     TROUBLESHOOTING,
     ROOT_ACCESS,
     INSTALL_WIZARD,
@@ -493,9 +496,14 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler {
-                    if (currentScreen == Screen.SETTINGS_TERMINAL
+                    if (currentScreen == Screen.SETTINGS_CHROOT_DETAIL) {
+                        currentScreen = Screen.SETTINGS_CHROOT
+                    } else if (currentScreen == Screen.SETTINGS_PROOT_DETAIL) {
+                        currentScreen = Screen.SETTINGS_PROOT
+                    } else if (currentScreen == Screen.SETTINGS_TERMINAL
                         || currentScreen == Screen.SETTINGS_X11
                         || currentScreen == Screen.SETTINGS_CHROOT
+                        || currentScreen == Screen.SETTINGS_PROOT
                         || currentScreen == Screen.TROUBLESHOOTING
                         || currentScreen == Screen.ROOT_ACCESS) {
                         currentScreen = Screen.SETTINGS
@@ -518,6 +526,8 @@ class MainActivity : ComponentActivity() {
                 
                 // Selected Distro for Wizard/Settings
                 var selectedDistro by remember { mutableStateOf<com.ivarna.fluxlinux.core.data.Distro?>(null) }
+                // Selected target id for Chroot/PRoot storage detail
+                var storageTargetId by remember { mutableStateOf<String?>(null) }
                 
                 // Refresh key to force UI update on resume
                 // Collected from StateManager for remote triggers too
@@ -846,6 +856,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToChrootSettings = {
                                 currentScreen = Screen.SETTINGS_CHROOT
+                            },
+                            onNavigateToProotSettings = {
+                                currentScreen = Screen.SETTINGS_PROOT
                             }
                         )
                     }
@@ -860,20 +873,76 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     Screen.SETTINGS_CHROOT -> {
-                        com.ivarna.fluxlinux.ui.screens.ChrootSettingsScreen(
+                        com.ivarna.fluxlinux.ui.screens.ChrootStorageListScreen(
                             onBack = { currentScreen = Screen.SETTINGS },
-                            onNavigateToInstall = {
-                                // Route to distro install for rooted Debian
-                                selectedDistro = com.ivarna.fluxlinux.core.data.DistroRepository
-                                    .supportedDistros
-                                    .firstOrNull { it.id == "debian13_chroot" }
-                                currentScreen = if (selectedDistro != null) {
-                                    Screen.INSTALL_WIZARD
-                                } else {
-                                    Screen.HOME
-                                }
+                            onSelectDistro = { id ->
+                                storageTargetId = id
+                                currentScreen = Screen.SETTINGS_CHROOT_DETAIL
+                            },
+                            onNavigateToDistros = {
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.DISTROS
                             }
                         )
+                    }
+                    Screen.SETTINGS_CHROOT_DETAIL -> {
+                        val targetId = storageTargetId
+                        if (targetId == null) {
+                            LaunchedEffect(Unit) {
+                                currentScreen = Screen.SETTINGS_CHROOT
+                            }
+                        } else {
+                            com.ivarna.fluxlinux.ui.screens.ChrootStorageDetailScreen(
+                                distroId = targetId,
+                                onBack = { currentScreen = Screen.SETTINGS_CHROOT },
+                                onNavigateToInstall = {
+                                    selectedDistro = com.ivarna.fluxlinux.core.data.DistroRepository
+                                        .supportedDistros
+                                        .firstOrNull { it.id == targetId }
+                                    currentScreen = if (selectedDistro != null) {
+                                        Screen.INSTALL_WIZARD
+                                    } else {
+                                        Screen.SETTINGS_CHROOT
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    Screen.SETTINGS_PROOT -> {
+                        com.ivarna.fluxlinux.ui.screens.ProotStorageListScreen(
+                            onBack = { currentScreen = Screen.SETTINGS },
+                            onSelectDistro = { id ->
+                                storageTargetId = id
+                                currentScreen = Screen.SETTINGS_PROOT_DETAIL
+                            },
+                            onNavigateToDistros = {
+                                currentScreen = Screen.HOME
+                                currentTab = BottomTab.DISTROS
+                            }
+                        )
+                    }
+                    Screen.SETTINGS_PROOT_DETAIL -> {
+                        val targetId = storageTargetId
+                        if (targetId == null) {
+                            LaunchedEffect(Unit) {
+                                currentScreen = Screen.SETTINGS_PROOT
+                            }
+                        } else {
+                            com.ivarna.fluxlinux.ui.screens.ProotStorageDetailScreen(
+                                distroId = targetId,
+                                onBack = { currentScreen = Screen.SETTINGS_PROOT },
+                                onNavigateToInstall = {
+                                    selectedDistro = com.ivarna.fluxlinux.core.data.DistroRepository
+                                        .supportedDistros
+                                        .firstOrNull { it.id == targetId }
+                                    currentScreen = if (selectedDistro != null) {
+                                        Screen.INSTALL_WIZARD
+                                    } else {
+                                        Screen.SETTINGS_PROOT
+                                    }
+                                }
+                            )
+                        }
                     }
                     Screen.TROUBLESHOOTING -> {
                         com.ivarna.fluxlinux.ui.screens.TroubleshootingScreen(

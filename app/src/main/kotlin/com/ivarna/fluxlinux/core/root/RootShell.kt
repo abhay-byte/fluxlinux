@@ -99,6 +99,7 @@ object RootShell {
         return try {
             val args = buildSuArgs(inv, cmd)
             val pb = ProcessBuilder(args).redirectErrorStream(true).start()
+            try { pb.outputStream.close() } catch (_: Exception) {}
             processHolder?.set(pb)
             try {
                 if (onLine != null) {
@@ -573,6 +574,7 @@ object RootShell {
             val args = buildSuArgs(invocation, "id")
             Log.d(TAG, "trySuProbe: $args")
             val pb = ProcessBuilder(args).redirectErrorStream(true).start()
+            try { pb.outputStream.close() } catch (_: Exception) {}
             // Read first (small output) — avoids pipe deadlock; process exits on deny quickly.
             val outFuture = executor.submit<String> {
                 pb.inputStream.bufferedReader().use { it.readText() }
@@ -608,6 +610,7 @@ object RootShell {
             val pb = ProcessBuilder(args)
                 .redirectErrorStream(true)
                 .start()
+            try { pb.outputStream.close() } catch (_: Exception) {}
 
             val reader = BufferedReader(InputStreamReader(pb.inputStream))
             var line: String?
