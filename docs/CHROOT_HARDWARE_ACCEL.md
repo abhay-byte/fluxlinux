@@ -6,7 +6,7 @@ This document explains how VirGL (GPU acceleration) and PulseAudio work in chroo
 
 Chroot environments run as a separate Linux filesystem on Android, but they need special handling for:
 - **VirGL** - Uses the host GPU for OpenGL acceleration
-- **PulseAudio** - Routes audio through Termux
+- **PulseAudio** - Routes audio through the embedded FluxLinux host PREFIX (app uid)
 
 ## Architecture
 
@@ -14,9 +14,9 @@ Chroot environments run as a separate Linux filesystem on Android, but they need
 ┌────────────────────────────────────────────────────────────────┐
 │ Android                                                        │
 │  ┌─────────────────────────────────────────────────────────┐  │
-│  │ Termux (User Context)                                   │  │
+│  │ FluxLinux app uid (embedded PREFIX)                     │  │
 │  │  • VirGL server (virgl_test_server_android)             │  │
-│  │  • PulseAudio server (network mode)                     │  │
+│  │  • PulseAudio server (AAudio + TCP 127.0.0.1:4713)      │  │
 │  │  • Creates sockets in $PREFIX/tmp                       │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                          ▲ ▲                                   │
@@ -25,7 +25,7 @@ Chroot environments run as a separate Linux filesystem on Android, but they need
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │ Chroot (Debian 13)                                      │  │
 │  │  • /tmp → Termux tmp (VirGL socket at /tmp/.virgl_test) │  │
-│  │  • PULSE_SERVER=127.0.0.1 (TCP audio)                   │  │
+│  │  • PULSE_SERVER=tcp:127.0.0.1 (TCP audio)               │  │
 │  │  • gpu-launch wrapper sets GALLIUM_DRIVER=virpipe       │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
@@ -70,27 +70,31 @@ FLUX_GPU_DEBUG=1 gpu-launch glmark2
 
 ### How It Works
 
-1. **Server**: PulseAudio runs in Termux with TCP module enabled
-2. **Client**: Chroot apps connect via `PULSE_SERVER=127.0.0.1`
-3. **No socket needed**: Uses TCP loopback (127.0.0.1)
+1. **Server**: PulseAudio runs in the embedded PREFIX as the **app uid** (`start_pulse_host.sh`)
+2. **Client**: Guests connect via `PULSE_SERVER=tcp:127.0.0.1`
+3. **No unix socket for guests**: TCP loopback only (`listen=127.0.0.1`)
 
 ### Critical: UID/Permissions
 
-Like VirGL, PulseAudio **MUST** be started from Termux context:
-- Root can't access Termux's XDG_RUNTIME_DIR
-- FluxLinux starts PulseAudio alongside VirGL before chroot entry
+Like VirGL, PulseAudio **MUST** be started from the app uid (never root, never `--system`, never inside the guest):
+- Root can't use the app `XDG_RUNTIME_DIR`
+- A guest Pulse/PipeWire has no Android AAudio/SLES sink
+- FluxLinux starts Pulse via `prepareHost` / desktop start (`start_pulse_host.sh`) **before** `su`
 
-### Termux Server Command
+### Host Server Command
 
 ```bash
-pulseaudio --start \
-  --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
-  --exit-idle-time=-1
+# SSOT: $HOME/start_pulse_host.sh
+pulseaudio --start --exit-idle-time=-1 \
+  --dl-search-path="$PREFIX/lib/pulseaudio/modules"
+pactl load-module module-aaudio-sink
+pactl load-module module-native-protocol-tcp \
+  auth-ip-acl=127.0.0.1 auth-anonymous=1 listen=127.0.0.1
 ```
 
 ### Usage in Chroot
 
-Apps automatically use audio when `PULSE_SERVER=127.0.0.1` is set (done by launch script).
+Apps automatically use audio when `PULSE_SERVER=tcp:127.0.0.1` is set (builders, helper `env -i`, and GUI wrappers).
 
 ```bash
 # Test audio
@@ -124,9 +128,8 @@ pactl info
 pkill -9 -f virgl_test_server
 nohup setsid virgl_test_server_android >/dev/null 2>&1 &
 
-# Kill and restart PulseAudio  
-pkill -9 -f pulseaudio
-pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1
+# Restart host Pulse (app uid — never root)
+bash "$HOME/start_pulse_host.sh"
 ```
 
 ---

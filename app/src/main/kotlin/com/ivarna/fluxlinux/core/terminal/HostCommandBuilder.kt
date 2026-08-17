@@ -31,6 +31,8 @@ object HostCommandBuilder {
         env["PD_PROOT_BIN"] = TermuxHostPaths.libProot(ctx).absolutePath
         env["PROOT_LOADER"] = TermuxHostPaths.libLoader(ctx).absolutePath
         env["PROOT_LOADER_32"] = TermuxHostPaths.libLoader32(ctx).absolutePath
+        env["PD_PULSEAUDIO_BIN"] = TermuxHostPaths.libPulseaudio(ctx).absolutePath
+        env["PD_PACTL_BIN"] = TermuxHostPaths.libPactl(ctx).absolutePath
         env["LD_LIBRARY_PATH"] =
             "${TermuxHostPaths.LIB}:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
         env["PREFIX"] = TermuxHostPaths.PREFIX
@@ -47,6 +49,10 @@ object HostCommandBuilder {
         env["TERMUX__HOME"] = TermuxHostPaths.HOME
         env["SSL_CERT_FILE"] = TermuxHostPaths.SSL_CERT
         env["CURL_CA_BUNDLE"] = TermuxHostPaths.SSL_CERT
+        // Do not set PULSE_SERVER here: pulseaudio refuses to spawn a
+        // daemon when it is set. Native clients use the unix socket via
+        // PULSE_RUNTIME_PATH. Guests get tcp:127.0.0.1 from the builders.
+        env["PULSE_RUNTIME_PATH"] = "${TermuxHostPaths.HOME}/.pulse"
 
         val termuxExec = TermuxHostPaths.termuxExec(ctx)
         // On x86_64 hosts (NDK translation), the binfmt_misc runner is an x86_64

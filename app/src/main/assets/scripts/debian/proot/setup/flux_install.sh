@@ -453,8 +453,7 @@ elif [ -n "$DEFAULT_SETUP" ]; then
         "${HOME:-}/flux_guest_common.sh" \
         "${SCRIPT_DIR}/flux_guest_common.sh"
     do
-        if [ -f "$_common" ] && [ "$FAMILY_SCRIPT_NAME" != "setup_debian_family.sh" ] \
-            && [ "$FAMILY_SCRIPT_NAME" != "setup_alpine_family.sh" ]; then
+        if [ -f "$_common" ]; then
             cat "$_common" >> "$SETUP_HOST_PATH"
             echo "" >> "$SETUP_HOST_PATH"
             break

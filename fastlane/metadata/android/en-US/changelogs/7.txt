@@ -1,18 +1,12 @@
 KDE Plasma Desktop & Zsh Optimizations (v1.5)
 
 New:
-* KDE Plasma 6 desktop environment - full install via kde-standard metapackage
-* KDE launch/stop buttons on home screen (moved from settings)
-* Re-install/re-configure options for XFCE4 and KDE in settings
-* Correct Stop button - stops the right DE (XFCE4 or KDE) based on what is running
+* Full KDE Plasma 6 desktop environment
+* KDE launch and stop controls on home
+* Re-install/re-configure options in settings
 
-Fixes:
-* KDE window decorations now load correctly (disabled OpenGL compositing in kwinrc)
-* KDE customization script no longer fails on qt5-style-plugins
-* KDE stop script now uses correct Plasma 6 process names
-* PulseAudio properly integrated in KDE (TCP loopback, same as XFCE4)
-
-Performance:
-* Zsh startup 96% faster (removed zsh-autocomplete plugin)
-* Fastfetch + pokemon-colorscripts backgrounded on shell start
-* Disabled zsh update prompts and compfix checks
+Fixes & Performance:
+* KDE window decoration rendering fixed
+* PulseAudio audio integration in KDE
+* Zsh startup 96% faster with optimized shell plugins
+* Fastfetch & pokemon-colorscripts startup backgrounded

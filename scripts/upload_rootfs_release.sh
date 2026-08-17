@@ -166,6 +166,14 @@ for pin in "${PINS[@]}"; do
   fi
 done
 
+# Keep host-bootstrap pins already on the release (uploaded separately).
+remote_dir="$WORK_DIR/remote_sums"
+mkdir -p "$remote_dir"
+if gh release download "$RELEASE_TAG" --repo "$REPO" --pattern sha256sums.txt --dir "$remote_dir" --clobber 2>/dev/null \
+  && [ -f "$remote_dir/sha256sums.txt" ]; then
+  grep ' bootstrap_com\.' "$remote_dir/sha256sums.txt" >> "$sha256sums_path" || true
+fi
+
 echo "[UPLOAD] sha256sums.txt"
 gh_upload "$sha256sums_path" --clobber
 

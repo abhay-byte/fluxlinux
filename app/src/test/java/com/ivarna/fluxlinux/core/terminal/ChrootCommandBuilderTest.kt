@@ -148,6 +148,7 @@ class ChrootCommandBuilderTest {
         assertEquals("/system/bin:/system/xbin:/sbin:" + System.getenv("PATH").orEmpty(), env["PATH"])
         val fluxEnv = ChrootCommandBuilder.buildEnv(user = "flux")
         assertEquals("/home/flux", fluxEnv["HOME"])
+        assertEquals("tcp:127.0.0.1", fluxEnv["PULSE_SERVER"])
         assertEquals(ChrootPaths.CHROOT_PATH, fluxEnv["FLUX_CHROOT"])
     }
 

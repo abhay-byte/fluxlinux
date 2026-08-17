@@ -31,7 +31,7 @@ object BaseDesktopInstallPlan {
         if (method == "chroot") {
             listOf(
                 Phase("R0", "Checking root access…", 5),
-                Phase("HOST", "Preparing host environment…", 15),
+                Phase("HOST", "Preparing host (may download bootstrap from GitHub)…", 15),
                 Phase("DL", "Downloading $displayName rootfs…", 10),
                 Phase("ROOTFS", "Installing $displayName chroot rootfs…", 30),
                 Phase("XFCE", "Installing XFCE desktop…", 25),
@@ -39,7 +39,7 @@ object BaseDesktopInstallPlan {
             )
         } else {
             listOf(
-                Phase("HOST", "Preparing host environment…", 20),
+                Phase("HOST", "Preparing host (may download bootstrap from GitHub)…", 20),
                 Phase("DL", "Downloading $displayName rootfs…", 15),
                 Phase("ROOTFS", "Installing $displayName rootfs + XFCE…", 35),
                 Phase("CUSTOM", "Applying Flux customization…", 30),
@@ -54,13 +54,9 @@ object BaseDesktopInstallPlan {
             ?: DistroInstallProfile.require("debian")
         val sm = ScriptManager(ctx)
         val family = sm.getScriptContent(profile.familyScript)
-        val common = if (profile.familyScript.contains("debian") ||
-            profile.familyScript.contains("alpine")
-        ) {
-            ""
-        } else {
-            runCatching { sm.getScriptContent("common/setup/flux_guest_common.sh") }.getOrDefault("")
-        }
+        val common = runCatching {
+            sm.getScriptContent("common/setup/flux_guest_common.sh")
+        }.getOrDefault("")
         return buildString {
             append("export FLUX_THEME='").append(theme).append("'\n")
             append("export FLUX_DESKTOP_ENV='xfce'\n")

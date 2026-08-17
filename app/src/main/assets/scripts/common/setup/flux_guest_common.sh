@@ -2,7 +2,8 @@
 # flux_guest_common.sh — shared guest helpers (sourced by family / customization).
 # Safe to concatenate in front of a family payload. Idempotent functions.
 
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+# Guest bins only — never append host $PATH (PRoot repair used to see host pactl).
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # Host Termux libs (OpenSSL/LDAP) must not leak into glibc guests.
 unset LD_LIBRARY_PATH
 unset LD_PRELOAD
@@ -12,6 +13,20 @@ _flux_log() { echo "FluxLinux: $*"; }
 # Portable stat: GNU coreutils uses `-c %u`, BSD userland (Chimera) uses `-f %u`.
 _flux_stat_u() { stat -c %u "$1" 2>/dev/null || stat -f %u "$1" 2>/dev/null || true; }
 _flux_stat_g() { stat -c %g "$1" 2>/dev/null || stat -f %g "$1" 2>/dev/null || true; }
+
+# GNU sed -i '' edits a backup named ''; BSD sed -i requires a suffix (or '').
+_flux_sed_i() {
+    _expr=$1
+    _file=$2
+    [ -n "$_file" ] && [ -f "$_file" ] || return 1
+    _tmp="${_file}.fluxsed.$$"
+    if sed "$_expr" "$_file" > "$_tmp"; then
+        mv "$_tmp" "$_file"
+    else
+        rm -f "$_tmp"
+        return 1
+    fi
+}
 
 # Detect Chimera apk v3 (musl, /usr/lib/apk DB, no --no-cache).
 _flux_is_chimera() {
@@ -200,11 +215,14 @@ _flux_ensure_home() {
     chmod -R u+rwX /home/flux/.config /home/flux/.cache /home/flux/.local 2>/dev/null || true
     cat > /home/flux/.vnc/xstartup <<'EOF'
 #!/bin/sh
-export PULSE_SERVER=127.0.0.1
+export PULSE_SERVER=tcp:127.0.0.1
 [ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources"
 exec startxfce4
 EOF
     chmod +x /home/flux/.vnc/xstartup
+    if command -v _flux_write_pulse_client >/dev/null 2>&1; then
+        _flux_write_pulse_client
+    fi
 }
 
 _flux_write_gpu_mode() {
@@ -441,4 +459,146 @@ _flux_apt_prep() {
     mkdir -p /etc/apt/apt.conf.d
     printf 'APT::Sandbox::User "root";\nDPkg::Use-Pty "false";\n' \
         > /etc/apt/apt.conf.d/99flux-nosandbox
+}
+
+# Host Pulse in the app PREFIX. Guests are clients only (no guest daemon).
+_flux_write_pulse_client() {
+    mkdir -p /etc/profile.d
+    printf 'export PULSE_SERVER=tcp:127.0.0.1\n' > /etc/profile.d/flux-pulse.sh
+    chmod 644 /etc/profile.d/flux-pulse.sh 2>/dev/null || true
+    if [ -f /etc/environment ]; then
+        if grep -q '^PULSE_SERVER=' /etc/environment 2>/dev/null; then
+            _flux_sed_i 's|^PULSE_SERVER=.*|PULSE_SERVER=tcp:127.0.0.1|' /etc/environment
+        else
+            printf 'PULSE_SERVER=tcp:127.0.0.1\n' >> /etc/environment
+        fi
+    else
+        printf 'PULSE_SERVER=tcp:127.0.0.1\n' > /etc/environment
+    fi
+    mkdir -p /etc/pulse/client.conf.d 2>/dev/null || true
+    if [ -d /etc/pulse/client.conf.d ]; then
+        cat > /etc/pulse/client.conf.d/99-fluxlinux.conf <<'EOF'
+default-server = tcp:127.0.0.1
+autospawn = no
+EOF
+    fi
+    if [ -f /etc/pulse/client.conf ]; then
+        if grep -qE '^;?[[:space:]]*default-server' /etc/pulse/client.conf 2>/dev/null; then
+            _flux_sed_i 's/^;*[[:space:]]*default-server.*/default-server = tcp:127.0.0.1/' /etc/pulse/client.conf
+        else
+            printf '\ndefault-server = tcp:127.0.0.1\n' >> /etc/pulse/client.conf
+        fi
+        if grep -qE '^;?[[:space:]]*autospawn' /etc/pulse/client.conf 2>/dev/null; then
+            _flux_sed_i 's/^;*[[:space:]]*autospawn.*/autospawn = no/' /etc/pulse/client.conf
+        else
+            printf 'autospawn = no\n' >> /etc/pulse/client.conf
+        fi
+    fi
+    if [ -f /home/flux/.vnc/xstartup ]; then
+        _flux_sed_i 's|^export PULSE_SERVER=.*|export PULSE_SERVER=tcp:127.0.0.1|' /home/flux/.vnc/xstartup
+    fi
+}
+
+_flux_mask_pipewire_pulse() {
+    # Do not remove PipeWire — only stop pipewire-pulse stealing 4713 / the default.
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user mask --now pipewire-pulse.socket pipewire-pulse.service 2>/dev/null || true
+        systemctl mask pipewire-pulse.socket pipewire-pulse.service 2>/dev/null || true
+    fi
+    for _unit in pipewire-pulse.socket pipewire-pulse.service; do
+        for _dir in /etc/systemd/user /etc/systemd/system; do
+            mkdir -p "$_dir"
+            if [ ! -e "$_dir/$_unit" ]; then
+                ln -sf /dev/null "$_dir/$_unit" 2>/dev/null || true
+            fi
+        done
+    done
+}
+
+_flux_try_install() {
+    # Best-effort named packages. Never handle_error the family if a plugin is missing.
+    _flux_log "Installing Pulse client: $*"
+    if command -v apt-get >/dev/null 2>&1; then
+        _flux_apt_prep
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
+    elif command -v apk >/dev/null 2>&1; then
+        if _flux_is_chimera 2>/dev/null; then
+            apk add "$@"
+        else
+            apk add --no-cache "$@"
+        fi
+    elif command -v dnf5 >/dev/null 2>&1; then
+        dnf5 -y --setopt=install_weak_deps=False --setopt=tsflags=nodocs install "$@"
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf -y --setopt=install_weak_deps=False --setopt=tsflags=nodocs install "$@"
+    elif command -v zypper >/dev/null 2>&1; then
+        zypper --non-interactive install --no-recommends --auto-agree-with-licenses "$@"
+    elif command -v xbps-install >/dev/null 2>&1; then
+        xbps-install -y "$@"
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -S --noconfirm --needed "$@"
+    else
+        return 1
+    fi
+}
+
+# Host $PREFIX/bin/pactl must not count. Only a guest-tree binary.
+_flux_guest_pactl() {
+    for _p in /usr/bin/pactl /usr/sbin/pactl /bin/pactl; do
+        if [ -x "$_p" ]; then
+            echo "$_p"
+            return 0
+        fi
+    done
+    return 1
+}
+
+_flux_install_pulse_client() {
+    _have=$(_flux_guest_pactl || true)
+    if [ -n "$_have" ]; then
+        _flux_log "pulse client already present ($_have)"
+        if command -v dnf5 >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1 \
+            || command -v zypper >/dev/null 2>&1; then
+            _flux_mask_pipewire_pulse
+        fi
+        return 0
+    fi
+    if command -v apt-get >/dev/null 2>&1; then
+        _flux_try_install libpulse0 pulseaudio-utils xfce4-pulseaudio-plugin \
+            || _flux_try_install libpulse0 pulseaudio-utils || true
+    elif _flux_is_chimera 2>/dev/null; then
+        _flux_try_install libpulse libpulse-progs xfce4-pulseaudio-plugin \
+            || _flux_try_install libpulse libpulse-progs || true
+    elif command -v apk >/dev/null 2>&1; then
+        _flux_try_install libpulse pulseaudio-utils xfce4-pulseaudio \
+            || _flux_try_install libpulse pulseaudio-utils || true
+    elif command -v dnf5 >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+        _flux_try_install pulseaudio-libs pulseaudio-utils xfce4-pulseaudio-plugin \
+            || _flux_try_install pulseaudio-libs pulseaudio-utils || true
+        _flux_mask_pipewire_pulse
+    elif command -v zypper >/dev/null 2>&1; then
+        _flux_try_install libpulse0 pulseaudio-utils xfce4-pulseaudio-plugin \
+            || _flux_try_install libpulse0 pulseaudio-utils \
+            || _flux_try_install libpulse0 || true
+        _flux_mask_pipewire_pulse
+    elif command -v xbps-install >/dev/null 2>&1; then
+        # Never fall back to the `pulseaudio` server package.
+        _flux_try_install pulseaudio-utils xfce4-pulseaudio-plugin \
+            || _flux_try_install pulseaudio-utils \
+            || _flux_try_install libpulseaudio || true
+    elif command -v pacman >/dev/null 2>&1; then
+        _flux_try_install libpulse xfce4-pulseaudio-plugin \
+            || _flux_try_install libpulse || true
+    fi
+    _have=$(_flux_guest_pactl || true)
+    if [ -n "$_have" ]; then
+        _flux_log "pulse client ready ($_have)"
+    else
+        _flux_log "WARN pulse client (pactl) still missing"
+    fi
+}
+
+_flux_setup_pulse() {
+    _flux_write_pulse_client
+    _flux_install_pulse_client
 }

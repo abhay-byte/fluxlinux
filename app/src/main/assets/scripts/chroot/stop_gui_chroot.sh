@@ -1,5 +1,5 @@
 #!/data/data/com.ivarna.fluxlinux/files/usr/bin/bash
-# stop_gui_chroot.sh — app-uid: stop Pulse + root stop_*_gui.sh
+# stop_gui_chroot.sh — app-uid: stop X11/VirGL + root stop_*_gui.sh (Pulse stays up)
 # Arg1 / FLUX_CHROOT_DISTRO: debian13_chroot|alpine_chroot|fedora_chroot|void_chroot|opensuse_chroot|deepin_chroot|chimera_chroot|manjaro_chroot|ubuntu_chroot|kali_chroot|parrot_chroot|archlinux_chroot.
 # Does NOT pkill proot.
 
@@ -90,10 +90,8 @@ else
     FLUX_BB='${FLUX_BB:-}' FLUX_RESOLVE_BB='$RESOLVER_TMP' sh '$ROOT_STOP_TMP'"
 fi
 
-echo "Stopping PulseAudio + VirGL (app uid)..."
+echo "Stopping VirGL (app uid; Pulse stays running)..."
 pkill -f "virgl_test_server" 2>/dev/null || true
-pulseaudio --kill 2>/dev/null || true
-pkill -f pulseaudio 2>/dev/null || true
 
 pkill -9 -f "termux-x11" 2>/dev/null || true
 pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true

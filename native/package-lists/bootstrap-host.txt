@@ -1,7 +1,8 @@
 # Full host bootstrap packages for FluxLinux native terminal (termux-lib parity).
 # One package name per line. Comments and blank lines ignored.
 # For *building*: prefer termux-lib-ssot seeds; note subpackages are produced by parents:
-#   curl <- libcurl, xz-utils <- liblzma, flac <- libflac, libltdl <- libtool
+#   curl <- libcurl, xz-utils <- liblzma, libltdl <- libtool
+#   flac is the CLI; libflac is the shared library Pulse/libsndfile actually need.
 # Assemble with: --list termux-lib-ssot.txt (exact termux-lib PACKAGES names)
 
 # Shell & core
@@ -50,6 +51,10 @@ libsndfile
 libvorbis
 libogg
 flac
+libflac
+libsoxr
+libandroid-execinfo
+libmp3lame
 libopus
 speexdsp
 dbus

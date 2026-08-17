@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# fluxlinux-chroot v2.8
+# fluxlinux-chroot v2.9
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
@@ -17,7 +17,7 @@
 #   FLUX_CHROOT  FLUX_PACKAGE  FLUX_HOST_TMP  FLUX_PREFIX  FLUX_BB  FLUX_SHELL
 set -u
 
-VERSION_STR="fluxlinux-chroot v2.8"
+VERSION_STR="fluxlinux-chroot v2.9"
 # Prefer caller-pinned env (RootShell / start_gui). Fallbacks cover both store flavors.
 if [ -z "${FLUX_PACKAGE:-}" ]; then
   if [ -d /data/data/com.zenithblue.fluxlinux/files/usr ]; then
@@ -296,9 +296,9 @@ build_guest_env_args() {
   # Forcing en_US.UTF-8 here prints setlocale warnings on Manjaro ARM.
   _lang="${LANG:-C}"
   if [ "$USER_NAME" = "root" ]; then
-    GUEST_ENV_ARGS="PATH=$_gp HOME=/root USER=root LOGNAME=root TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
+    GUEST_ENV_ARGS="PATH=$_gp HOME=/root USER=root LOGNAME=root TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PULSE_SERVER=tcp:127.0.0.1 DEBIAN_FRONTEND=noninteractive"
   else
-    GUEST_ENV_ARGS="PATH=$_gp HOME=/home/flux USER=flux LOGNAME=flux NVM_DIR=/home/flux/.nvm TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp DEBIAN_FRONTEND=noninteractive"
+    GUEST_ENV_ARGS="PATH=$_gp HOME=/home/flux USER=flux LOGNAME=flux NVM_DIR=/home/flux/.nvm TERM=$_term LANG=$_lang TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PULSE_SERVER=tcp:127.0.0.1 DEBIAN_FRONTEND=noninteractive"
   fi
 }
 

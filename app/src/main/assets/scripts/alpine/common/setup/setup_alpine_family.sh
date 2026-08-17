@@ -93,6 +93,9 @@ apk add --no-cache \
         echo "FluxLinux: XFCE package install failed"
         exit 1
     }
+# Named Pulse *client* only — do not pull the xfce4 metapackage for audio.
+apk add --no-cache libpulse pulseaudio-utils xfce4-pulseaudio 2>/dev/null \
+    || apk add --no-cache libpulse pulseaudio-utils 2>/dev/null || true
 
 if [ ! -e /usr/bin/startxfce4 ]; then
     echo "FluxLinux: ERROR: startxfce4 missing after apk install"
@@ -161,11 +164,31 @@ if id flux >/dev/null 2>&1; then
     mkdir -p /home/flux/.vnc
     cat > /home/flux/.vnc/xstartup <<'EOF'
 #!/bin/sh
-export PULSE_SERVER=127.0.0.1
+export PULSE_SERVER=tcp:127.0.0.1
 [ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources"
 exec startxfce4
 EOF
     chmod +x /home/flux/.vnc/xstartup
+fi
+if command -v _flux_write_pulse_client >/dev/null 2>&1; then
+    _flux_write_pulse_client
+else
+    mkdir -p /etc/profile.d /etc/pulse/client.conf.d
+    printf 'export PULSE_SERVER=tcp:127.0.0.1\n' > /etc/profile.d/flux-pulse.sh
+    chmod 644 /etc/profile.d/flux-pulse.sh 2>/dev/null || true
+    if [ -f /etc/environment ]; then
+        if grep -q '^PULSE_SERVER=' /etc/environment 2>/dev/null; then
+            sed -i 's|^PULSE_SERVER=.*|PULSE_SERVER=tcp:127.0.0.1|' /etc/environment
+        else
+            printf 'PULSE_SERVER=tcp:127.0.0.1\n' >> /etc/environment
+        fi
+    else
+        printf 'PULSE_SERVER=tcp:127.0.0.1\n' > /etc/environment
+    fi
+    cat > /etc/pulse/client.conf.d/99-fluxlinux.conf <<'EOF'
+default-server = tcp:127.0.0.1
+autospawn = no
+EOF
 fi
 
 # Ensure home ownership / writability.

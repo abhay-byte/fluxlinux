@@ -23,7 +23,8 @@ object ProotCommandBuilder {
         // Guest flux-locale.sh / .zshrc select a locale that exists.
         return "env -i HOME=$home USER=$u LOGNAME=$u " +
             "TERM=\"\${TERM:-xterm-256color}\" LANG=C " +
-            "TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PATH=$GUEST_PATH"
+            "TMPDIR=/tmp XDG_RUNTIME_DIR=/tmp PATH=$GUEST_PATH " +
+            "PULSE_SERVER=tcp:127.0.0.1"
     }
 
     /** zsh-first cascade (default pref). */

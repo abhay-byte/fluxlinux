@@ -176,12 +176,15 @@ class UkpaHostDispatchContractTest {
             "--needed glibc is a no-op on ALARM and does not restore i18n",
             arch.contains("pacman -S --noconfirm --needed glibc")
         )
-        assertTrue(arch.contains("pacman -S --noconfirm glibc"))
+        assertTrue(arch.contains("_flux_ensure_en_us_locale || exit 1"))
+        val common = repoFile(
+            "src/main/assets/scripts/common/setup/flux_guest_common.sh"
+        ).readText()
+        assertTrue(common.contains("pacman -S --noconfirm glibc"))
         assertTrue(
             "family must fail closed when locale -a has no UTF-8 name",
-            arch.contains("locale -a has neither en_US.utf8 nor C.utf8")
+            common.contains("locale -a has neither en_US.utf8 nor C.utf8")
         )
-        assertTrue(arch.contains("_flux_ensure_en_us_locale || exit 1"))
     }
 
     @Test

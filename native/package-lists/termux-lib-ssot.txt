@@ -41,6 +41,10 @@ libsndfile
 libvorbis
 libogg
 flac
+libflac
+libsoxr
+libandroid-execinfo
+libmp3lame
 libopus
 speexdsp
 dbus

@@ -7,10 +7,6 @@ PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
 _HOST_ENV="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}/etc/fluxlinux-host.env"
 [ -r "$_HOST_ENV" ] && . "$_HOST_ENV"
 
-# Detect how we're running
-IS_ROOT=false
-if [ "$(id -u)" = "0" ]; then IS_ROOT=true; fi
-
 # Termux paths (from SSOT env, with safe fallbacks)
 PKG="${TERMUX_APP__PACKAGE_NAME:-$PKG}"
 TERMUX_PREFIX="${TERMUX__PREFIX:-/data/data/$PKG/files/usr}"
@@ -35,8 +31,8 @@ mkdir -p "$PULSE_RUNTIME_PATH" 2>/dev/null
 
 # Kill stale host graphics services only — NEVER am force-stop own package
 # (that would kill FluxLinux itself if the package name matches).
+# Pulse is a host service: do not pkill it here (CLI audio stays up).
 pkill -f "virgl_test_server" 2>/dev/null || true
-pkill -f pulseaudio 2>/dev/null || true
 pkill -f termux-x11 2>/dev/null || true
 pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 2
@@ -59,18 +55,11 @@ if [ -n "$_ctx" ] && command -v chcon >/dev/null 2>&1; then
   chcon -R "$_ctx" "$TMPDIR" 2>/dev/null || chcon "$_ctx" "$TMPDIR" 2>/dev/null || true
 fi
 
-# Start PulseAudio over TCP
-if $IS_ROOT; then
-  pulseaudio --system --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-    --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
-    --exit-idle-time=-1 2>/dev/null || \
-  pulseaudio --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-    --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
-    --exit-idle-time=-1 2>/dev/null
-else
-  pulseaudio --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-    --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
-    --exit-idle-time=-1 2>/dev/null
+# Host Pulse (app uid). Supervisor logs FluxLinux: [AUDIO] … and never blocks XFCE.
+if [ -x "$TERMUX_HOME/start_pulse_host.sh" ]; then
+  bash "$TERMUX_HOME/start_pulse_host.sh" || true
+elif command -v start_pulse_host.sh >/dev/null 2>&1; then
+  start_pulse_host.sh || true
 fi
 
 # VirGL is optional. Custom package builds currently omit it; XFCE runs
@@ -178,7 +167,7 @@ echo "FluxLinux: Guest GPU mode=$GPU_MODE"
 # Launch XFCE in proot — propagate guest exit code (never force exit 0)
 GUEST_RC=0
 if [ "$DISTRO" = "termux" ]; then
-  export PULSE_SERVER=127.0.0.1
+  export PULSE_SERVER=tcp:127.0.0.1
   env DISPLAY=:0 startxfce4
   GUEST_RC=$?
 else

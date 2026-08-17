@@ -62,6 +62,10 @@ DEFAULT_PACKAGES = [
     "libvorbis",
     "libogg",
     "flac",
+    "libflac",
+    "libsoxr",
+    "libandroid-execinfo",
+    "libmp3lame",
     "libopus",
     "speexdsp",
     "dbus",
@@ -176,6 +180,12 @@ def verify_bootstrap(
         required.extend(
             [
                 "usr/bin/pulseaudio",
+                "usr/lib/libsoxr.so",
+                "usr/lib/libandroid-execinfo.so",
+                "usr/lib/libFLAC.so",
+                "usr/lib/libmp3lame.so",
+                "usr/lib/pulseaudio/modules/module-aaudio-sink.so",
+                "usr/lib/pulseaudio/modules/module-sles-sink.so",
                 "usr/lib/pulseaudio/modules/module-native-protocol-tcp.so",
             ]
         )
@@ -225,6 +235,9 @@ def copy_to_jni_libs(extract_dir: Path, target_prefix: str, jni_dir: Path) -> No
         "usr/bin/bash": "libbash.so",
         "usr/libexec/proot/loader": "libloader.so",
         "usr/libexec/proot/loader32": "libloader32.so",
+        # W^X: app uid cannot exec $PREFIX/bin/pulseaudio (EACCES).
+        "usr/bin/pulseaudio": "libpulseaudio.so",
+        "usr/bin/pactl": "libpactl.so",
     }
     print(f"[*] Copying critical binaries to {jni_dir}...")
     base = extract_dir / target_prefix

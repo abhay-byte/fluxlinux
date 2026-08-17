@@ -7,6 +7,14 @@ import org.junit.Test
 class ProotCommandBuilderTest {
 
     @Test
+    fun guestLoginEnv_setsPulseTcpLocalhost() {
+        val env = ProotCommandBuilder.guestLoginEnv("flux")
+        assertTrue(env.contains("PULSE_SERVER=tcp:127.0.0.1"))
+        assertTrue(env.startsWith("env -i "))
+        assertTrue(!env.contains("LD_LIBRARY_PATH"))
+    }
+
+    @Test
     fun login_defaults_to_debian() {
         val args = ProotCommandBuilder.buildArgs(
             shell = "/bin/bash",
@@ -34,6 +42,7 @@ class ProotCommandBuilderTest {
         assertTrue(!joined.contains("login debian"))
         assertTrue(joined.contains("env -i"))
         assertTrue(joined.contains("TMPDIR=/tmp"))
+        assertTrue(joined.contains("PULSE_SERVER=tcp:127.0.0.1"))
         assertTrue(joined.contains("LANG=C"))
         assertTrue(!joined.contains("LC_ALL=en_US.UTF-8"))
         assertTrue(!joined.contains("LANG=en_US.UTF-8"))

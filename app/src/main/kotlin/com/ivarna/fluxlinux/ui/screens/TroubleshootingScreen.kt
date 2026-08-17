@@ -38,7 +38,7 @@ fun TroubleshootingScreen(
     val issues = listOf(
         TroubleshootingItem("Termux Connection Failed", "Run the fix command from the Home screen connection panel. Ensure 'Allow External Apps' is true in ~/.termux/termux.properties."),
         TroubleshootingItem("GUI Not Starting", "Check if Termux:X11 is installed. Ensure you selected the correct display ID (usually 0). Try 'export DISPLAY=:0' in Termux."),
-        TroubleshootingItem("Audio Issues", "Audio forwarding requires Pulseaudio. Install it in Termux: 'pkg install pulseaudio' and start it with 'pulseaudio --start'."),
+        TroubleshootingItem("Audio Issues", "Settings → Audio shows whether host Pulse is running, can start or restart it, and has supervisor logs. Guests use PULSE_SERVER=tcp:127.0.0.1. Do not install a Pulse server inside the guest."),
         TroubleshootingItem("Performance is Low", "Enable hardware acceleration in Settings if supported. Ensure you are not running heavy generic kernels without GPU drivers."),
         TroubleshootingItem("Touch Input Offset", "Check screen resolution settings in Termux:X11 preferences. Matches device resolution?")
     )

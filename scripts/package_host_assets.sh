@@ -51,11 +51,22 @@ stage_app_id() {
   local flavor_assets="$APP_SRC/$flavor/assets"
   local flavor_jni="$APP_SRC/$flavor/jniLibs"
 
-  # 1. Verify inputs
+  # 1. Verify inputs. Ivarna does not package bootstrap.tar (GitHub `rootfs`
+  #    download at first host setup). Zenithblue still ships it in the APK.
   local missing=0
-  for f in "$src/bootstrap.tar" "$src/jniLibs/arm64-v8a/libbash.so" \
+  local require_bootstrap=1
+  if [ "$flavor" = "ivarna" ]; then
+    require_bootstrap=0
+  fi
+  local required=("$src/jniLibs/arm64-v8a/libbash.so" \
            "$src/jniLibs/arm64-v8a/libproot.so" "$src/jniLibs/arm64-v8a/libloader.so" \
-           "$src/jniLibs/arm64-v8a/libloader32.so"; do
+           "$src/jniLibs/arm64-v8a/libloader32.so" \
+           "$src/jniLibs/arm64-v8a/libpulseaudio.so" \
+           "$src/jniLibs/arm64-v8a/libpactl.so")
+  if [ "$require_bootstrap" -eq 1 ]; then
+    required+=("$src/bootstrap.tar")
+  fi
+  for f in "${required[@]}"; do
     if [ ! -f "$f" ]; then
       echo "ERROR: missing $f — run assemble_bootstrap.py --package-name $app_id first" >&2
       missing=1
@@ -65,16 +76,34 @@ stage_app_id() {
 
   # 2-3. Stage assets + jniLibs (flavor source set)
   mkdir -p "$flavor_assets" "$flavor_jni/arm64-v8a"
-  cp -f "$src/bootstrap.tar" "$flavor_assets/bootstrap.tar"
+  if [ "$require_bootstrap" -eq 1 ]; then
+    cp -f "$src/bootstrap.tar" "$flavor_assets/bootstrap.tar"
+  else
+    # Leftover staged tarball would still be packaged — delete it.
+    rm -f "$flavor_assets/bootstrap.tar"
+  fi
   cp -f "$src/jniLibs/arm64-v8a/"*.so "$flavor_jni/arm64-v8a/"
 
-  # 4. Report
-  local bootstrap_sha bootstrap_size
-  bootstrap_sha="$(sha256_of "$flavor_assets/bootstrap.tar")"
-  bootstrap_size="$(du -h "$flavor_assets/bootstrap.tar" | awk '{print $1}')"
+  # Pulse runtime overlay for already-extracted PREFIX (no EXTRACT_VERSION bump).
+  mkdir -p "$flavor_assets/pulse-runtime"
+  local lib_root="$src/root/data/data/$app_id/files/usr/lib"
+  local so
+  for so in libsoxr.so libsoxr-lsr.so libandroid-execinfo.so libFLAC.so libmp3lame.so; do
+    if [ -e "$lib_root/$so" ]; then
+      cp -fL "$lib_root/$so" "$flavor_assets/pulse-runtime/$so"
+    fi
+  done
 
+  # 4. Report
   echo "=== packaged host assets for $app_id (flavor: $flavor) ==="
-  echo "  app/src/$flavor/assets/bootstrap.tar  $bootstrap_size  sha256=$bootstrap_sha"
+  if [ -f "$flavor_assets/bootstrap.tar" ]; then
+    local bootstrap_sha bootstrap_size
+    bootstrap_sha="$(sha256_of "$flavor_assets/bootstrap.tar")"
+    bootstrap_size="$(du -h "$flavor_assets/bootstrap.tar" | awk '{print $1}')"
+    echo "  app/src/$flavor/assets/bootstrap.tar  $bootstrap_size  sha256=$bootstrap_sha"
+  else
+    echo "  app/src/$flavor/assets/bootstrap.tar  NOT packaged — download from GitHub tag 'rootfs'"
+  fi
   echo "  app/src/$flavor/jniLibs/arm64-v8a/    $(ls "$flavor_jni/arm64-v8a" | tr '\n' ' ')"
   echo "  rootfs: NOT packaged — downloaded at install time from GitHub release tag 'rootfs'"
 }

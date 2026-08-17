@@ -49,9 +49,8 @@ pkill -9 -f "termux-x11" 2>/dev/null || true
 pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 killall -9 Xwayland 2>/dev/null || true
 
-# Step 4: Stop PulseAudio + VirGL
-echo "[4/4] Stopping PulseAudio + VirGL..."
-pulseaudio --kill 2>/dev/null || true
+# Step 4: Stop VirGL only. Host Pulse stays up so CLI / next desktop has audio.
+echo "[4/4] Stopping VirGL (Pulse stays running)..."
 pkill -f "virgl_test_server" 2>/dev/null || true
 
 echo ""

@@ -14,7 +14,9 @@ import java.util.concurrent.Executors
  * session opens: extract bootstrap → deploy scripts/loader → setup_termux
  * validation (host gate). Rootfs archives are NOT part of host readiness —
  * the selected distro's rootfs is downloaded at install time
- * (RootfsDownloader). All heavy work runs on a background executor; [onDone]
+ * (RootfsDownloader). Ivarna also downloads the host bootstrap tarball from
+ * the same GitHub `rootfs` tag when it is not packaged in the APK.
+ * All heavy work runs on a background executor; [onDone]
  * is dispatched on the main thread.
  *
  * Fail-closed: false unless extract AND scripts/loader deploy AND setup_termux succeed.
@@ -182,6 +184,8 @@ object TerminalLauncher {
         if (!HostScriptDeployer.deployScripts(ctx)) {
             return false
         }
+        // Host Pulse is independent of XFCE. Cheap if already running.
+        PulseHost.ensureStarted(ctx)
         if (!forceHostSetup && isHostSetupDone(ctx)) return true
 
         val marker = TermuxHostPaths.setupTermuxMarker(ctx)

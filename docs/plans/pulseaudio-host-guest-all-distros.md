@@ -4,7 +4,7 @@
 | --- | --- |
 | **Author** | FluxLinux |
 | **Date** | 2026-08-16 |
-| **Status** | **PLAN (do not implement in this session)** |
+| **Status** | **COMPLETE** — see [results/pulseaudio-device-report.md](results/pulseaudio-device-report.md) |
 | **Repo** | `/home/abhaybyte/repos/fluxlinux` |
 | **Audience** | Implementers of host bootstrap + desktop launch + guest family scripts |
 | **Flavor / package** | Ivarna (`com.ivarna.fluxlinux`) first; zenithblue bootstrap must get the same package-list / overlay fix |
@@ -33,6 +33,7 @@ Audio works the same way on **every** installed distro, **PRoot and chroot**, fr
 7. A short tone (`module-sine` or `paplay`) is audible from native and from at least one PRoot + one chroot guest.
 8. Stop-desktop does **not** tear down the host Pulse daemon (CLI audio stays up). Host Pulse is independent of XFCE.
 9. Existing PRoot containers and all 12 chroots survive the host-side fix (no bootstrap wipe).
+10. Settings → **Audio** shows host Pulse running/stopped, Start or Restart, and supervisor logs (does not start Pulse as root or inside a guest).
 
 ---
 
@@ -364,6 +365,7 @@ Write a short `docs/plans/results/pulseaudio-device-report.md` with log pointers
 | Chroot helper | `fluxlinux_chroot.sh` `build_guest_env_args` |
 | Guest | `flux_guest_common.sh` + family tails (or one prepended `setup_pulse_guest.sh`) |
 | Docs | this plan, `docs/CHROOT_HARDWARE_ACCEL.md` (Termux → embedded PREFIX), `TroubleshootingScreen.kt` copy (“install pulseaudio in Termux” is stale) |
+| In-app Audio UI | `PulseHost.kt` (query/start/restart + `cacheDir/pulse_host.log`), `AudioSettingsScreen.kt`, `SettingsScreen.kt` nav card after X11, `MainActivity.kt` `SETTINGS_AUDIO` |
 | Tests | `ProotCommandBuilder` env contains `PULSE_SERVER=tcp:127.0.0.1`; helper env builder; `verify_bootstrap` fixture if one exists |
 
 `HostScriptDeployer` must list the new host script or GUI/native will keep the old silent start.
@@ -425,3 +427,24 @@ The plan is implementable and does not require changing X11, VirGL, rootfs downl
 ## 10. Suggested first implementer commit
 
 H1 + H3 + a failing-then-passing `verify_bootstrap.sh` run on the current tarball (it must **FAIL** today on the four `.so` files). That locks the diagnosis before any launch-script edits.
+
+---
+
+## 11. In-app Audio settings (follow-up)
+
+Settings hub card **Audio** (after X11 Display) opens `AudioSettingsScreen`:
+
+- Status from `pulseaudio --check` + `pactl info` (probe does **not** start the daemon).
+- **Start** when stopped; **Restart** when running (`pulseaudio --kill` then `start_pulse_host.sh` — only this button kills Pulse).
+- **View logs** / **Copy** of `cacheDir/pulse_host.log` (supervisor + status lines).
+- Desktop stop still does **not** kill Pulse.
+- `start_pulse_host.sh` execs `$PREFIX/bin/pulseaudio` under `/system/bin/env -i` (no `LD_PRELOAD`). App-uid `libbash` + termux-exec otherwise breaks `pulseaudio --start` (`/proc/self/exe` mismatch).
+- TCP gate: `tcp_ok` passes `PULSE_SERVER=tcp:127.0.0.1` **inside** `env -i`; after `load-module` the supervisor re-checks `/proc/net/tcp` (`tcp_bound_localhost_only`) and `tcp_ok` before printing success. `/proc/net/tcp` must be **this app uid** (reinstall assigns a new uid; a leftover Pulse on `:4713` is not ours).
+- `ensureStarted` retries on `[AUDIO] FAIL` / missing success line (once-per-process flag is not sticky on failure).
+- Idle-daemon heal uses the first `pidof` PID only; missing `pidof` does not `--kill`; waits until `--check` is false before `--start`.
+- Debian/Alpine write `PULSE_SERVER` via `_flux_write_pulse_client` (or the same append/replace) so `/etc/environment` is not truncated.
+- Void (and the SSOT helper) never falls back to installing the guest `pulseaudio` daemon package.
+- Settings → **Repair guests** runs `repair_pulse_guests.sh`: stages `setup_pulse_guest.sh` + `flux_guest_common.sh` into each installed PRoot (`--shared-tmp` + `env -i` guest PATH, same as `ProotCommandBuilder.guestLoginEnv`) and each chroot when `su` works. Guest `pactl` counts only `/usr/bin/pactl` / `/usr/sbin/pactl` / `/bin/pactl` (not host `$PREFIX/bin`). Toast is fail/partial/success from that output.
+- Guest `sed -i` goes through `_flux_sed_i` (temp file + mv) so Chimera BSD sed does not fail.
+
+Tests: `PulseHostTest` (parse status / log ring / `supervisorOk`), `AudioSettingsContractTest` (hub + wiring + TCP gate + no daemon fallback).

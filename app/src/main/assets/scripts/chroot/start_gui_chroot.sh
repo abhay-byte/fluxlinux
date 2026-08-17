@@ -112,19 +112,18 @@ fi
 export PULSE_RUNTIME_PATH="${HOME}/.pulse"
 mkdir -p "$PULSE_RUNTIME_PATH" "$TMPDIR" 2>/dev/null
 
-# Stale host services only — do NOT force-stop $PKG
+# Stale host graphics only — do NOT force-stop $PKG and do not kill Pulse.
 pkill -f "virgl_test_server" 2>/dev/null || true
-pkill -f pulseaudio 2>/dev/null || true
 pkill -f termux-x11 2>/dev/null || true
 pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 1
 
-# PulseAudio (app uid — flux requirement)
-echo "FluxLinux: Starting PulseAudio..."
-pulseaudio --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-  --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
-  --exit-idle-time=-1 2>/dev/null || true
-pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1 >/dev/null 2>&1 || true
+# Host Pulse (app uid) before su. Supervisor prints FluxLinux: [AUDIO] …
+if [ -x "$TERMUX_HOME/start_pulse_host.sh" ]; then
+  bash "$TERMUX_HOME/start_pulse_host.sh" || true
+elif command -v start_pulse_host.sh >/dev/null 2>&1; then
+  start_pulse_host.sh || true
+fi
 
 # VirGL optional
 if command -v virgl_test_server_android >/dev/null; then

@@ -102,25 +102,28 @@ class OmzPokemonContractTest {
             "family install must ship fastfetch so the shell always has it",
             manjaro.contains("fastfetch")
         )
-        assertTrue(
-            "en_US.UTF-8 must be generated so agnosterzak can paint @flux",
-            manjaro.contains("en_US.UTF-8 UTF-8")
-        )
         assertTrue(manjaro.contains("_flux_ensure_locale"))
         assertTrue(manjaro.contains("_flux_ensure_hostname"))
-        assertTrue(
-            "pacman guests must restore glibc i18n data",
-            manjaro.contains("pacman -S --noconfirm glibc")
-        )
         assertFalse(
             "--needed glibc is a no-op when glibc is already installed",
             manjaro.contains("pacman -S --noconfirm --needed glibc")
         )
+        val common = repoFile(
+            "src/main/assets/scripts/common/setup/flux_guest_common.sh"
+        ).readText()
+        assertTrue(
+            "pacman guests must restore glibc i18n data",
+            common.contains("pacman -S --noconfirm glibc")
+        )
+        assertTrue(
+            "en_US.UTF-8 must be generated so agnosterzak can paint @flux",
+            common.contains("en_US.UTF-8 UTF-8")
+        )
         assertTrue(
             "directory locales work when locale-archive is empty under proot",
-            manjaro.contains("localedef --no-archive")
+            common.contains("localedef --no-archive")
         )
-        assertTrue(manjaro.contains("_flux_sanitize_lang"))
+        assertTrue(common.contains("_flux_sanitize_lang"))
     }
 
     @Test

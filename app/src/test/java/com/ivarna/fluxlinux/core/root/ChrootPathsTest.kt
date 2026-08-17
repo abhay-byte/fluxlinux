@@ -9,8 +9,8 @@ import org.junit.Test
 class ChrootPathsTest {
 
     @Test
-    fun helper_version_is_v28() {
-        assertEquals("fluxlinux-chroot v2.8", ChrootPaths.CHROOT_HELPER_VERSION)
+    fun helper_version_is_v29() {
+        assertEquals("fluxlinux-chroot v2.9", ChrootPaths.CHROOT_HELPER_VERSION)
     }
 
     @Test

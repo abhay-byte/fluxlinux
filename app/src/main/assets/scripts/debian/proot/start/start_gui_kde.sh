@@ -7,8 +7,10 @@ DISTRO=${1:-debian}
 kill -9 $(pgrep -f "termux.x11") 2>/dev/null
 sleep 1
 
-# Enable PulseAudio over Network
-pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1
+# Host Pulse (app uid). Not a guest daemon.
+if [ -x "${TERMUX__HOME:-$HOME}/start_pulse_host.sh" ]; then
+  bash "${TERMUX__HOME:-$HOME}/start_pulse_host.sh" || true
+fi
 
 # Fix XDG_RUNTIME_DIR: Qt/KDE reject /tmp (world-writable 0777)
 FLUX_RUNTIME_DIR="${TMPDIR:-/data/data/com.termux/files/usr/tmp}/runtime-flux-kde"

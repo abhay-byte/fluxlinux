@@ -61,6 +61,13 @@ object TermuxHostPaths {
     fun libBash(ctx: Context): File =
         File(ctx.applicationInfo.nativeLibraryDir, "libbash.so")
 
+    /** W^X-safe Pulse daemon (same rule as [libBash]). */
+    fun libPulseaudio(ctx: Context): File =
+        File(ctx.applicationInfo.nativeLibraryDir, "libpulseaudio.so")
+
+    fun libPactl(ctx: Context): File =
+        File(ctx.applicationInfo.nativeLibraryDir, "libpactl.so")
+
     fun termuxExec(ctx: Context): File =
         File(ctx.filesDir, "usr/lib/libtermux-exec.so")
 
@@ -96,6 +103,8 @@ object TermuxHostPaths {
             |export PD_PROOT_BIN="${libProot(ctx).absolutePath}"
             |export PROOT_LOADER="${libLoader(ctx).absolutePath}"
             |export PROOT_LOADER_32="${libLoader32(ctx).absolutePath}"
+            |export PD_PULSEAUDIO_BIN="${libPulseaudio(ctx).absolutePath}"
+            |export PD_PACTL_BIN="${libPactl(ctx).absolutePath}"
             |""".trimMargin()
         } else {
             ""

@@ -104,6 +104,7 @@ object ChrootCommandBuilder {
         envMap.remove("LC_ALL")
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
         envMap["TMPDIR"] = "/tmp"
+        envMap["PULSE_SERVER"] = "tcp:127.0.0.1"
         envMap["FLUX_CHROOT"] = chrootPath
         RootShell.cachedBusyBox()?.let { envMap["FLUX_BB"] = it }
         return envMap

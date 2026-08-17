@@ -117,6 +117,18 @@ for bin in "${required_bins[@]}"; do
     echo "FluxLinux: OK $bin -> $bin_path"
 done
 
+# Pulse must actually exec — a present binary with missing .so was a false green.
+# Mode 600 overlay .so files also fail to mmap as untrusted_app.
+for _so in libsoxr.so libsoxr-lsr.so libandroid-execinfo.so libFLAC.so libmp3lame.so; do
+    [ -f "$PREFIX/lib/$_so" ] || continue
+    chmod 755 "$PREFIX/lib/$_so" 2>/dev/null || true
+done
+_PA="${PD_PULSEAUDIO_BIN:-pulseaudio}"
+if ! "$_PA" --version >/dev/null 2>&1; then
+    fail "pulseaudio cannot exec (need libpulseaudio.so in nativeLibraryDir + runtime libs)"
+fi
+echo "FluxLinux: OK pulseaudio --version ($("$_PA" --version 2>/dev/null | head -1))"
+
 python -c "import sys; assert sys.version_info[0] >= 3" \
     || fail "python present but failed smoke import"
 

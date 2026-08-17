@@ -40,7 +40,6 @@ import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.core.utils.RootUtils
 import com.ivarna.fluxlinux.core.utils.SystemInfoUtils
-import com.ivarna.fluxlinux.core.utils.ApkDownloader
 import com.ivarna.fluxlinux.core.utils.LogcatStreamer
 import com.ivarna.fluxlinux.core.data.TermuxIntentFactory
 import com.ivarna.fluxlinux.core.data.ScriptManager
@@ -526,13 +525,13 @@ fun HostBootstrapStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Embedded host card (bootstrap.tar inside this APK — no Termux install needed)
+        // Embedded host card (ivarna: download bootstrap.tar from GitHub; zenithblue: APK asset)
         PrerequisiteItem(
             name = "FluxLinux Host (embedded)",
             isInstalled = bootstrapDone,
             isOutdated = false,
             version = if (bootstrapDone) "v1 (extracted)" else null,
-            apkStatus = ApkStatus.INSTALLED,
+            apkStatus = if (bootstrapDone) ApkStatus.INSTALLED else ApkStatus.NOT_INSTALLED,
             progress = progress,
             minVersionHint = null,
             onDownload = { startInit() },
@@ -541,8 +540,14 @@ fun HostBootstrapStep(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        val hostHint = if (com.ivarna.fluxlinux.core.install.HostBootstrap.downloadsFromRelease(context.packageName)) {
+            "Initialize downloads the Linux host (~124 MiB) from GitHub when you tap the button. " +
+                "That archive is not in the F-Droid APK. No separate Termux APK is required."
+        } else {
+            "The Linux host environment (Termux-class prefix + proot-distro) is bundled inside this app — no separate Termux APK is required for Debian installs."
+        }
         Text(
-            text = "The Linux host environment (Termux-class prefix + proot-distro) is bundled inside this app — no separate Termux APK is required for Debian installs.",
+            text = hostHint,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
             style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             modifier = Modifier.fillMaxWidth()

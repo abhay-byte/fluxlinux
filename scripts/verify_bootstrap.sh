@@ -22,6 +22,13 @@ required=(
   "usr/bin/proot"
   "usr/bin/proot-distro"
   "usr/bin/pulseaudio"
+  "usr/lib/libsoxr.so"
+  "usr/lib/libandroid-execinfo.so"
+  "usr/lib/libFLAC.so"
+  "usr/lib/libmp3lame.so"
+  "usr/lib/pulseaudio/modules/module-aaudio-sink.so"
+  "usr/lib/pulseaudio/modules/module-sles-sink.so"
+  "usr/lib/pulseaudio/modules/module-native-protocol-tcp.so"
   "usr/libexec/termux-x11/loader.apk"
 )
 
@@ -55,7 +62,7 @@ fi
 
 # jniLibs
 jni="$ROOT/native/bootstrap/$PKG/jniLibs/arm64-v8a"
-for so in libbash.so libproot.so libloader.so libloader32.so; do
+for so in libbash.so libproot.so libloader.so libloader32.so libpulseaudio.so libpactl.so; do
   if [[ -f "$jni/$so" ]]; then
     echo "  [OK] jniLibs $so"
   else

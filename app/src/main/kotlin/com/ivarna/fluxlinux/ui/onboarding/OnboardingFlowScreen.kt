@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -57,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
+import com.ivarna.fluxlinux.core.install.HostBootstrap
 import com.ivarna.fluxlinux.core.install.OnboardingInstallRunner
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.ui.components.CompactDistroCard
@@ -66,9 +69,10 @@ import com.ivarna.fluxlinux.ui.components.MethodTabs
 import com.ivarna.fluxlinux.ui.components.isChrootCard
 import com.ivarna.fluxlinux.ui.install.InstallProgressPanel
 import com.ivarna.fluxlinux.ui.install.InstallThemePickRow
+import com.ivarna.fluxlinux.ui.screens.HostBootstrapStep
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 
-private enum class OnboardStep { Welcome, DistroPick, Options, Running, Done }
+private enum class OnboardStep { Welcome, Consent, HostSetup, DistroPick, Options, Running, Done }
 
 /**
  * Full first-run onboarding: welcome → distro catalog → base install options →
@@ -131,11 +135,19 @@ fun OnboardingFlowScreen(
             .systemBarsPadding()
     ) {
         when (step) {
-            OnboardStep.Welcome -> WelcomePage(onNext = { step = OnboardStep.DistroPick })
+            OnboardStep.Welcome -> WelcomePage(onNext = { step = OnboardStep.Consent })
+            OnboardStep.Consent -> ConsentPage(
+                onBack = { step = OnboardStep.Welcome },
+                onNext = { step = OnboardStep.HostSetup }
+            )
+            OnboardStep.HostSetup -> HostSetupPage(
+                onBack = { step = OnboardStep.Consent },
+                onNext = { step = OnboardStep.DistroPick }
+            )
             OnboardStep.DistroPick -> DistroPickPage(
                 selectedId = selectedDistroId,
                 onSelect = { selectedDistroId = it },
-                onBack = { step = OnboardStep.Welcome },
+                onBack = { step = OnboardStep.HostSetup },
                 onNext = { step = OnboardStep.Options }
             )
             OnboardStep.Options -> OptionsPage(
@@ -210,6 +222,94 @@ private fun WelcomePage(onNext: () -> Unit) {
         )
         Spacer(Modifier.height(20.dp))
         PrimaryButton("Get Started", onNext)
+    }
+}
+
+@Composable
+private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
+    var downloadConsent by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        Text(
+            "Downloads from GitHub",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "The F-Droid APK does not include the Linux host or a distro rootfs. Those archives are downloaded from GitHub when you continue. F-Droid does not check them.",
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            fontSize = 15.sp
+        )
+        Spacer(Modifier.height(20.dp))
+        DownloadConsentRow(
+            consented = downloadConsent,
+            onConsentChange = { downloadConsent = it }
+        )
+        Spacer(Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("Back", fontWeight = FontWeight.SemiBold)
+            }
+            Button(
+                onClick = onNext,
+                enabled = downloadConsent,
+                modifier = Modifier.weight(1f).height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Continue", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HostSetupPage(onBack: () -> Unit, onNext: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        Text(
+            "Host environment",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Download and extract the FluxLinux host prefix, then initialize PulseAudio and the terminal. Distro install comes after this.",
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            fontSize = 15.sp
+        )
+        Spacer(Modifier.height(16.dp))
+        HostBootstrapStep(
+            onRefresh = {},
+            onContinue = onNext
+        )
+        Spacer(Modifier.height(12.dp))
+        TextButton(
+            onClick = onBack,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Text("Back", fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -604,6 +704,13 @@ private fun OptionsPage(
             )
         }
 
+        Spacer(Modifier.height(20.dp))
+        var downloadConsent by remember { mutableStateOf(false) }
+        DownloadConsentRow(
+            consented = downloadConsent,
+            onConsentChange = { downloadConsent = it }
+        )
+
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Dark primary is near-black — TextButton default contentColor is unreadable.
@@ -618,6 +725,7 @@ private fun OptionsPage(
             }
             Button(
                 onClick = onInstall,
+                enabled = downloadConsent,
                 modifier = Modifier.weight(1f).height(52.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary,
@@ -628,6 +736,47 @@ private fun OptionsPage(
                 Text("Install", fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+/**
+ * F-Droid Inclusion: executable downloads (host bootstrap / distro rootfs) must
+ * be opt-in, no harder to decline than accept, and must say F-Droid does not
+ * verify those files.
+ */
+@Composable
+private fun DownloadConsentRow(
+    consented: Boolean,
+    onConsentChange: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val downloadsHost = HostBootstrap.downloadsFromRelease(context.packageName)
+    val body = if (downloadsHost) {
+        "I understand this install downloads Linux system images (host bootstrap and the chosen distro) from GitHub. Those files are not in the F-Droid APK and are not checked by F-Droid."
+    } else {
+        "I understand this install downloads the chosen distro's Linux rootfs from GitHub. That archive is not in the Play/F-Droid APK and is not checked by F-Droid."
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+            .clickable { onConsentChange(!consented) }
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Checkbox(
+            checked = consented,
+            onCheckedChange = onConsentChange,
+            colors = CheckboxDefaults.colors(checkedColor = FluxAccentMagenta)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            body,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 12.dp)
+        )
     }
 }
 

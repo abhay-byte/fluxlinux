@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Button
@@ -75,6 +76,7 @@ fun SettingsScreen(
     onNavigateToRootCheck: (() -> Unit)? = null,
     onNavigateToTerminalSettings: (() -> Unit)? = null,
     onNavigateToX11Settings: (() -> Unit)? = null,
+    onNavigateToAudioSettings: (() -> Unit)? = null,
     onNavigateToChrootSettings: (() -> Unit)? = null,
     onNavigateToProotSettings: (() -> Unit)? = null,
     onNavigateToLegacyTermuxSettings: (() -> Unit)? = null,
@@ -150,6 +152,12 @@ fun SettingsScreen(
                 title = "X11 Display",
                 subtitle = "Scale, fullscreen, input for embedded X11",
                 onClick = { onNavigateToX11Settings?.invoke() }
+            )
+            SettingsNavCard(
+                icon = Icons.Default.VolumeUp,
+                title = "Audio",
+                subtitle = "Host PulseAudio status, start, restart, logs",
+                onClick = { onNavigateToAudioSettings?.invoke() }
             )
             SettingsNavCard(
                 icon = Icons.Default.Storage,

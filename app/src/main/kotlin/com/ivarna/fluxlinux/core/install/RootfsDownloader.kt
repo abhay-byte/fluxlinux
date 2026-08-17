@@ -54,13 +54,24 @@ object RootfsDownloader {
             .build()
     }
 
+    fun DistroInstallProfile.toPinnedArchive(): PinnedReleaseArchive =
+        PinnedReleaseArchive(
+            fileName = rootfsFileName,
+            sha256 = rootfsSha256,
+            url = rootfsUrl,
+            minBytes = rootfsMinBytes
+        )
+
     /**
      * True when `destDir/rootfsFileName` exists, is larger than
      * [DistroInstallProfile.rootfsMinBytes], and its SHA256 matches
      * [DistroInstallProfile.rootfsSha256].
      */
     fun isDeployed(destDir: File, profile: DistroInstallProfile): Boolean =
-        isValid(destFile(destDir, profile), profile)
+        isDeployed(destDir, profile.toPinnedArchive())
+
+    fun isDeployed(destDir: File, archive: PinnedReleaseArchive): Boolean =
+        isValid(File(destDir, archive.fileName), archive)
 
     /**
      * Guarantee a verified rootfs archive in [destDir].
@@ -81,28 +92,53 @@ object RootfsDownloader {
         client: OkHttpClient = defaultClient,
         isCancelled: () -> Boolean = { false },
         onProgress: (Progress) -> Unit = {}
+    ): Boolean = ensurePresent(
+        destDir,
+        profile.toPinnedArchive(),
+        client,
+        isCancelled,
+        onProgress,
+        extraLocalCandidates = localCandidates(destDir, profile)
+    )
+
+    fun ensurePresent(
+        destDir: File,
+        archive: PinnedReleaseArchive,
+        client: OkHttpClient = defaultClient,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (Progress) -> Unit = {},
+        extraLocalCandidates: List<File> = emptyList()
     ): Boolean {
         destDir.mkdirs()
-        val dest = destFile(destDir, profile)
+        val dest = File(destDir, archive.fileName)
 
         // 1. Verified destination — done, no network.
-        if (isValid(dest, profile)) {
-            Log.i(TAG, "Rootfs already deployed and verified: ${dest.absolutePath}")
+        if (isValid(dest, archive)) {
+            Log.i(TAG, "Archive already deployed and verified: ${dest.absolutePath}")
             return true
         }
 
         // 2. Local candidates (D7). $HOME/rootfs/, proot cache, Download dirs.
-        for (candidate in localCandidates(destDir, profile)) {
+        val candidates = extraLocalCandidates.ifEmpty {
+            listOf(
+                File(destDir, archive.fileName),
+                File(destDir, "rootfs/${archive.fileName}"),
+                File("/sdcard/Download/${archive.fileName}"),
+                File("/storage/emulated/0/Download/${archive.fileName}")
+            )
+        }
+        for (candidate in candidates) {
             if (!candidate.isFile) continue
+            if (candidate.absolutePath == dest.absolutePath) continue
             if (isCancelled()) return false
-            if (!isValid(candidate, profile)) {
+            if (!isValid(candidate, archive)) {
                 Log.w(TAG, "Candidate fails gate, skipped: ${candidate.absolutePath}")
                 continue
             }
             Log.i(TAG, "Copying verified local candidate ${candidate.absolutePath} → ${dest.absolutePath}")
             if (!copyWithCancel(candidate, dest, isCancelled)) return false
-            if (isValid(dest, profile)) {
-                Log.i(TAG, "Rootfs from local candidate: ${dest.absolutePath}")
+            if (isValid(dest, archive)) {
+                Log.i(TAG, "Archive from local candidate: ${dest.absolutePath}")
                 return true
             }
             Log.w(TAG, "Copied candidate failed gate — deleting ${dest.absolutePath}")
@@ -112,7 +148,7 @@ object RootfsDownloader {
         if (isCancelled()) return false
 
         // 3. Network download with Range resume.
-        return download(destDir, dest, profile, client, isCancelled, onProgress)
+        return download(destDir, dest, archive, client, isCancelled, onProgress)
     }
 
     // ── network ─────────────────────────────────────────────────────────────
@@ -120,18 +156,18 @@ object RootfsDownloader {
     private fun download(
         destDir: File,
         dest: File,
-        profile: DistroInstallProfile,
+        archive: PinnedReleaseArchive,
         client: OkHttpClient,
         isCancelled: () -> Boolean,
         onProgress: (Progress) -> Unit
     ): Boolean {
-        val partial = File(destDir, profile.rootfsFileName + ".partial")
+        val partial = File(destDir, archive.fileName + ".partial")
 
         // Second iteration only runs after a 416 deleted the partial.
         repeat(2) { attempt ->
             val existing = if (partial.isFile) partial.length() else 0L
             val request = Request.Builder()
-                .url(profile.rootfsUrl)
+                .url(archive.url)
                 .apply {
                     if (existing > 0L) {
                         header("Range", "bytes=$existing-")
@@ -167,24 +203,24 @@ object RootfsDownloader {
                         val contentLength = body.contentLength()
                         val total = if (contentLength > 0L) existing + contentLength else -1L
                         val remaining = if (contentLength > 0L) contentLength else -1L
-                        if (!checkFreeSpace(destDir, remaining, profile.rootfsMinBytes)) {
+                        if (!checkFreeSpace(destDir, remaining, archive.minBytes)) {
                             return false
                         }
                         val ok = streamBody(body, partial, append = true, total, isCancelled, onProgress)
                         if (!ok || isCancelled()) return false
-                        return finishVerified(dest, partial, profile)
+                        return finishVerified(dest, partial, archive)
                     }
                     resp.code == 200 -> {
                         // Full response — truncate/restart, never append a
                         // stale partial (D5).
                         val body = resp.body ?: return false
                         val contentLength = body.contentLength()
-                        if (!checkFreeSpace(destDir, contentLength, profile.rootfsMinBytes)) {
+                        if (!checkFreeSpace(destDir, contentLength, archive.minBytes)) {
                             return false
                         }
                         val ok = streamBody(body, partial, append = false, contentLength, isCancelled, onProgress)
                         if (!ok || isCancelled()) return false
-                        return finishVerified(dest, partial, profile)
+                        return finishVerified(dest, partial, archive)
                     }
                     else -> {
                         Log.e(TAG, "Rootfs download HTTP ${resp.code}")
@@ -235,22 +271,22 @@ object RootfsDownloader {
     }
 
     /**
-     * Gate the finished `.partial`: size > [DistroInstallProfile.rootfsMinBytes]
-     * and SHA256 == [DistroInstallProfile.rootfsSha256]. On success, atomically
+     * Gate the finished `.partial`: size > [PinnedReleaseArchive.minBytes]
+     * and SHA256 == [PinnedReleaseArchive.sha256]. On success, atomically
      * rename to the final filename (D4/D5).
      */
     private fun finishVerified(
         dest: File,
         partial: File,
-        profile: DistroInstallProfile
+        archive: PinnedReleaseArchive
     ): Boolean {
-        if (!isValid(partial, profile)) {
+        if (!isValid(partial, archive)) {
             // Delete the final output (D4). The partial is kept: a truncated
             // stream resumes via Range; a corrupt-complete partial self-heals
             // through the 416 restart path on the next attempt.
             Log.e(
                 TAG,
-                "Downloaded rootfs failed gate: size=${partial.length()} " +
+                "Downloaded archive failed gate: size=${partial.length()} " +
                     "sha=${sha256(partial)} — keeping partial for resume"
             )
             dest.delete()
@@ -267,16 +303,19 @@ object RootfsDownloader {
             }
             partial.delete()
         }
-        Log.i(TAG, "Rootfs deployed: ${dest.absolutePath} (${dest.length()} bytes, SHA OK)")
+        Log.i(TAG, "Archive deployed: ${dest.absolutePath} (${dest.length()} bytes, SHA OK)")
         return true
     }
 
     // ── gates ───────────────────────────────────────────────────────────────
 
     internal fun isValid(file: File, profile: DistroInstallProfile): Boolean =
+        isValid(file, profile.toPinnedArchive())
+
+    internal fun isValid(file: File, archive: PinnedReleaseArchive): Boolean =
         file.isFile &&
-            file.length() > profile.rootfsMinBytes &&
-            sha256(file) == profile.rootfsSha256
+            file.length() > archive.minBytes &&
+            sha256(file) == archive.sha256
 
     /**
      * D11: free-space precheck after response headers.
@@ -308,9 +347,6 @@ object RootfsDownloader {
     }
 
     // ── candidates ──────────────────────────────────────────────────────────
-
-    private fun destFile(destDir: File, profile: DistroInstallProfile): File =
-        File(destDir, profile.rootfsFileName)
 
     /**
      * Local candidates in the same order `flux_install.sh` searches (D7):

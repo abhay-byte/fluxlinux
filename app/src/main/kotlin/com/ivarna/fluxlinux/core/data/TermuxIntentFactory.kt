@@ -13,7 +13,7 @@ import com.ivarna.fluxlinux.core.data.ScriptManager
  * use this factory — use `terminalComponentFor(distroId)` + the session
  * factories. Remaining legitimate call sites: GUI Start/Stop (deferred GUI
  * pass) and legacy optional tweaks. The install/buildRun* builders below are
- * DEAD (no product caller) — do not re-wire them.
+ * DEAD (no product caller) — do not re-wire them. Do not start Pulse here.
  */
 object TermuxIntentFactory {
 

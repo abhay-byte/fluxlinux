@@ -55,6 +55,7 @@ enum class Screen {
     SETTINGS,
     SETTINGS_TERMINAL,
     SETTINGS_X11,
+    SETTINGS_AUDIO,
     SETTINGS_CHROOT,
     SETTINGS_CHROOT_DETAIL,
     SETTINGS_PROOT,
@@ -528,6 +529,7 @@ class MainActivity : ComponentActivity() {
                         currentScreen = Screen.SETTINGS_PROOT
                     } else if (currentScreen == Screen.SETTINGS_TERMINAL
                         || currentScreen == Screen.SETTINGS_X11
+                        || currentScreen == Screen.SETTINGS_AUDIO
                         || currentScreen == Screen.SETTINGS_CHROOT
                         || currentScreen == Screen.SETTINGS_PROOT
                         || currentScreen == Screen.SETTINGS_LEGACY_TERMUX
@@ -881,6 +883,9 @@ class MainActivity : ComponentActivity() {
                             onNavigateToX11Settings = {
                                 currentScreen = Screen.SETTINGS_X11
                             },
+                            onNavigateToAudioSettings = {
+                                currentScreen = Screen.SETTINGS_AUDIO
+                            },
                             onNavigateToChrootSettings = {
                                 currentScreen = Screen.SETTINGS_CHROOT
                             },
@@ -899,6 +904,11 @@ class MainActivity : ComponentActivity() {
                     }
                     Screen.SETTINGS_X11 -> {
                         com.ivarna.fluxlinux.ui.screens.X11SettingsScreen(
+                            onBack = { currentScreen = Screen.SETTINGS }
+                        )
+                    }
+                    Screen.SETTINGS_AUDIO -> {
+                        com.ivarna.fluxlinux.ui.screens.AudioSettingsScreen(
                             onBack = { currentScreen = Screen.SETTINGS }
                         )
                     }
