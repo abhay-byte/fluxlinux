@@ -142,6 +142,7 @@ scanignore:
   - app/src/ivarna/assets/pulse-runtime/
   - app/src/zenithblue/assets/pulse-runtime/
   - app/src/main/assets/scripts/opensuse/common/libevp_md2.so
+  - app/src/main/assets/scripts/common/setup/bwrap-proot-shim
   - assets/xfce4/
   - assets/wallpaper/
 ```

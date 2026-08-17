@@ -55,32 +55,24 @@ Builds:
       - assets/xfce4/cursor/cursor.zip
       - assets/wallpaper/wallpaper.zip
 
-  # 2.0.0: flavor `ivarna` is F-Droid/GitHub; zenithblue is Play-only.
-  # Gradle compiles only the ivarna flavor. libXlorie.so is built from source
-  # via NDK+CMake from vendored lorie native tree + submodules (fetched by
-  # fdroidserver, needs bison+patch+gcc at configure). The host bootstrap is
-  # assembled here from tracked .debs (native/output) because bootstrap.tar is
-  # gitignored. Remaining prebuilts are FLOSS; sources cited in
-  # docs/releases/fdroid-update-mr.md.
   - versionName: 2.0.0
     versionCode: 12
-    commit: REPLACE_WITH_V2_0_0_TAG_SHA
+    commit: 63f022adb4acc1fe18cc007e042a5ab1896c3c11
     subdir: app
-    submodules: yes
+    submodules: true
     sudo:
       - apt-get update
       - apt-get install -y binutils bison patch gcc python3
-      - cd .. && python3 scripts/assemble_bootstrap.py --package-name com.ivarna.fluxlinux --list native/package-lists/termux-lib-ssot.txt --mode full
+      - cd .. && python3 scripts/assemble_bootstrap.py --package-name com.ivarna.fluxlinux
+        --list native/package-lists/termux-lib-ssot.txt --mode full
     gradle:
       - ivarna
-    # Only paths the scanner actually flags. Unused/non-exist scanignore is a
-    # hard fail. .deb and .tar.xz are not flagged; .apk is always deleted and
-    # cannot be scanignored (see docs/plans/fdroid-buildserver-native-so.md §2).
     scanignore:
       - native/bootstrap/
       - app/src/ivarna/assets/pulse-runtime/
       - app/src/zenithblue/assets/pulse-runtime/
       - app/src/main/assets/scripts/opensuse/common/libevp_md2.so
+      - app/src/main/assets/scripts/common/setup/bwrap-proot-shim
       - app/src/main/assets/loader.bin
       - assets/xfce4/
       - assets/wallpaper/
