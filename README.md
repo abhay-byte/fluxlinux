@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/logo/logo.webp" width="150" />
   <h1>FluxLinux</h1>
-  <p><strong>Run full Linux desktop environments on your Android device</strong></p>
+  <p><strong>Run full Linux desktops on Android — 12 distros, PRoot or Chroot, XFCE4, X11, and PulseAudio</strong></p>
 
   <a href="https://github.com/abhay-byte/fluxlinux">
     <img src="docs/readme/showcase.gif" alt="FluxLinux Showcase" width="100%" />
@@ -27,7 +27,7 @@
   <!-- Row 2 -->
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL_v3-2ea44f?style=for-the-badge&logo=gnu&logoColor=white" alt="License"></a>
   <img src="https://img.shields.io/badge/Kotlin-100%25-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
-  <a href="https://github.com/abhay-byte/fluxlinux/releases"><img src="https://img.shields.io/badge/Release-v1.7-2ea44f?style=for-the-badge&logo=github&logoColor=white" alt="Latest Release"></a>
+  <a href="https://github.com/abhay-byte/fluxlinux/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.0-2ea44f?style=for-the-badge&logo=github&logoColor=white" alt="Latest Release"></a>
 
 </div>
 
@@ -49,6 +49,54 @@
     </tr>
   </table>
 </div>
+
+---
+
+## 🐧 Supported Distros
+
+Twelve guests. **Every one** installs as **PRoot** (no root) or **Chroot** (rooted), with **XFCE4** on the in-app X11 display and **host PulseAudio**. Rootfs archives download on demand from the GitHub [`rootfs`](https://github.com/abhay-byte/fluxlinux/releases/tag/rootfs) tag after an in-app opt-in.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_debian.webp" width="48"/><br/><b>Debian</b><br/>13 Trixie</td>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_alpine.webp" width="48"/><br/><b>Alpine</b><br/>3.24</td>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_fedora.webp" width="48"/><br/><b>Fedora</b><br/>44</td>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_void.webp" width="48"/><br/><b>Void</b><br/>Rolling</td>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_opensuse.webp" width="48"/><br/><b>openSUSE</b><br/>Tumbleweed</td>
+      <td align="center" width="16%"><img src="app/src/main/res/drawable/distro_deepin.webp" width="48"/><br/><b>Deepin</b><br/>25</td>
+    </tr>
+    <tr>
+      <td align="center"><img src="app/src/main/res/drawable/distro_chimera.webp" width="48"/><br/><b>Chimera</b><br/>musl / apk v3</td>
+      <td align="center"><img src="app/src/main/res/drawable/distro_manjaro.webp" width="48"/><br/><b>Manjaro</b><br/>ARM</td>
+      <td align="center"><img src="app/src/main/res/drawable/distro_ubuntu.webp" width="48"/><br/><b>Ubuntu</b><br/>26.04</td>
+      <td align="center"><img src="app/src/main/res/drawable/distro_kali.webp" width="48"/><br/><b>Kali</b><br/>Rolling</td>
+      <td align="center"><img src="app/src/main/res/drawable/distro_parrot.webp" width="48"/><br/><b>Parrot</b><br/>7.2</td>
+      <td align="center"><img src="app/src/main/res/drawable/distro_arch.webp" width="48"/><br/><b>Arch</b><br/>ARM</td>
+    </tr>
+  </table>
+</div>
+
+<br/>
+
+| | Distro | Release | Packages | PRoot | Chroot | XFCE4 + X11 | PulseAudio |
+|---|--------|---------|----------|:-----:|:------:|:-----------:|:----------:|
+| <img src="app/src/main/res/drawable/distro_debian.webp" width="28"/> | **Debian** | 13 Trixie | apt | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_alpine.webp" width="28"/> | **Alpine** | 3.24 | apk | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_fedora.webp" width="28"/> | **Fedora** | 44 | dnf | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_void.webp" width="28"/> | **Void** | Rolling | xbps | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_opensuse.webp" width="28"/> | **openSUSE** | Tumbleweed | zypper | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_deepin.webp" width="28"/> | **Deepin** | 25 | apt | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_chimera.webp" width="28"/> | **Chimera** | Rolling | apk v3 | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_manjaro.webp" width="28"/> | **Manjaro** | ARM | pacman | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_ubuntu.webp" width="28"/> | **Ubuntu** | 26.04 | apt | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_kali.webp" width="28"/> | **Kali** | Rolling | apt | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_parrot.webp" width="28"/> | **Parrot** | 7.2 | apt | ✓ | ✓ | ✓ | ✓ |
+| <img src="app/src/main/res/drawable/distro_arch.webp" width="28"/> | **Arch** | ARM | pacman | ✓ | ✓ | ✓ | ✓ |
+
+Debian also ships the optional extra stacks (KDE Plasma, app/web/data/game/office/graphics). The other eleven use the shared XFCE4 + GPU + theme path.
+
+Per-distro notes: [docs/distro/](docs/distro/).
 
 ---
 
@@ -105,12 +153,14 @@ Modern Android hardware is powerful enough to run desktop workloads, but the sof
 
 | Feature | Description |
 |---------|-------------|
-| 🐧 **One-Tap Install** | Install Debian with XFCE4 desktop in minutes |
+| 🐧 **12 Distros** | Debian, Alpine, Fedora, Void, openSUSE, Deepin, Chimera, Manjaro, Ubuntu, Kali, Parrot, Arch — each PRoot and Chroot |
+| 🖥️ **XFCE4 + X11** | In-app X11 display (no external Termux:X11). XFCE4 on every guest |
+| 🔊 **PulseAudio** | Host Pulse as the app uid; guests connect over `127.0.0.1` TCP |
 | 🔓 **Rootless Mode** | Works on any Android 8+ device via PRoot |
-| ⚡ **Turbo Mode** | Native chroot performance for rooted devices |
+| ⚡ **Turbo Mode** | Native chroot for rooted devices (Magisk / KernelSU / APatch BusyBox) |
 | 🎮 **GPU Acceleration** | Turnip (Adreno) + VirGL for graphics |
-| 🎨 **Custom Themes** | Beautiful XFCE4 with Space theme |
-| 📦 **Dev Stacks** | Pre-configured environments for coding |
+| 🎨 **Custom Themes** | XFCE4 Space theme, Papirus icons, wallpapers |
+| 📦 **Dev Stacks** | Extra Debian environments for coding, office, and graphics |
 
 ---
 
@@ -168,34 +218,38 @@ Modern Android hardware is powerful enough to run desktop workloads, but the sof
 flowchart TB
     subgraph Android["📱 Android Device"]
         FluxLinux["🚀 FluxLinux App<br/>(Kotlin + Jetpack Compose)"]
-        
-        subgraph Termux["🔧 Termux Environment"]
-            TermuxHost["Terminal Host"]
-            
-            subgraph Container["Linux Container"]
-                PRoot["🔓 PRoot<br/>(Rootless)"]
-                Chroot["⚡ Chroot<br/>(Rooted)"]
-            end
-            
-            subgraph Distro["🐧 Debian 13 Trixie"]
-                XFCE["XFCE4 Desktop"]
-                DevTools["Development Tools"]
-            end
+
+        subgraph Host["🔧 Embedded host"]
+            TermuxHost["bash · proot · PulseAudio"]
+            X11["In-app X11 display"]
         end
-        
-        subgraph Display["🖥️ Display System"]
-            X11["Termux:X11"]
-            GPU["GPU Acceleration<br/>(Turnip/VirGL)"]
+
+        subgraph Container["Linux container"]
+            PRoot["🔓 PRoot<br/>(rootless)"]
+            Chroot["⚡ Chroot<br/>(rooted)"]
+        end
+
+        subgraph Distro["🐧 12 guests"]
+            XFCE["XFCE4 Desktop"]
+            DevTools["Optional Debian stacks"]
+        end
+
+        subgraph Display["🖥️ Graphics & audio"]
+            GPU["GPU Acceleration<br/>(Turnip / VirGL)"]
+            Pulse["Host PulseAudio<br/>TCP 127.0.0.1"]
         end
     end
-    
+
     FluxLinux --> TermuxHost
+    FluxLinux --> X11
     TermuxHost --> PRoot
     TermuxHost --> Chroot
     PRoot --> Distro
     Chroot --> Distro
     Distro --> X11
     X11 --> GPU
+    Distro --> Pulse
+    TermuxHost --> Pulse
 ```
 
 ---
@@ -206,12 +260,14 @@ flowchart TB
 |----------|-------------|
 | [**Setup & Onboarding Guide**](docs/tutorial/setup_fluxlinux.md) | Step-by-step visual installation tutorial |
 | [**Debian PRoot Setup Guide**](docs/tutorial/setup_debian_proot.md) | Step-by-step Debian PRoot configuration tutorial |
+| [**Debian Chroot Setup Guide**](docs/tutorial/setup_debian_chroot.md) | Step-by-step Debian Chroot configuration tutorial |
+| [**Distro reference**](docs/distro/) | Per-guest notes (Alpine, Fedora, Ubuntu, Kali, …) |
 | [**Installation Reference**](docs/install_ref/) | Packages, paths, versions, environments |
 | [**Scripts Reference**](docs/scripts_reference.md) | All installation and setup scripts |
 | [**Hardware Acceleration**](docs/hardware_acceleration.md) | GPU setup guide (Turnip/VirGL) |
 | [**Script Execution Workflow**](docs/script_execution_workflow.md) | How scripts are executed |
 | [**Testing Reference**](docs/testing_reference.md) | Sample projects for testing |
-| [**Assets Reference**](docs/assets_reference.md) | Themes, icons, wallpapers |
+| [**Assets Reference**](docs/assets_reference.md) | Themes, icons, wallpapers, rootfs |
 | [**Architecture**](docs/architecture.md) | System design overview |
 | [**Roadmap**](docs/roadmap.md) | Development roadmap |
 
@@ -222,15 +278,14 @@ flowchart TB
 ### Requirements
 
 - Android 8.0+ (API 26+)
-- [Termux](https://f-droid.org/packages/com.termux/) (from F-Droid)
-- [Termux:X11](https://github.com/termux/termux-x11) (for GUI)
+- No external Termux or Termux:X11 APK — host shell, PRoot, X11, and PulseAudio ship inside FluxLinux
+- Chroot needs a rooted device with Magisk, KernelSU, or APatch BusyBox
 
 ### Install
 
-1. Download FluxLinux from [Releases](https://github.com/abhay-byte/fluxlinux/releases)
-2. Install Termux from F-Droid
-3. Install Termux:X11
-4. Open FluxLinux and follow setup wizard
+1. Get FluxLinux from [F-Droid](https://f-droid.org/packages/com.ivarna.fluxlinux), [Google Play](https://play.google.com/store/apps/details?id=com.zenithblue.fluxlinux), or [GitHub Releases](https://github.com/abhay-byte/fluxlinux/releases)
+2. Open the app and finish the first-run host setup
+3. Pick a distro and install as PRoot or Chroot — the rootfs downloads after you opt in
 
 <div align="center">
   <img src="assets/screenshots/setup_wizard.png" width="250" />
