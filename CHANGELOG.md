@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased (v2.0.0)
+## v2.0.0
 
 ### Features
+- feat: embed Termux-prefix host + X11 (no external Termux APK)
+- feat: 12-distro catalog; on-demand GitHub `rootfs` downloads (SHA256)
+- feat: host PulseAudio (app uid, TCP 127.0.0.1 guests)
+- feat: W^X-safe host bins in nativeLibraryDir (targetSdk 36)
+- feat: Settings PRoot/Chroot storage + Legacy Termux leftovers
+- feat: compile libXlorie.so from source (NDK 29 + CMake)
 - feat: chroot uses Magisk/KernelSU/APatch built-in BusyBox — NDK module no longer required
 - feat: Settings → Terminal guest login shell toggle (zsh default, bash opt-in) — new proot/chroot sessions honor it; chroot root now follows the pref (default zsh) with the Settings switch as the escape hatch
 
@@ -10,6 +16,8 @@
 - fix: fluxlinux-chroot v2.8 — shared BusyBox resolver (APatch + KSU paths, applet probe, pin to /data/local/tmp/flux_busybox)
 - fix: fluxlinux_chroot v2.5 — chroot root login fail-opens to sh when bash/zsh are missing (Alpine/Chimera minirootfs)
 - fix: Fedora chroot flux login — do not hardcode `/bin/su` (missing on Fedora 44+); helper v2.7 uses runuser then su then staged busybox `setuidgid` (Android busybox has no `chroot --userspec`); Fedora family installs util-linux
+- fix: LorieView JNI matches native `nativeInit()J` so the X11 display opens
+- fix: restore loader.apk after F-Droid scanner deletes `*.apk`
 
 ## v1.8.0
 

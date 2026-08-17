@@ -1,9 +1,9 @@
 # F-Droid & Play Store Metadata Summary
 
 ## App Information
-- **Package Name**: com.zenithblue.fluxlinux
+- **Package Name**: com.ivarna.fluxlinux (F-Droid / GitHub); com.zenithblue.fluxlinux (Play)
 - **App Name**: FluxLinux
-- **Current Version**: 1.8.0 (versionCode: 10)
+- **Current Version**: 2.0.0 (versionCode: 12)
 - **Target SDK**: 36 (Android 16)
 - **Min SDK**: 26 (Android 8.0)
 

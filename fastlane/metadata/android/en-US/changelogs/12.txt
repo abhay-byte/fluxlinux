@@ -1,7 +1,7 @@
-FluxLinux v2.0.0
-
-* Embedded host terminal and embedded X11 server — no external Termux APK required
-* Multi-distro catalog: Debian, Alpine, Fedora, Void, openSUSE, Deepin, Chimera, Manjaro, Ubuntu, Kali, Parrot, and Arch Linux
-* On-demand rootfs downloads with SHA256 integrity verification
-* Integrated PulseAudio audio server and hardware acceleration (Turnip/VirGL)
-* Unified PRoot and Chroot environment management
+- Embedded host + X11 — no external Termux required
+- 12-distro catalog; rootfs downloaded on demand (SHA256)
+- Host PulseAudio; guests via TCP 127.0.0.1
+- PRoot/Chroot storage settings + Legacy Termux leftovers
+- Guest shell toggle (bash/zsh); chroot without BusyBox NDK module
+- libXlorie.so compiled from source (NDK 29)
+- X11 display JNI fix (LorieView.nativeInit)

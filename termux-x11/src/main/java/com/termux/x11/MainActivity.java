@@ -124,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
     ViewTreeObserver.OnPreDrawListener mOnPredrawListener = new ViewTreeObserver.OnPreDrawListener() {
         @Override
         public boolean onPreDraw() {
-            if (!LorieView.connected())
+            if (getLorieView() == null || !getLorieView().connected())
                 return false;
 
             finishStartupDraw();
@@ -260,7 +260,7 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("ClickableViewAccessibility")
     private void initStylusAuxButtons() {
         final ViewPager pager = getTerminalToolbarViewPager();
-        boolean stylusMenuEnabled = prefs.showStylusClickOverride.get() && LorieView.connected();
+        boolean stylusMenuEnabled = prefs.showStylusClickOverride.get() && getLorieView().connected();
         final float menuUnselectedTrasparency = 0.66f;
         final float menuSelectedTrasparency = 1.0f;
         Button left = findViewById(R.id.button_left_click);
@@ -352,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showStylusAuxButtons(boolean show) {
         LinearLayout buttons = findViewById(R.id.mouse_helper_visibility);
-        if (LorieView.connected() && show) {
+        if (getLorieView().connected() && show) {
             buttons.setVisibility(View.VISIBLE);
             buttons.setAlpha(isInPictureInPictureMode ? 0.f : 1.f);
         } else {
@@ -388,7 +388,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMouseAuxButtons(boolean show) {
         View v = findViewById(R.id.mouse_buttons);
-        v.setVisibility((LorieView.connected() && show && "1".equals(prefs.touchMode.get())) ? View.VISIBLE : View.GONE);
+        v.setVisibility((getLorieView().connected() && show && "1".equals(prefs.touchMode.get())) ? View.VISIBLE : View.GONE);
         v.setAlpha(isInPictureInPictureMode ? 0.f : 0.7f);
         makeSureHelpersAreVisibleAndInScreenBounds();
     }
@@ -516,7 +516,7 @@ public class MainActivity extends AppCompatActivity {
                 service = null;
 
                 Log.v("Lorie", "Disconnected");
-                runOnUiThread(() -> { LorieView.connect(-1); clientConnectedStateChanged();} );
+                runOnUiThread(() -> { getLorieView().connect(-1); clientConnectedStateChanged();} );
             }, 0);
         } catch (RemoteException ignored) {}
 
@@ -525,7 +525,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.v("LorieBroadcastReceiver", "Extracting logcat fd.");
                 ParcelFileDescriptor logcatOutput = service.getLogcatOutput();
                 if (logcatOutput != null)
-                    LorieView.startLogcat(logcatOutput.detachFd());
+                    getLorieView().startLogcat(logcatOutput.detachFd());
 
                 tryConnect();
 
@@ -538,11 +538,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     boolean tryConnect() {
-        if (LorieView.connected())
+        if (getLorieView().connected())
             return false;
 
         if (service == null) {
-            boolean sent = LorieView.requestConnection();
+            boolean sent = getLorieView().requestConnection();
             handler.postDelayed(this::tryConnect, 250);
             return true;
         }
@@ -551,7 +551,7 @@ public class MainActivity extends AppCompatActivity {
             ParcelFileDescriptor fd = service.getXConnection();
             if (fd != null) {
                 Log.v("MainActivity", "Extracting X connection socket.");
-                LorieView.connect(fd.detachFd());
+                getLorieView().connect(fd.detachFd());
                 finishStartupDraw();
                 getLorieView().triggerCallback();
                 clientConnectedStateChanged();
@@ -592,7 +592,7 @@ public class MainActivity extends AppCompatActivity {
         useTermuxEKBarBehaviour = prefs.useTermuxEKBarBehaviour.get();
         showIMEWhileExternalConnected = prefs.showIMEWhileExternalConnected.get();
 
-        findViewById(R.id.mouse_buttons).setVisibility(prefs.showMouseHelper.get() && "1".equals(prefs.touchMode.get()) && LorieView.connected() ? View.VISIBLE : View.GONE);
+        findViewById(R.id.mouse_buttons).setVisibility(prefs.showMouseHelper.get() && "1".equals(prefs.touchMode.get()) && getLorieView().connected() ? View.VISIBLE : View.GONE);
         showMouseAuxButtons(prefs.showMouseHelper.get());
         showStylusAuxButtons(prefs.showStylusClickOverride.get());
 
@@ -642,7 +642,7 @@ public class MainActivity extends AppCompatActivity {
         final ViewPager pager = getTerminalToolbarViewPager();
         ViewGroup parent = (ViewGroup) pager.getParent();
 
-        boolean showNow = LorieView.connected() && prefs.showAdditionalKbd.get() && prefs.additionalKbdVisible.get();
+        boolean showNow = getLorieView().connected() && prefs.showAdditionalKbd.get() && prefs.additionalKbdVisible.get();
 
         pager.setVisibility(showNow ? View.VISIBLE : View.INVISIBLE);
 
@@ -670,7 +670,7 @@ public class MainActivity extends AppCompatActivity {
     public void toggleExtraKeys(boolean visible, boolean saveState) {
         boolean enabled = prefs.showAdditionalKbd.get();
 
-        if (enabled && LorieView.connected() && saveState)
+        if (enabled && getLorieView().connected() && saveState)
             prefs.additionalKbdVisible.put(visible);
 
         setTerminalToolbarView();
@@ -964,7 +964,7 @@ public class MainActivity extends AppCompatActivity {
     @SuppressWarnings("SameParameterValue")
     void clientConnectedStateChanged() {
         runOnUiThread(()-> {
-            boolean connected = LorieView.connected();
+            boolean connected = getLorieView().connected();
             // Extra keys only if showAdditionalKbd (default OFF)
             setTerminalToolbarView();
             findViewById(R.id.mouse_buttons).setVisibility(prefs.showMouseHelper.get() && "1".equals(prefs.touchMode.get()) && connected ? View.VISIBLE : View.GONE);
@@ -985,7 +985,7 @@ public class MainActivity extends AppCompatActivity {
         if (getInstance() == null)
             return false;
 
-        return LorieView.connected();
+        return getInstance().getLorieView().connected();
     }
 
     public static void getRealMetrics(DisplayMetrics m) {

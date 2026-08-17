@@ -57,7 +57,7 @@ Builds:
 
   - versionName: 2.0.0
     versionCode: 12
-    commit: 63f022adb4acc1fe18cc007e042a5ab1896c3c11
+    commit: v2.0.0
     subdir: app
     submodules: true
     sudo:
