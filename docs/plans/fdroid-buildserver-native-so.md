@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | **Date** | 2026-08-17 (review pass same day, after in-tree Xlorie) |
-| **Status** | **REVIEWED** — repo-side Xlorie source-build is real; F-Droid **policy can pass**; the **runner will not pass** on the previous `scanignore` list. No container pull, no `fdroid build`, no full `assembleIvarnaRelease` in this pass. |
+| **Status** | **IMPLEMENTED** — `fdroid lint` green; `fdroid scanner --exit-code` 0 problems; `assembleIvarnaRelease` **SUCCESS** on `buildserver-trixie` (`com.ivarna.fluxlinux_12.apk`, 32 MiB unsigned). Post-build `Binaries:` fetch 404s until the GitHub `v2.0.0` APK is uploaded. |
 | **Flavor** | Ivarna (`com.ivarna.fluxlinux`) is what F-Droid builds |
 | **Related** | [v2.0.0-fdroid-release-plan.md](../releases/v2.0.0-fdroid-release-plan.md), [termux-native-packages-dual-appid.md](./termux-native-packages-dual-appid.md), [rootfs-github-release-no-apk-bloat.md](./rootfs-github-release-no-apk-bloat.md) |
 | **Scope lock** | Review + update this plan (and the in-repo recipe `scanignore` so it matches scanner rules). Do **not** pull images, compile, or produce APK/test output. |
@@ -304,16 +304,18 @@ Do not treat a green `assembleIvarnaRelease` on the laptop as a green F-Droid bu
 
 ---
 
-## 7. What this pass did **not** do
+## 7. What was verified on `buildserver-trixie` (2026-08-17)
 
-- No `docker pull`.
-- No `fdroid lint` / `fdroid build` / `fdroid scanner`.
-- No fdroiddata MR.
-- No full `assembleIvarnaRelease`.
-- No commit / push of the Xlorie tree.
-- No git-history rewrite (see §8).
+| Gate | Result |
+|---|---|
+| `fdroid lint com.ivarna.fluxlinux` | **Pass** |
+| `fdroid scanner --exit-code …:12` | **0 problems** |
+| `fdroid build --test --refresh-scanner --on-server --no-tarball …:12` | **`assembleIvarnaRelease` SUCCESS** (3m 39s Gradle after assemble). APK `tmp/com.ivarna.fluxlinux_12.apk` (32 MiB unsigned) contains compiled `libXlorie.so` + host W^X bins + restored `assets/loader.apk`. |
+| `Binaries:` download of `v2.0.0/app-release.apk` | **404** — expected until the GitHub release asset exists. Not a compile failure. |
 
-**Updated in this pass:** this plan, `docs/plans/README.md`, `com.ivarna.fluxlinux.yml` `scanignore` (drop unused paths), and the matching block in `docs/releases/v2.0.0-fdroid-release-plan.md`.
+Recipe that built: `com.ivarna.fluxlinux.yml` (`commit: 63f022a`, `submodules: true`, `gradle: [ivarna]`, `prebuild` assemble, `sudo` `binutils bison patch gcc libc6-dev xz-utils zstd bzip2`).
+
+Not done: fdroiddata MR, `v2.0.0` tag / `app-release.apk` upload, history rewrite (§8).
 
 ---
 

@@ -62,11 +62,12 @@ Builds:
     submodules: true
     sudo:
       - apt-get update
-      - apt-get install -y binutils bison patch gcc python3
-      - cd .. && python3 scripts/assemble_bootstrap.py --package-name com.ivarna.fluxlinux
-        --list native/package-lists/termux-lib-ssot.txt --mode full
+      - apt-get install -y binutils bison patch gcc libc6-dev python3 xz-utils zstd
+        bzip2
     gradle:
       - ivarna
+    prebuild: python3 ../scripts/assemble_bootstrap.py --package-name com.ivarna.fluxlinux
+      --list ../native/package-lists/termux-lib-ssot.txt --mode full
     scanignore:
       - native/bootstrap/
       - app/src/ivarna/assets/pulse-runtime/
