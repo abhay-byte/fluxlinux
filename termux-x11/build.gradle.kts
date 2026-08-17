@@ -6,11 +6,26 @@ plugins {
 android {
     namespace = "com.termux.x11"
     compileSdk = 36
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 26
         buildConfigField("String", "COMMIT", "\"1.03.01\"")
         buildConfigField("String", "VERSION_NAME", "\"1.03.01\"")
+        // libXlorie.so is compiled from source (upstream lorie native tree);
+        // Ivarna packages arm64-v8a only (x86_64 runs it via NDK translation).
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    // Compile libXlorie.so from source: vendored lorie native tree + 16
+    // dependency submodules under src/main/cpp/ (pinned upstream commits).
+    // Toolchain at build time: Python3 + Bison + patch (see docs/plans).
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     buildTypes {

@@ -223,7 +223,25 @@ def create_tarball(extract_dir: Path, target_prefix: str, tar_path: Path) -> Non
     print(f"[*] Packaging bootstrap into {tar_path}...")
     if tar_path.exists():
         tar_path.unlink()
-    subprocess.run(["tar", "-cf", str(tar_path), "usr"], cwd=files_dir, check=True)
+    # F-Droid reproducible publish: pin sort order, mtime, uid/gid so the APK
+    # hash does not change between machines (docs/plans/fdroid-buildserver-native-so.md).
+    source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH", "")
+    mtime = source_date_epoch if source_date_epoch.isdigit() else "0"
+    subprocess.run(
+        [
+            "tar",
+            "--sort=name",
+            f"--mtime=@{mtime}",
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            "-cf",
+            str(tar_path),
+            "usr",
+        ],
+        cwd=files_dir,
+        check=True,
+    )
     size_mb = tar_path.stat().st_size / (1024 * 1024)
     print(f"[*] Tarball created: {size_mb:.2f} MB")
 
@@ -306,7 +324,9 @@ def main() -> None:
     ap.add_argument(
         "--loader-apk",
         type=Path,
-        default=ROOT / "native/loader/shell-loader.apk",
+        default=None,
+        help="Path to loader.apk (default: app/src/main/assets/loader.apk, "
+        "or loader.bin if the scanner already deleted the .apk)",
     )
     ap.add_argument(
         "--allow-missing",
@@ -325,6 +345,10 @@ def main() -> None:
         help="full = host+GUI (pulse/xkb); terminal-proot = shell+proot only",
     )
     args = ap.parse_args()
+    if args.loader_apk is None:
+        apk = ROOT / "app/src/main/assets/loader.apk"
+        fallback = ROOT / "app/src/main/assets/loader.bin"
+        args.loader_apk = apk if apk.is_file() else fallback
 
     package_name = args.package_name
     deb_dir = (args.deb_dir or ROOT / "native/output" / package_name).resolve()

@@ -35,6 +35,7 @@ packages/android-ndk-r27d-aarch64-linux-musl.tar.xz
 
 # Module build outputs
 termux-x11/build/
+termux-x11/.cxx/
 stub/build/
 
 app/release

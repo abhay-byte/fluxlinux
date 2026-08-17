@@ -88,7 +88,11 @@ android {
             }
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // F-Droid has no keystore.properties; an empty signingConfig
+            // ("release" without storeFile) fails assemble. Sign only locally.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -152,6 +156,23 @@ val flavorAppIds = mapOf(
     "ivarna" to "com.ivarna.fluxlinux",
     "zenithblue" to "com.zenithblue.fluxlinux"
 )
+
+// F-Droid's scanner always deletes *.apk before Gradle. Keep a .bin twin
+// (scanignored) and restore assets/loader.apk so HostScriptDeployer still
+// finds it in the F-Droid-built APK.
+tasks.register("restoreLoaderApk") {
+    val dest = file("src/main/assets/loader.apk")
+    val src = file("src/main/assets/loader.bin")
+    inputs.file(src)
+    outputs.file(dest)
+    doLast {
+        if (src.isFile && (!dest.isFile || dest.length() != src.length())) {
+            src.copyTo(dest, overwrite = true)
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" || it.name.startsWith("pre") && it.name.endsWith("Build") }
+    .configureEach { dependsOn("restoreLoaderApk") }
 
 for ((flavorName, appId) in flavorAppIds) {
     val taskName = "packageHostAssets" + flavorName.replaceFirstChar { it.uppercase() }
