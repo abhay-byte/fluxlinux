@@ -1,27 +1,45 @@
-# Worker 06 — Links, Install Permissions & Callback Hardening
+# Worker 06 — Clean Permissions, External Links, Callbacks, and PRoot Bridges
 
 ## Goal
-Preserve the proven v1.8 Play fixes and prevent external-link/deep-link regressions.
+Remove obsolete external-Termux/install permissions and reduce the Android surface exposed to the embedded Linux guest.
 
-## Do
-1. Confirm `REQUEST_INSTALL_PACKAGES` is absent.
-2. Confirm no `ApkDownloader`, `PackageInstaller`, `ACTION_INSTALL_PACKAGE`, unknown-sources settings flow, or APK MIME installer remains in Play.
-3. Audit every user-facing external URL. Remove direct `.apk`, `.apks`, `.xapk`, `.zip`, binary attachment, or auto-download install CTA.
-4. External prerequisite buttons may open approved app/product/project landing pages only; FluxLinux must not download/install third-party APKs.
-5. Audit `fluxlinux://callback`: accept callbacks only for active app-created task IDs and expected fixed fields.
-6. Reject arbitrary shell commands, script paths, file paths, URLs, unexpected hosts/actions, duplicate/stale callbacks.
-7. Add regression tests for spoofed callback inputs.
+## Tasks
+1. Confirm Play manifest does **not** contain:
+   - `REQUEST_INSTALL_PACKAGES`;
+   - `ACCESS_SUPERUSER`;
+   - unknown-source installer permissions/APIs.
+2. Because Play now uses the embedded runtime, remove `com.termux.permission.RUN_COMMAND`, Termux/Termux:X11 package queries, and prerequisite UI **if no remaining embedded component truly needs them**.
+3. Remove APK download/install flows, direct `.apk/.apks/.xapk` installation CTAs, and package-installer code.
+4. Audit browsable intents/deep links, especially `fluxlinux://callback`:
+   - accept only fixed expected fields;
+   - bind to active app-created operation/session IDs;
+   - reject arbitrary command/script/path/URL injection;
+   - reject replay/stale callbacks.
+5. Audit PRoot bind mounts. Keep only what is needed for Linux functionality.
+6. Avoid broad `/data`, `/system`, `/vendor`, and whole-storage exposure unless a documented requirement/test proves it is necessary.
+7. Prefer an explicit shared folder/SAF bridge for user files where practical.
+8. Ensure guest processes remain under the FluxLinux Android UID and cannot call privileged Android app APIs through an unsafe command bridge.
+9. Add negative callback/bridge tests.
 
 ## Tests
 ```bash
-rg -n 'REQUEST_INSTALL_PACKAGES|canRequestPackageInstalls|ACTION_INSTALL_PACKAGE|PackageInstaller|application/vnd.android.package-archive' app/src
-rg -n 'https?://[^" ]+\.(apk|apks|xapk|zip)([?" ]|$)' app/src/zenithblue app/src/main fastlane || true
-./gradlew :app:testZenithblueDebugUnitTest
+./gradlew test
+./gradlew lintZenithblueRelease
+./gradlew bundleZenithblueRelease
 ```
-Run adb deep-link negative tests with malformed, stale, unknown-task and injected values.
+
+Run static searches for installer APIs, direct APK URLs, old Termux prerequisite strings, and dangerous callback command execution.
+
+ADB negative tests should attempt malformed callbacks, arbitrary commands, stale IDs, shell metacharacters, and untrusted URLs; all must fail safely.
+
+Device test required guest access: home, temp, networking, selected/shared files, X11/Pulse sockets.
 
 ## Acceptance
-- No APK-install permission or implementation in Play.
-- No direct binary-install link exposed by Play UI/metadata.
-- Valid callback flow still works.
-- Spoofed/stale callbacks cannot trigger shell execution or state transitions.
+- obsolete external-Termux permissions/queries are gone when not needed;
+- no external app installer path exists;
+- callbacks cannot inject arbitrary commands;
+- PRoot bridge/binds are documented and minimized;
+- normal distro/desktop/file workflows still work.
+
+## Do not
+Do not break ordinary guest networking or user file access merely to minimize binds; replace broad access with a controlled bridge where necessary.
