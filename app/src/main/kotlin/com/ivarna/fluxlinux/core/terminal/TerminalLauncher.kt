@@ -177,6 +177,13 @@ object TerminalLauncher {
         forceHostSetup: Boolean = false,
         progress: (done: Long, total: Long, phase: String) -> Unit = { _, _, _ -> }
     ): Boolean {
+        // Fast path (proot-opt-01): host already set up + bootstrap extracted →
+        // skip ensureExtracted / deployScripts / tree sweeps entirely and return
+        // immediately (< 5ms). Only PulseHost runs (AtomicBoolean-guarded no-op).
+        if (!forceHostSetup && isHostSetupDone(ctx) && BootstrapInstaller.isExtracted(ctx)) {
+            PulseHost.ensureStarted(ctx)
+            return true
+        }
         // Corrupt/partial tree (no valid marker) → clean re-extract (containers preserved).
         if (!BootstrapInstaller.ensureExtracted(ctx, onProgress = progress)) {
             return false

@@ -25,6 +25,11 @@ object GuestApkDbRepair {
      */
     fun repairIfNeeded(ctx: Context, method: String, distroId: String? = null) {
         if (method != "proot") return
+        // Versioned cache (proot-opt-01): one sweep per distro, then later session
+        // opens skip the recursive ensureWritableTree() chmod walks entirely.
+        val cacheKey = GuestRepairCache.apkDbKey(distroId ?: method)
+        val prefs = ctx.getSharedPreferences(GuestRepairCache.PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(cacheKey, false)) return
         val prootName = GuestZshrcRepair.resolveProotName(distroId)
         val isChimera = prootName == "chimera"
         if (prootName != "alpine" && !isChimera) return
@@ -91,6 +96,8 @@ object GuestApkDbRepair {
                 if (!log.exists()) log.writeText("")
                 log.setWritable(true, false)
             }
+            // Cache only after a completed sweep (exception above leaves it unset).
+            prefs.edit().putBoolean(cacheKey, true).apply()
         } catch (e: Exception) {
             Log.w(TAG, "apk db repair failed: ${e.message}")
         }

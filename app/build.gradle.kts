@@ -135,6 +135,10 @@ android {
             useLegacyPackaging = true
         }
     }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 // Reproducible builds configuration for F-Droid

@@ -362,4 +362,28 @@ class GuestZshrcRepairTest {
             dir.deleteRecursively()
         }
     }
+
+    @Test
+    fun repairIfNeeded_cachesCompletion_skipsSecondPass() {
+        val dir = prootFilesDir()
+        try {
+            val home = File(
+                dir,
+                "usr/var/lib/proot-distro/containers/alpine/rootfs/home/flux"
+            )
+            home.mkdirs()
+            val ctx = FakeContext(dir, "$dir/jni")
+            // First pass creates the profile and caches completion (proot-opt-01).
+            GuestZshrcRepair.repairIfNeeded(ctx, "proot", "alpine")
+            val zshrc = File(home, ".zshrc")
+            assertTrue(zshrc.isFile)
+            // Second pass must return instantly via the SharedPreferences flag —
+            // deleting the file proves the cached pass did not re-scan/rewrite.
+            zshrc.delete()
+            GuestZshrcRepair.repairIfNeeded(ctx, "proot", "alpine")
+            assertFalse("cached pass should not recreate .zshrc", zshrc.exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

@@ -172,6 +172,9 @@ object StateManager {
         }
         
         editor.apply()
+        // proot-opt-01: invalidate versioned guest-repair flags so a fresh
+        // install re-runs the zshrc / apk-db repair pass for this distro.
+        com.ivarna.fluxlinux.core.terminal.GuestRepairCache.clearDistro(context, distroId)
         android.util.Log.d("StateManager", "Cleared all state for distro: $distroId")
     }
 

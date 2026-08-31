@@ -14,7 +14,7 @@ class FakePrefsContext(
     nativeLibDir: String = "/fake/jni"
 ) : FakeContext(filesDir, nativeLibDir) {
 
-    val prefs = InMemoryPrefs()
+    override val prefs = InMemoryPrefs()
 
     override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = prefs
 }

@@ -23,6 +23,30 @@ object HostScriptDeployer {
 
     private const val TAG = "HostScriptDeployer"
 
+    /**
+     * Deploy marker (proot-opt-01): `home/.fluxlinux/scripts.deployed` holds the
+     * current [DEPLOY_VERSION]. Bump the version whenever the script list or any
+     * deployed asset changes so existing installs re-deploy on the next cold run.
+     * A current marker makes [deployScripts] a no-op — no 30-script asset copy,
+     * no pulse overlay, no loader churn — on successive warm sessions.
+     */
+    internal const val DEPLOY_VERSION = 1
+    private const val MARKER_REL = "home/.fluxlinux/scripts.deployed"
+
+    /** Marker file: content is the deployed [DEPLOY_VERSION]. */
+    internal fun deployMarker(ctx: Context): File = File(ctx.filesDir, MARKER_REL)
+
+    internal fun isDeployed(ctx: Context): Boolean {
+        val marker = deployMarker(ctx)
+        return marker.isFile && marker.readText().trim() == DEPLOY_VERSION.toString()
+    }
+
+    internal fun markDeployed(ctx: Context) {
+        val marker = deployMarker(ctx)
+        marker.parentFile?.mkdirs()
+        marker.writeText(DEPLOY_VERSION.toString())
+    }
+
     private data class HostScript(
         val name: String,
         val assetPath: String,
@@ -136,10 +160,21 @@ object HostScriptDeployer {
         HostScript("stop_guest_gui.sh", "scripts/chroot/stop_guest_gui.sh"),
     )
 
-    /** @return false when any required deploy step fails (fail-closed contract). */
-    fun deployScripts(ctx: Context): Boolean {
+    /**
+     * Deploy host + distro scripts/assets into `$HOME` and the loader APK.
+     * Idempotent: when the deploy marker is current and [force] is false the
+     * whole loop is skipped (warm path). The package-path rewrite tree walk
+     * (applyPackageToExtractedPrefix) was removed from here — it already runs
+     * inside [BootstrapInstaller] on extraction, and re-walking usr/bin,
+     * usr/etc, usr/share, python3.14 and include on every call is the startup
+     * stall this optimization removes.
+     *
+     * @param force when true, always rewrite assets and refresh the marker
+     * @return false when any required deploy step fails (fail-closed contract)
+     */
+    fun deployScripts(ctx: Context, force: Boolean = false): Boolean {
+        if (!force && isDeployed(ctx)) return true
         return try {
-            TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir, ctx)
             val homeDir = File(ctx.filesDir, "home").also { it.mkdirs() }
             var ok = true
             for (script in HOST_SCRIPTS) {
@@ -167,6 +202,7 @@ object HostScriptDeployer {
             overlayPulseRuntime(ctx)
             val loaderOk = deployLoaderApk(ctx)
             if (!loaderOk) Log.w(TAG, "loader.apk deploy failed — host not ready")
+            if (ok && loaderOk) markDeployed(ctx)
             ok && loaderOk
         } catch (e: Exception) {
             Log.e(TAG, "Failed to deploy scripts", e)

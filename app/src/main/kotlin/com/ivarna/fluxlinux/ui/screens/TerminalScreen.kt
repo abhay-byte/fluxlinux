@@ -405,8 +405,15 @@ fun TerminalScreen(
                         // freshly opened or switched session never shows a blank/dead view.
                         view.isFocusable = true
                         view.isFocusableInTouchMode = true
-                        FluxTerminalSessionManager.attachView(view)
-                        view.requestFocus()
+                        // T3/proot-opt-01: only re-attach + re-focus when the session
+                        // actually changed (new tab / switched tab). Typing, font-size,
+                        // extra-keys and other recompositions must NOT re-attach the
+                        // same TerminalSession or steal focus every frame.
+                        val activeTerminalSession = FluxTerminalSessionManager.activeSession?.session
+                        if (activeTerminalSession == null || view.currentSession != activeTerminalSession) {
+                            FluxTerminalSessionManager.attachView(view)
+                            view.requestFocus()
+                        }
                         // T5: resize + SIGWINCH only on real size/pid change.
                         forceTerminalResize(view)
                     },

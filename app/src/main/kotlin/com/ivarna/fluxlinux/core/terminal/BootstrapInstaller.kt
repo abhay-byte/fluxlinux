@@ -82,9 +82,12 @@ object BootstrapInstaller {
         onProgress: (done: Long, total: Long, phase: String) -> Unit = { _, _, _ -> }
     ): Boolean {
         if (!force && isExtracted(ctx)) {
-            // Re-apply SSOT rewrite + proot-distro PROOT_LOADER pass-through + host env
-            // (idempotent; fixes installs extracted before the W^X patch landed).
-            TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir, ctx)
+            // Happy path (proot-opt-01): the prefix is already extracted AND the
+            // package rewrite / host env were applied when markExtracted() ran.
+            // Re-walking the whole prefix tree here on every terminal open is the
+            // multi-second startup stall — skip it. Old trees predating the W^X
+            // rewrite carry an older EXTRACT_VERSION marker → fail isExtracted →
+            // full re-extract path below re-applies applyPackageToExtractedPrefix.
             return true
         }
         return try {

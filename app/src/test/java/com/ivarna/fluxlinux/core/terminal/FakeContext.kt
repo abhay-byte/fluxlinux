@@ -1,7 +1,9 @@
 package com.ivarna.fluxlinux.core.terminal
 
 import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
+import com.ivarna.fluxlinux.core.utils.InMemoryPrefs
 import java.io.File
 
 /**
@@ -19,10 +21,15 @@ open class FakeContext(
         sourceDir = "/data/app/fake/fake.apk"
     }
 
+    /** In-memory prefs (proot-opt-01: GuestZshrcRepair / GuestApkDbRepair need them). */
+    open val prefs = InMemoryPrefs()
+
     override fun getApplicationInfo(): ApplicationInfo = appInfo
     override fun getApplicationContext() = this
     override fun getFilesDir(): File = filesDir
     override fun getCacheDir(): File = File(filesDir, "cache").also { it.mkdirs() }
     override fun getAssets(): android.content.res.AssetManager =
         throw UnsupportedOperationException("assets not stubbed")
+
+    override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = prefs
 }

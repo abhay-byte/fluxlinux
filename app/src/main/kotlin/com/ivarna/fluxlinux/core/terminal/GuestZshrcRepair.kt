@@ -130,6 +130,11 @@ fi
 """.trimStart()
 
     fun repairIfNeeded(ctx: Context, method: String, distroId: String? = null) {
+        // Versioned cache (proot-opt-01): after one successful verification pass
+        // per distro, later session opens skip the file reads + regex sweeps.
+        val cacheKey = GuestRepairCache.zshrcKey(distroId ?: method)
+        val prefs = ctx.getSharedPreferences(GuestRepairCache.PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(cacheKey, false)) return
         val zshrc = resolveZshrc(ctx, method, distroId) ?: return
         val rootfs = zshrc.parentFile?.parentFile?.parentFile // home/flux/.zshrc → rootfs
         val isApkGuest = isApkGuest(distroId)
@@ -176,6 +181,8 @@ fi
                 writeEnsureLocaleScript(rootfs)
             }
             writeFastfetchPresets(zshrc.parentFile, rootfs)
+            // Cache only after a completed pass (exception above leaves it unset).
+            prefs.edit().putBoolean(cacheKey, true).apply()
         } catch (e: Exception) {
             Log.w(TAG, "zshrc repair failed: ${e.message}")
         }
