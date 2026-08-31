@@ -40,7 +40,7 @@ SCHEMA_VERSION = 1
 # upstream checksum is represented as null, never invented.
 ROOTFS = [
     ("distro_debian", "rootfs.debian", "debian", "debian_13_rootfs.tar.xz", "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803", 50 * 1024 * 1024, "Debian 13 arm64 maintainer-supplied Flux rootfs; source URL not recorded", None, "docs/playstore/v2_0_compliance_roadmap.md"),
-    ("distro_alpine", "rootfs.alpine", "alpine", "alpine_3.24_rootfs.tar.gz", "f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259", 1 * 1024 * 1024, "Official Alpine minirootfs 3.24.1; source URL not recorded in the archive record", None, "docs/distro/alpine.md"),
+    ("distro_alpine", "rootfs.alpine", "alpine", "alpine_3.24_rootfs.tar.gz", "da25146101274ce944472380285f09b96583dcb6093cdf57058ef2648b5f75d7", 1 * 1024 * 1024, "Official Alpine minirootfs 3.24.1 expanded with the FluxLinux Play baseline package set", None, "docs/distro/alpine.md"),
     ("distro_fedora", "rootfs.fedora", "fedora", "fedora_44_rootfs.tar.xz", "2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4", 20 * 1024 * 1024, "Fedora Container Base Generic-Minimal 44 aarch64 OCI input; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
     ("distro_void", "rootfs.void", "void", "void_20250202_rootfs.tar.xz", "01a30f17ae06d4d5b322cd579ca971bc479e02cc284ec1e5a4255bea6bac3ce6", 20 * 1024 * 1024, "Void Linux glibc aarch64 2025-02-02 maintainer-supplied rootfs; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
     ("distro_opensuse", "rootfs.opensuse", "opensuse", "opensuse_tumbleweed_rootfs.tar.xz", "bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a", 15 * 1024 * 1024, "openSUSE Tumbleweed aarch64 20251127 maintainer-supplied rootfs; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
@@ -197,6 +197,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT / "assets" / "rootfs")
     parser.add_argument(
+        "--alpine-source",
+        type=Path,
+        help="Optional pre-provisioned Alpine Play baseline archive; other payloads use --source-root",
+    )
+    parser.add_argument(
         "--host-source",
         type=Path,
         default=ROOT / "native" / "bootstrap" / "com.zenithblue.fluxlinux" / "bootstrap.tar",
@@ -236,7 +241,11 @@ def main() -> None:
         stage_payload(host_source, "runtime_host", "bootstrap.tar", host_manifest, output_root)
 
     for module, payload_id, distro_id, archive_name, expected_hash, min_bytes, upstream, upstream_hash, record in ROOTFS:
-        source = source_root / archive_name
+        source = (
+            args.alpine_source.resolve()
+            if distro_id == "alpine" and args.alpine_source
+            else source_root / archive_name
+        )
         digest, compressed, expanded = verify_one(source, expected_hash, min_bytes, archive_name)
         metadata = manifest_for(
             payload_id,

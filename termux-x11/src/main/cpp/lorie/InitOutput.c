@@ -209,7 +209,7 @@ void ddxGiveUp(unused enum ExitCode error) {
     log(ERROR, "Server stopped (%d)", error);
     CloseWellKnownConnections();
     UnlockServer();
-    exit(error);
+    /* dix_main owns the final return; never terminate the Android process. */
 }
 
 static void* ddxReadyThread(unused void* cookie) {
@@ -243,7 +243,7 @@ static void* ddxReadyThread(unused void* cookie) {
                 pid_t w = waitpid(pid, &status, 0);
                 if (w == -1) {
                     perror("waitpid");
-                    GiveUp(SIGKILL);
+                    GiveUp(SIGTERM);
                 }
 
                 if (WIFEXITED(status)) {

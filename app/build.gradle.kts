@@ -210,6 +210,7 @@ for ((flavorName, appId) in flavorAppIds) {
 
 val playPayloadSourceRoot = providers.gradleProperty("playPayloadSourceRoot")
     .orElse(rootProject.file("assets/rootfs").absolutePath)
+val playAlpineSource = providers.gradleProperty("playAlpineSource")
 val playHostBootstrapSource = providers.gradleProperty("playHostBootstrapSource")
     .orElse(rootProject.file("native/bootstrap/com.zenithblue.fluxlinux/bootstrap.tar").absolutePath)
 val playPayloadOutputDirs = listOf(
@@ -232,12 +233,16 @@ tasks.register<Exec>("preparePlayPayloads") {
     group = "build"
     description = "Verify and stage Play payloads into ignored dynamic-feature assets"
     workingDir = rootProject.projectDir
-    commandLine(
-        "python3",
-        "scripts/prepare_play_payloads.py",
+    val prepareArgs = mutableListOf(
+        "python3", "scripts/prepare_play_payloads.py",
         "--source-root", playPayloadSourceRoot.get(),
         "--host-source", playHostBootstrapSource.get()
     )
+    playAlpineSource.orNull?.let {
+        prepareArgs += listOf("--alpine-source", it)
+        inputs.file(it)
+    }
+    commandLine(prepareArgs)
     inputs.files(fileTree(playPayloadSourceRoot))
     inputs.file(playHostBootstrapSource)
     outputs.dirs(playPayloadOutputDirs)

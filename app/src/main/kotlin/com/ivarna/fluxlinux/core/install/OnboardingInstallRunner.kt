@@ -205,6 +205,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         completePhase(phases, hostIdx, onProgress, "Host ready")
 
         val profile = DistroInstallProfile.require(distroId)
+        val verifiedRootfsSpec = PayloadProviders.rootfs.verifiedSpec(profile)
         enter(phases, dlIdx, onProgress, "Acquiring ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
@@ -245,7 +246,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             put("PYTHONUNBUFFERED", "1")
             put("FLUX_ROOTFS_PATH", "${TermuxHostPaths.HOME}/${profile.rootfsFileName}")
             put("FLUX_ROOTFS_NAME", profile.rootfsFileName)
-            put("FLUX_ROOTFS_SHA256", profile.rootfsSha256)
+            put("FLUX_ROOTFS_SHA256", verifiedRootfsSpec.sha256)
         }
         // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
         // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
@@ -291,9 +292,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
             false
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
-        log(phases, customIdx, onProgress, "Staging Oh My Zsh on host (avoids proot hang)…")
+        log(phases, customIdx, onProgress, "Preparing optional shell customization…")
         val hostOmzOk = try {
-            ProotZshBootstrap.install(appCtx, profile.prootName) { line ->
+            FlavorCustomizationBridge.install(appCtx, profile.prootName) { line ->
                 if (!isStale(gen) && line.isNotBlank()) log(phases, customIdx, onProgress, line)
             }
         } catch (e: Exception) {
@@ -437,7 +438,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
             bbExport +
             "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
-                "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +
+                "export FLUX_ROOTFS_SHA256='${PayloadProviders.rootfs.verifiedSpec(profile).sha256}'; " +
                 "export FLUX_CHROOT='$chrootPath'; " +
                 "export FLUX_DISTRO_LABEL='$label'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +

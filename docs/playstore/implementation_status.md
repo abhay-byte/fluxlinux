@@ -1,6 +1,6 @@
 # FluxLinux Play v2 implementation status
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Baseline
 
@@ -23,7 +23,7 @@ features; later policy-removal workers remain unchanged.
 | 01 `branch_baseline` | pass | Exact v2 baseline prepared with pinned submodules and generated ignored bootstrap input; Play/non-Play builds and tests pass. |
 | 02 `play_flavor_boundary` | pass | Common installers consume verified payload abstractions; zenithblue is packaged/local-only with rooted paths gated off, and ivarna retains release-backed providers. |
 | 03 `remove_remote_executable_delivery` | partial | PFD delivery, provenance, atomic app-private staging, and Play AAB boundaries are implemented; no physical Play/device E2E was available in this worker. |
-| 04 `remove_nested_and_writable_executables` | partial | Host W^X routing, libattr/libacl closure, embedded X11 path, Pulse/PRoot artifact cleanup, APK/AAB scans, bundletool installation, and host/Alpine PFD smoke evidence pass. Full Alpine package customization and the resulting XFCE/X11 display session were not completed because the device's Alpine repository DNS was intermittent; see `worker_reports/04_remove_nested_and_writable_executables_report.md`. |
+| 04 `remove_nested_and_writable_executables` | partial | Host W^X/permission routing, Android-derived guest DNS, pre-provisioned local-only Alpine Play baseline, embedded X11 lifecycle refactor, Pulse/PRoot artifact cleanup, and fresh APK/AAB scans pass. Android DNS is healthy; guest resolver/package-network failure remains under investigation, and device-visible Alpine/XFCE/X11 E2E is unverified. A 16 KB ELF alignment blocker is recorded in `worker_reports/04_remove_nested_and_writable_executables_report.md`. |
 | 05 `remove_root_chroot_from_play` | pending |  |
 | 06 `links_permissions_and_callbacks` | pending |  |
 | 07 `foreground_services` | pending |  |

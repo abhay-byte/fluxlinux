@@ -373,6 +373,7 @@ object DesktopLauncher {
                             logText = GuiDesktopLog.read(app)
                         )
                     }
+                    EmbeddedX11.stopServer(app)
                     onDone?.invoke()
                 }
             )

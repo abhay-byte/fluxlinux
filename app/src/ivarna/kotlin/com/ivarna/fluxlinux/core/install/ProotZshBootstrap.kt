@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
  * hang for a long time (slow unlink of partial clones; unbounded network).
  * Java [File.deleteRecursively] + host `git` (PREFIX) is much more reliable.
  */
-object ProotZshBootstrap {
+internal object ProotZshBootstrap {
 
     private const val TAG = "ProotZshBootstrap"
     private const val OMZ_URL = "https://github.com/ohmyzsh/ohmyzsh.git"

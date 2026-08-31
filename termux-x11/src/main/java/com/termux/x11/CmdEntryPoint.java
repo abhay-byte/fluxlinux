@@ -38,23 +38,49 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
      *
      * @param args The command-line arguments
      */
-    public static void main(String[] args) {
-        android.util.Log.i("CmdEntryPoint", "commit " + BuildConfig.COMMIT);
-        // EmbeddedX11 calls this from its dedicated server thread. Posting to
-        // the app main looper would make server startup dependent on UI work.
-        if (Looper.myLooper() == handler.getLooper())
-            handler.post(() -> new CmdEntryPoint(args));
-        else
-            new CmdEntryPoint(args);
-        Looper.loop();
+    public static int main(String[] args) {
+        return main(args, null);
     }
 
-    CmdEntryPoint(String[] args) {
-        if (!start(args))
-            System.exit(1);
+    /** Run the embedded server and return its native Xorg status to the owner thread. */
+    public static int main(String[] args, Runnable onStarted) {
+        android.util.Log.i("CmdEntryPoint", "commit " + BuildConfig.COMMIT);
+        CmdEntryPoint endpoint = new CmdEntryPoint(args, onStarted);
+        if (!endpoint.started)
+            return 1;
+        try {
+            return waitForServer();
+        } finally {
+            endpoint.close();
+        }
+    }
 
-        spawnListeningThread();
-        sendBroadcastDelayed();
+    private final boolean started;
+    private final Runnable delayedBroadcast = new Runnable() {
+        @Override
+        public void run() {
+            sendBroadcastDelayed();
+        }
+    };
+
+    CmdEntryPoint(String[] args, Runnable onStarted) {
+        started = start(args);
+        if (!started) {
+            Log.e("CmdEntryPoint", "Embedded X11 native start failed");
+            return;
+        }
+
+        if (onStarted != null)
+            onStarted.run();
+        // The embedded owner does not need the standalone TCP discovery
+        // listener. Send the same-package ACTION_START directly, then retry
+        // briefly while the in-app display Activity finishes registering.
+        sendBroadcast(intent);
+        handler.postDelayed(delayedBroadcast, 100);
+    }
+
+    private void close() {
+        handler.removeCallbacks(delayedBroadcast);
     }
 
     @SuppressLint({"WrongConstant", "PrivateApi"})
@@ -134,11 +160,7 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         if (!connected())
             sendBroadcast(intent);
 
-        handler.postDelayed(this::sendBroadcastDelayed, 1000);
-    }
-
-    void spawnListeningThread() {
-        new Thread(this::listenForConnections).start();
+        handler.postDelayed(delayedBroadcast, 1000);
     }
 
     /** @noinspection DataFlowIssue*/
@@ -184,6 +206,8 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
     }
 
     public static native boolean start(String[] args);
+    private static native int waitForServer();
+    public static native void stop();
     public native ParcelFileDescriptor getXConnection();
     public native ParcelFileDescriptor getLogcatOutput();
     private static native boolean connected();
@@ -207,7 +231,6 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         } catch (UnsatisfiedLinkError | Exception e) {
             Log.e("CmdEntryPoint", "Failed to load embedded libXlorie.so", e);
             System.err.println("Failed to load embedded X11 native library.");
-            System.exit(134);
         }
     }
 }

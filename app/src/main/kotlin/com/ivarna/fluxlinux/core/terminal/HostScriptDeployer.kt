@@ -21,10 +21,19 @@ object HostScriptDeployer {
 
     private const val TAG = "HostScriptDeployer"
 
-    private data class HostScript(
+    internal enum class AssetType {
+        SCRIPT,
+        GUEST_EXECUTABLE,
+        GUEST_LIBRARY,
+        CONFIG,
+        DATA
+    }
+
+    internal data class HostScript(
         val name: String,
         val assetPath: String,
-        val required: Boolean = true
+        val required: Boolean = true,
+        val type: AssetType = AssetType.SCRIPT
     )
 
     private val HOST_SCRIPTS: List<HostScript> = listOf(
@@ -66,7 +75,8 @@ object HostScriptDeployer {
         HostScript(
             "bwrap-proot-shim",
             "scripts/common/setup/bwrap-proot-shim",
-            required = false
+            required = false,
+            type = AssetType.GUEST_EXECUTABLE
         ),
         HostScript("setup_fedora_family.sh", "scripts/fedora/common/setup/setup_fedora_family.sh"),
         HostScript("setup_void_family.sh", "scripts/void/common/setup/setup_void_family.sh"),
@@ -107,7 +117,8 @@ object HostScriptDeployer {
         HostScript(
             "libevp_md2.so",
             "scripts/opensuse/common/libevp_md2.so",
-            required = false
+            required = false,
+            type = AssetType.GUEST_LIBRARY
         ),
         // Chroot setup/uninstall
         HostScript("setup_debian13_chroot.sh", "scripts/chroot/setup_debian13_chroot.sh"),
@@ -146,7 +157,7 @@ object HostScriptDeployer {
                     ctx.assets.open(script.assetPath).use { input ->
                         FileOutputStream(out).use { input.copyTo(it) }
                     }
-                    out.setExecutable(true, false)
+                    applyPermissions(out, script.type)
                 } catch (e: Exception) {
                     Log.w(TAG, "Script ${script.assetPath} not found in assets", e)
                     if (script.required) ok = false
@@ -168,6 +179,18 @@ object HostScriptDeployer {
             Log.e(TAG, "Failed to deploy scripts", e)
             false
         }
+    }
+
+    /**
+     * Host scripts and guest helper executables need 0755. Guest shared
+     * libraries, configs and data are deployed as non-executable 0644 files;
+     * the guest loader decides how to map a library later.
+     */
+    private fun applyPermissions(file: File, type: AssetType) {
+        val executable = type == AssetType.SCRIPT || type == AssetType.GUEST_EXECUTABLE
+        file.setReadable(true, false)
+        file.setWritable(true, false)
+        file.setExecutable(executable, false)
     }
 
     /**

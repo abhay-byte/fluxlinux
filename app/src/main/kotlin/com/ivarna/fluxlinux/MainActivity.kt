@@ -307,7 +307,7 @@ class MainActivity : ComponentActivity() {
             android.util.Log.w("FluxLinux", "Host theme stage failed", e)
         }
         try {
-            val omzOk = com.ivarna.fluxlinux.core.install.ProotZshBootstrap.install(
+            val omzOk = com.ivarna.fluxlinux.core.install.FlavorCustomizationBridge.install(
                 activity, prootName
             ) { line ->
                 android.util.Log.i("FluxLinux", "Host OMZ ($prootName): $line")

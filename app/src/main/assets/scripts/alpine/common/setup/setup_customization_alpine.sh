@@ -38,8 +38,11 @@ if id -gn "$CUSTOM_USER" >/dev/null 2>&1; then
     CUSTOM_GROUP="$(id -gn "$CUSTOM_USER")"
 fi
 
-# DNS
-if [ ! -s /etc/resolv.conf ]; then
+# DNS: prefer the Android active-network resolver when this helper is invoked
+# directly; the common helper handles the concatenated proot path.
+if command -v _flux_ensure_dns >/dev/null 2>&1; then
+    _flux_ensure_dns
+elif [ ! -s /etc/resolv.conf ]; then
     printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
 fi
 

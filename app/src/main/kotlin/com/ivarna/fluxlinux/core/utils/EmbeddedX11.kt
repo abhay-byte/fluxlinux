@@ -24,27 +24,54 @@ object EmbeddedX11 {
      * into this app). Equivalent of the standalone termux-x11 binary: it binds
      * the X socket and broadcasts ACTION_START which the X11 activity receives.
      */
-    @Volatile
-    private var serverThread: Thread? = null
+    enum class State { STOPPED, STARTING, RUNNING, STOPPING }
 
-    fun startServer(context: Context) {
-        if (serverThread?.isAlive == true) return
-        val app = context.applicationContext
-        serverThread = Thread({
-            try {
-                android.os.Looper.prepare()
-                // CmdEntryPoint normally discovers the current application,
-                // but pin the same-package context explicitly for the module's
-                // ACTION_START broadcast.
-                com.termux.x11.CmdEntryPoint.ctx = app
-                com.termux.x11.CmdEntryPoint.main(arrayOf(":0", "-legacy-drawing"))
-                android.os.Looper.loop()
+    private val lifecycleLock = Any()
+    @Volatile private var lifecycleState = State.STOPPED
+    @Volatile private var serverThread: Thread? = null
+
+    fun state(): State = lifecycleState
+
+    /** Start the native server on its owning thread. */
+    fun startServer(context: Context): Boolean {
+        synchronized(lifecycleLock) {
+            if (lifecycleState == State.RUNNING || lifecycleState == State.STARTING)
+                return true
+            if (lifecycleState == State.STOPPING)
+                return false
+            lifecycleState = State.STARTING
+            val app = context.applicationContext
+            val thread = Thread({
+                try {
+                    android.os.Looper.prepare()
+                    com.termux.x11.CmdEntryPoint.ctx = app
+                    val status = com.termux.x11.CmdEntryPoint.main(
+                        arrayOf(":0", "-legacy-drawing")
+                    ) {
+                        synchronized(lifecycleLock) { lifecycleState = State.RUNNING }
+                        Log.i(TAG, "Embedded X11 native server started")
+                    }
+                    Log.i(TAG, "Embedded X11 native server returned status=$status")
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Embedded X11 server failed without killing the app", e)
+                } finally {
+                    synchronized(lifecycleLock) {
+                        lifecycleState = State.STOPPED
+                        serverThread = null
+                    }
+                }
+            }, "fluxlinux-x11-server")
+            thread.isDaemon = false
+            serverThread = thread
+            return try {
+                thread.start()
+                true
             } catch (e: Exception) {
-                Log.e(TAG, "Embedded X11 server exited", e)
+                lifecycleState = State.STOPPED
+                serverThread = null
+                Log.e(TAG, "Could not create embedded X11 thread", e)
+                false
             }
-        }, "fluxlinux-x11-server").apply {
-            isDaemon = false
-            start()
         }
     }
 
@@ -52,11 +79,42 @@ object EmbeddedX11 {
     fun launchPreferences(context: Context): Boolean =
         launch(context, com.termux.x11.LoriePreferences::class.java)
 
-    /** Ask the in-app X11 session to stop. */
+    /** Close only the in-app display Activity; this does not stop the server. */
     fun stopDisplay(context: Context) {
         runCatching {
             context.sendBroadcast(Intent("com.termux.x11.ACTION_STOP").setPackage(context.packageName))
         }
+    }
+
+    /** Request the bundled Xorg loop to stop and join its owning thread. */
+    fun stopServer(context: Context, timeoutMs: Long = 10_000L): Boolean {
+        val thread = synchronized(lifecycleLock) {
+            val current = serverThread
+            if (current == null || !current.isAlive) {
+                lifecycleState = State.STOPPED
+                return true
+            }
+            lifecycleState = State.STOPPING
+            current
+        }
+        runCatching { com.termux.x11.CmdEntryPoint.stop() }
+            .onFailure { Log.e(TAG, "Could not request embedded X11 stop", it) }
+        if (thread !== Thread.currentThread()) {
+            runCatching { thread.join(timeoutMs) }
+        }
+        val stopped = !thread.isAlive
+        if (stopped) {
+            synchronized(lifecycleLock) { lifecycleState = State.STOPPED }
+        } else {
+            Log.w(TAG, "Embedded X11 did not stop within ${timeoutMs}ms")
+        }
+        return stopped
+    }
+
+    /** Stop a previous server, then start a fresh native Xorg instance. */
+    fun restartServer(context: Context): Boolean {
+        if (!stopServer(context)) return false
+        return startServer(context)
     }
 
     private fun launch(context: Context, cls: Class<*>): Boolean = try {

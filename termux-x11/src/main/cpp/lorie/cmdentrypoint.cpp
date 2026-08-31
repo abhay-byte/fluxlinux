@@ -16,6 +16,9 @@
 #include <sys/ioctl.h>
 #include <libgen.h>
 #include <cerrno>
+#include <atomic>
+#include <cstdint>
+#include <pthread.h>
 extern "C" {
 #include <globals.h>
 #define class lorie_reserved_class
@@ -35,6 +38,11 @@ extern "C" {
 
 static int argc = 0;
 static char** argv = nullptr;
+static pthread_t xserver_thread;
+static bool xserver_joinable = false;
+static pthread_mutex_t xserver_mutex = PTHREAD_MUTEX_INITIALIZER;
+static std::atomic_bool xserver_running(false);
+static std::atomic_int xserver_status(0);
 __LIBC_HIDDEN__ volatile int conn_fd = -1;
 extern DeviceIntPtr lorieMouse, lorieTouch, lorieKeyboard, loriePen, lorieEraser;
 extern ScreenPtr pScreenPtr;
@@ -46,10 +54,10 @@ char *xtrans_unix_dir_x11 = nullptr;
 
 struct xorg_list registeredBuffers;
 
+extern "C" void GiveUp(int sig);
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_termux_x11_CmdEntryPoint_start(JNIEnv *env, __unused jclass cls, jobjectArray args) {
-    pthread_t t;
-    JavaVM* vm = nullptr;
     auto detectTracer = []() -> Bool {
         FILE *fp;
         char line[256];
@@ -196,17 +204,67 @@ Java_com_termux_x11_CmdEntryPoint_start(JNIEnv *env, __unused jclass cls, jobjec
         return JNI_FALSE;
     }
 
-    env->GetJavaVM(&vm);
-
     AChoreographer *choreographer = AChoreographer_getInstance();
     // Trigger it first time
     AChoreographer_postFrameCallback(choreographer, (AChoreographer_frameCallback) lorieChoreographerFrameCallback, choreographer);
 
     xorg_list_init(&registeredBuffers);
-    pthread_create(&t, nullptr, +[](__unused void* cookie) -> void* {
-        exit(dix_main(argc, (char**) argv, (char*[]) { nullptr }));
-    }, vm);
+    pthread_mutex_lock(&xserver_mutex);
+    if (xserver_running.load()) {
+        pthread_mutex_unlock(&xserver_mutex);
+        return JNI_TRUE;
+    }
+    if (xserver_joinable) {
+        log(ERROR, "X server thread is still joinable");
+        pthread_mutex_unlock(&xserver_mutex);
+        return JNI_FALSE;
+    }
+    xserver_running.store(true);
+    int create_status = pthread_create(&xserver_thread, nullptr, +[](__unused void* cookie) -> void* {
+        const int status = dix_main(argc, (char**) argv, (char*[]) { nullptr });
+        xserver_status.store(status);
+        xserver_running.store(false);
+        return reinterpret_cast<void*>(static_cast<intptr_t>(status));
+    }, nullptr);
+    if (create_status != 0) {
+        xserver_running.store(false);
+        log(ERROR, "Could not create X server thread: %s", strerror(create_status));
+        pthread_mutex_unlock(&xserver_mutex);
+        return JNI_FALSE;
+    }
+    xserver_joinable = true;
+    pthread_mutex_unlock(&xserver_mutex);
     return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_termux_x11_CmdEntryPoint_waitForServer(__unused JNIEnv *env, __unused jclass clazz) {
+    pthread_t thread;
+    pthread_mutex_lock(&xserver_mutex);
+    if (!xserver_joinable) {
+        const int status = xserver_status.load();
+        pthread_mutex_unlock(&xserver_mutex);
+        return status;
+    }
+    thread = xserver_thread;
+    pthread_mutex_unlock(&xserver_mutex);
+    void* result = nullptr;
+    pthread_join(thread, &result);
+    pthread_mutex_lock(&xserver_mutex);
+    xserver_joinable = false;
+    xserver_running.store(false);
+    pthread_mutex_unlock(&xserver_mutex);
+    return static_cast<jint>(reinterpret_cast<intptr_t>(result));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_termux_x11_CmdEntryPoint_stop(__unused JNIEnv *env, __unused jclass clazz) {
+    if (!xserver_running.load())
+        return;
+    // GiveUp is Xorg's own shutdown path: it wakes Dispatch, closes clients,
+    // runs OsCleanup/ddxGiveUp, and lets dix_main return to the owner thread.
+    GiveUp(SIGTERM);
+    lorieWakeServer();
 }
 
 static Bool handleTouchEvent(__unused ClientPtr pClient, void *closure) {
@@ -594,10 +652,9 @@ Java_com_termux_x11_CmdEntryPoint_listenForConnections(JNIEnv *env, jobject thiz
     }
 }
 
-void abort(void) {
-    _exit(134);
-}
-
 void exit(int code) {
-    _exit(code);
+    (void) code;
+    // Xorg's legacy fatal/help paths must not terminate the Android process.
+    GiveUp(SIGTERM);
+    pthread_exit(nullptr);
 }

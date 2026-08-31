@@ -14,6 +14,10 @@ import java.io.File
 object PlayFeatureRootfsProvider : RootfsPayloadProvider {
     override val id: String = "zenithblue-play-feature-delivery"
 
+    override fun verifiedSpec(profile: DistroInstallProfile): VerifiedPayloadSpec =
+        PlayPayloadRegistry.forProfile(profile)?.verifiedSpec
+            ?: VerifiedPayloadStore.spec(profile)
+
     override fun ensurePresent(
         ctx: Context,
         destDir: File,

@@ -137,7 +137,7 @@ object InstallSessionFactory {
         // rootfs identity inside the command string so the chroot setup script
         // can resolve and SHA-check the provider materialization.
         if (rootfsProfile != null) {
-            extra["FLUX_ROOTFS_SHA256"] = rootfsProfile.rootfsSha256
+            extra["FLUX_ROOTFS_SHA256"] = PayloadProviders.rootfs.verifiedSpec(rootfsProfile).sha256
             extra["FLUX_ROOTFS_NAME"] = rootfsProfile.rootfsFileName
         }
         val exports = extra.entries.joinToString(" ") { (k, v) ->
@@ -174,7 +174,7 @@ object InstallSessionFactory {
             extraEnv = mapOf(
                 "FLUX_ROOTFS_PATH" to "${TermuxHostPaths.HOME}/${profile.rootfsFileName}",
                 "FLUX_ROOTFS_NAME" to profile.rootfsFileName,
-                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256
+                "FLUX_ROOTFS_SHA256" to PayloadProviders.rootfs.verifiedSpec(profile).sha256
             )
         )
     }

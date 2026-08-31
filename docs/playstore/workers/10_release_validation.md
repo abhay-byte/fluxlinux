@@ -3,6 +3,21 @@
 ## Goal
 Prove the exact `zenithblue` AAB is technically sound, upgrades safely, receives Flux-managed executable/runtime payloads only through Google Play, and matches every Play Console/store declaration.
 
+## Inherited Worker 04 release blocker
+
+The inspected arm64 base APK produced Android's exact warning: **“This app
+isn’t 16 KB compatible. ELF alignment check failed.”** Affected libraries and
+first `LOAD` alignments were:
+
+`libtermux.so=0x1000`, `libpulseaudio.so=0x4000`, `libproot.so=0x4000`,
+`libpactl.so=0x4000`, `libloader32.so=0x1000`, `libloader.so=0x4000`,
+`libbash.so=0x4000`, `libandroidx.graphics.path.so=0x4000`, and
+`libXlorie.so=0x4000`.
+
+This is a release blocker for Worker 10. The exact tested AAB cannot be
+accepted for release until every affected library is rebuilt or supplied with
+verified 16 KB-compatible alignment and the warning is absent.
+
 ## Build gates
 
 Run from a clean checkout of the implementation branch:

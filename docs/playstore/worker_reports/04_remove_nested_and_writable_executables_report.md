@@ -1,17 +1,29 @@
 # Worker 04 — remove nested and writable executables
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Result
 
 **PARTIAL.** The source, generated host prefix, Play bundle, split APKs, and
-device host-runtime path satisfy the Worker 04 cleanup contracts. The device
-also requested and materialized the Alpine feature and entered the installed
-guest through PRoot. The final Alpine package/customization phase could not be
-completed because Alpine repository DNS was intermittent on the validation
-device, so a full XFCE startup and visible embedded X11 session are not claimed.
+host-runtime cleanup contracts pass. Worker 04 now also carries Android's
+active-network DNS into the guest, uses a pre-provisioned Alpine Play baseline,
+keeps Play customization local-only, and has a non-process-killing embedded
+X11 lifecycle. Device-visible X11 start/stop/restart and a clean offline Alpine
+end-to-end run remain unverified.
 
-The required next worker remains:
+The precise networking status is: **Android connectivity/DNS is healthy;
+guest resolver/package-network failure is under investigation.** On device
+`2a580689`, Android could ping both `1.1.1.1` and
+`dl-cdn.alpinelinux.org`, and the active Wi-Fi DNS was `192.168.1.1`. The PRoot
+guest initially had public resolvers (`8.8.8.8`, `8.8.4.4`); guest hostname
+resolution failed and `apk update` reported transient DNS errors. Replacing the
+guest resolver with the Android DNS was attempted, but the interrupted install
+left a rootfs directory without PRoot container metadata, so no valid Alpine
+package/customization retry is claimed. Guest BusyBox ping and the direct app
+UID ping also hit raw-socket `EPERM`; those results are not treated as proof of
+an Android network failure.
+
+The next worker remains pending and was not started:
 
 `docs/playstore/workers/05_remove_root_chroot_from_play.md`
 
@@ -46,7 +58,36 @@ The required next worker remains:
 - `HostScriptDeployer` no longer copies loader or Pulse `.so` files into
   writable app data. It writes only non-executable Pulse configuration.
 
-### C. Nested/disguised APK and ELF inventory
+### C. Android-derived guest DNS
+
+- Added `GuestDnsConfigurator`, which reads numeric DNS servers from the active
+  Android `LinkProperties.dnsServers` list and exports them as
+  `FLUX_DNS_SERVERS`.
+- `flux_guest_common.sh` writes that list to the guest `/etc/resolv.conf`
+  after validation. Public resolvers are used only when Android supplies no
+  usable resolver and the guest has no usable existing resolver.
+- Alpine family/customization setup uses the same helper for direct invocation;
+  the common concatenated PRoot path remains the normal path.
+- Unit coverage includes IPv4, IPv6, multiple, empty, invalid, duplicate, and
+  final-fallback resolver inputs.
+
+### D. Alpine Play baseline and customization boundary
+
+- Built the Play Alpine `aarch64` baseline from the official Alpine 3.24
+  minirootfs plus the required shell/base tools, certificates, D-Bus, XFCE4,
+  terminal, Mesa, Pulse client, and current Alpine family package set.
+- Baseline marker: `/etc/fluxlinux/play-baseline-v1`.
+- Baseline archive: `alpine_3.24_play_baseline_v1.tar.gz`,
+  `254299349` bytes, SHA-256
+  `da25146101274ce944472380285f09b96583dcb6093cdf57058ef2648b5f75d7`.
+- Play Alpine setup verifies the marker and performs only local user,
+  ownership, machine-id, Pulse, XFCE, and Flux asset setup. It does not run
+  `apk update`, `apk add`, or remote customization downloads at runtime.
+- Play Alpine, Debian, KDE-Debian, generic XFCE, and Debian customization
+  assets are flavor-specific local-only overrides. The ivarna flavor keeps its
+  existing remote customization implementation behind the flavor boundary.
+
+### E. Nested/disguised APK and ELF inventory
 
 - Removed tracked `app/src/main/assets/loader.apk` and `loader.bin`.
 - Removed all flavor `assets/pulse-runtime/*.so` overlays.
@@ -58,7 +99,7 @@ The required next worker remains:
   Play fallback boundaries, embedded GUI markers, package-list closure, and
   scanner contracts.
 
-### D. GUI/X11 launcher audit
+### F. GUI/X11 launcher audit
 
 - `EmbeddedX11` starts `CmdEntryPoint` in the app process and launches the
   same-package X11 activity.
@@ -68,8 +109,14 @@ The required next worker remains:
   APK, `app_process`, `CLASSPATH`, `pm path`, or loader asset.
 - Stop/setup scripts were cleaned of the corresponding nested-loader and
   external-X11 paths.
+- `EmbeddedX11` now exposes `STOPPED`, `STARTING`, `RUNNING`, and `STOPPING`,
+  with explicit `startServer`, `stopServer`, and `restartServer` ownership.
+  Native `dix_main` returns to its owning thread; the old `System.exit` and
+  `exit(dix_main(...))` shutdown paths were removed. Static lifecycle tests and
+  both debug/release native links pass. Device-visible lifecycle proof is still
+  pending.
 
-### E. PulseAudio and libattr/libacl
+### G. PulseAudio, libattr/libacl, and deployed permissions
 
 - Pulse host libraries remain in the verified host runtime's native library
   directory. App-private deployment writes only `default.pa.d/99-fluxlinux.pa`.
@@ -78,36 +125,61 @@ The required next worker remains:
 - Pulse supervisor exited successfully and logged an AAudio sink on
   `tcp=127.0.0.1:4713`. Existing nonfatal SLES/D-Bus symbol warnings remain
   outside this worker's scope.
+- `HostScriptDeployer` now classifies deployed files as scripts, guest
+  executables, guest libraries, configuration, or data. `libevp_md2.so` is a
+  guest library and is not marked executable; scripts and the guest bwrap shim
+  retain executable permissions.
 
-### F. Device and artifact evidence
+### H. Device and artifact evidence
 
-Validated on realme device serial `2a580689`:
+Validated artifact facts:
 
-- `bundletool build-apks --local-testing` succeeded for the final AAB.
-- Bundletool installation staged the runtime and Alpine feature modules through
-  the local-testing FakeSplitInstallManager path.
-- Package state: `versionCode=12`, `targetSdk=36`, `versionName=2.0.0`.
-- Runtime feature extraction produced marker `2|com.zenithblue.fluxlinux`.
-- Alpine feature materialized
-  `alpine_3.24_rootfs.tar.gz`, size `4023732`, SHA-256
-  `f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259`.
-- PRoot smoke commands succeeded:
-  `proot-distro login alpine -- /bin/echo guest-ok` returned `guest-ok`, and
-  the BusyBox identity command returned `uid=0(root)` inside the guest.
-- Device inspection found no `loader.apk`, `loader.bin`, or
-  `pulse-runtime` directory in app data, and no
-  `usr/libexec/termux-x11` directory.
+- Package metadata remains `com.zenithblue.fluxlinux`, `versionCode=12`,
+  `versionName=2.0.0`, `targetSdk=36`.
+- Fresh Zenithblue and Ivarna debug APKs and the Zenithblue release AAB build
+  successfully with the Play baseline source and native X11 lifecycle.
+- Final artifact hashes:
+  - Zenithblue debug APK: `48141518` bytes,
+    `5b4d7af8f2dc485ee4b5a8a124029cffab89d445df377ceab01c81add6d6c41f`.
+  - Ivarna debug APK: `48084453` bytes,
+    `6190e9358bd8488b61ed6f22b157568f6f7d09ffef4e61788652c2ba4967ca84`.
+  - Zenithblue release AAB: `1086112666` bytes,
+    `3cea428aee5244776f4793ad3d323455261d6fe4aa9f254fd179e304f5c46e31`.
+- `scripts/verify_play_host_artifacts.sh` passes on the release AAB and
+  Zenithblue debug APK. `scripts/verify_apk_host_assets.sh` passes on both
+  Zenithblue and Ivarna debug APKs.
+- The refreshed AAB customization scan passes for Alpine, Debian, KDE-Debian,
+  generic XFCE, and the four legacy Termux customization entry points; no
+  remote installer/download command remains in those Play assets. The Play
+  DEX contains no `IvarnaRemoteCustomization` or `ProotZshBootstrap` class.
+- The current device package is present on realme serial `2a580689`, but its
+  interrupted Alpine attempt is not a valid installed PRoot container:
+  `proot-distro list` reports no installed containers despite a stale rootfs
+  directory. Therefore no current device Alpine/PFD/XFCE/X11 E2E pass is
+  recorded here.
 
-The device reached `Installing Alpine rootfs + XFCE…` and the app's setup
-phase reached `Configuring alpine (Alpine Family)...`. A direct `apk update`
-could reach both v3.24 repositories, but subsequent package resolution
-intermittently failed with DNS errors and the full setup did not reach the
-XFCE-ready marker. Consequently, the visible X11 display and end-to-end GUI
-session remain unverified in this worker.
+### I. 16 KB compatibility blocker
 
-The debug device also displayed Android's existing 16 KB compatibility warning
-for several prebuilt native libraries. This is recorded as validation evidence;
-it is not silently treated as a Worker 04 pass condition.
+Android reported the exact warning: **“This app isn’t 16 KB compatible. ELF
+alignment check failed.”** The affected libraries and first `LOAD` alignment in
+the inspected arm64 base APK were:
+
+| Library | First `LOAD` alignment |
+|---|---:|
+| `libtermux.so` | `0x1000` |
+| `libpulseaudio.so` | `0x4000` |
+| `libproot.so` | `0x4000` |
+| `libpactl.so` | `0x4000` |
+| `libloader32.so` | `0x1000` |
+| `libloader.so` | `0x4000` |
+| `libbash.so` | `0x4000` |
+| `libandroidx.graphics.path.so` | `0x4000` |
+| `libXlorie.so` | `0x4000` |
+
+This is a release blocker carried into Workers 09 and 10. Worker 04 does not
+claim release compatibility until every affected library is rebuilt or
+otherwise supplied with verified 16 KB-compatible ELF alignment and the exact
+warning is absent.
 
 ## Verification
 
@@ -116,12 +188,21 @@ Passed:
 - `scripts/assemble_bootstrap.py --mode full`
 - `scripts/verify_bootstrap.sh`
 - `scripts/prepare_play_payloads.py`
+- `scripts/build_alpine_play_baseline.sh` with deterministic hash/size output
 - `scripts/verify_play_host_artifacts.sh` on the AAB and base split APK
-- `scripts/verify_apk_host_assets.sh` on the base split APK
-- Zenithblue and Ivarna flavor APK builds
-- Zenithblue Play AAB build
-- bundletool split generation and installation
-- host bootstrap/Pulse/PRoot device smoke checks above
+- `scripts/verify_apk_host_assets.sh` on the Zenithblue and Ivarna debug APKs
+- `testZenithblueDebugUnitTest` (367 tests, 0 failures)
+- combined Zenithblue and Ivarna debug unit-test build
+- Zenithblue and Ivarna debug APK builds plus the Zenithblue release AAB build
+- static DNS, typed-permission, Play asset, and embedded-X11 lifecycle tests
+- Android-layer DNS evidence and host-prefix inspection described above
+
+Not proven in this pass:
+
+- clean bundletool/local-testing installation of the refreshed AAB;
+- offline Alpine extraction/setup through XFCE and visible X11;
+- visible X11 start/stop/restart on device;
+- real Google Play feature delivery.
 
 Gradle was run with `--no-daemon`; after each Gradle invocation,
 `./gradlew --stop` was run and the process list was checked to confirm no
@@ -129,5 +210,6 @@ Gradle daemon remained.
 
 ## Follow-up
 
-Worker 05 should begin at
-`docs/playstore/workers/05_remove_root_chroot_from_play.md`.
+Worker 05 remains pending at
+`docs/playstore/workers/05_remove_root_chroot_from_play.md`; it was not started
+as part of Worker 04.

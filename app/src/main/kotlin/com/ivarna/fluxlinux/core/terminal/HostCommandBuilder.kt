@@ -1,6 +1,7 @@
 package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
+import com.ivarna.fluxlinux.BuildConfig
 
 /**
  * Builds argv + environment for **host** (embedded Termux-class prefix) scripts/commands.
@@ -46,11 +47,20 @@ object HostCommandBuilder {
         // X11 is compiled into the app module and started by EmbeddedX11 from
         // this process; there is no APK-on-disk loader or app_process fallback.
         env["FLUX_EMBEDDED_X11"] = "1"
+        if (BuildConfig.FLAVOR == "zenithblue") {
+            env["FLUX_PLAY_BASELINE"] = "1"
+        } else {
+            env.remove("FLUX_PLAY_BASELINE")
+        }
         env["TERMUX_X11_OVERRIDE_PACKAGE"] = TermuxHostPaths.PACKAGE
         env["TERMUX__PREFIX"] = TermuxHostPaths.PREFIX
         env["TERMUX__HOME"] = TermuxHostPaths.HOME
         env["SSL_CERT_FILE"] = TermuxHostPaths.SSL_CERT
         env["CURL_CA_BUNDLE"] = TermuxHostPaths.SSL_CERT
+        // Android's active LinkProperties DNS is the only resolver the PRoot
+        // guest can reliably inherit on host-prefix networks. The shell-side
+        // helper uses its public list only when this final fallback is needed.
+        env[GuestDnsConfigurator.ENV_NAME] = GuestDnsConfigurator.environmentValue(ctx)
         // Do not set PULSE_SERVER here: pulseaudio refuses to spawn a
         // daemon when it is set. Native clients use the unix socket via
         // PULSE_RUNTIME_PATH. Guests get tcp:127.0.0.1 from the builders.
@@ -60,7 +70,7 @@ object HostCommandBuilder {
         // On x86_64 hosts (NDK translation), the binfmt_misc runner is an x86_64
         // binary and rejects the arm64 preload at startup; the preload is also
         // unneeded there since shebang rewriting is handled by the translation layer.
-        val nativeHostArch = System.getProperty("os.arch", "").lowercase()
+        val nativeHostArch = System.getProperty("os.arch").orEmpty().lowercase()
         val x86_64Host = nativeHostArch.contains("x86_64") || nativeHostArch == "x86"
         if (termuxExec.exists() && !x86_64Host) {
             env["LD_PRELOAD"] = termuxExec.absolutePath

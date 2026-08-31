@@ -3,6 +3,21 @@
 ## Goal
 Make distribution/policy regressions fail automatically before a `zenithblue` AAB can be released, while avoiding false positives against expected Linux guest payloads.
 
+## Inherited Worker 04 release blocker
+
+Worker 04 found the Android warning **“This app isn’t 16 KB compatible. ELF
+alignment check failed.”** in the inspected arm64 base APK. The affected
+libraries and first `LOAD` alignments are:
+
+`libtermux.so=0x1000`, `libpulseaudio.so=0x4000`, `libproot.so=0x4000`,
+`libpactl.so=0x4000`, `libloader32.so=0x1000`, `libloader.so=0x4000`,
+`libbash.so=0x4000`, `libandroidx.graphics.path.so=0x4000`, and
+`libXlorie.so=0x4000`.
+
+The policy gate must carry this as a release-blocking check: it may not report
+the Play release as ready until all affected libraries are rebuilt or verified
+with 16 KB-compatible ELF alignment and the warning is absent.
+
 ## Scope rule
 
 Validate the **Play source sets/wiring and the final Play AAB**. Do not blanket-ban behavior that intentionally remains in `ivarna`.

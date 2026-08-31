@@ -20,9 +20,21 @@ chmod 1777 /tmp /var/tmp 2>/dev/null || true
 unset PROOT_TMP_DIR
 export TMPDIR=/tmp
 
-# 1. DNS (minirootfs ships without resolv.conf; keep multi-NS for proot flakiness)
-if [ ! -s /etc/resolv.conf ] || ! grep -q nameserver /etc/resolv.conf 2>/dev/null; then
-    echo "FluxLinux: Writing /etc/resolv.conf"
+# 1. DNS. The common helper is prepended by flux_install.sh; keep this
+# fallback for direct/chroot invocation too. Android DNS wins whenever it is
+# available through FLUX_DNS_SERVERS.
+if command -v _flux_ensure_dns >/dev/null 2>&1; then
+    _flux_ensure_dns
+elif [ -n "${FLUX_DNS_SERVERS:-}" ]; then
+    : > /etc/resolv.conf
+    _old_ifs=$IFS
+    IFS=,
+    for _dns in $FLUX_DNS_SERVERS; do
+        case "$_dns" in ''|*[!0-9A-Fa-f:.%]*) continue ;; esac
+        printf 'nameserver %s\n' "$_dns" >> /etc/resolv.conf
+    done
+    IFS=$_old_ifs
+else
     printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 8.8.4.4\n' > /etc/resolv.conf
 fi
 

@@ -44,6 +44,10 @@ sealed class PayloadAcquireResult {
 interface RootfsPayloadProvider {
     val id: String
 
+    /** Identity used by the installer for the provider's verified payload. */
+    fun verifiedSpec(profile: DistroInstallProfile): VerifiedPayloadSpec =
+        VerifiedPayloadStore.spec(profile)
+
     /**
      * Context-aware entry point used by providers whose source is Android's
      * split/module delivery API. The legacy overload remains available to the

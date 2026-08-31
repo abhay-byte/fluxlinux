@@ -51,8 +51,34 @@ _flux_ensure_tmp() {
 }
 
 _flux_ensure_dns() {
+    # Android supplies a comma-separated list from the active validated
+    # LinkProperties. Prefer it over rootfs/public DNS and write only numeric
+    # addresses so malformed inherited environment cannot become shell code.
+    if [ -n "${FLUX_DNS_SERVERS:-}" ]; then
+        _flux_dns_tmp="/etc/resolv.conf.flux.$$"
+        : > "$_flux_dns_tmp"
+        _flux_old_ifs=$IFS
+        IFS=,
+        for _flux_dns in $FLUX_DNS_SERVERS; do
+            case "$_flux_dns" in
+                ''|*[!0-9A-Fa-f:.%]*) continue ;;
+            esac
+            printf 'nameserver %s\n' "$_flux_dns" >> "$_flux_dns_tmp"
+        done
+        IFS=$_flux_old_ifs
+        if [ -s "$_flux_dns_tmp" ]; then
+            if ! cmp -s "$_flux_dns_tmp" /etc/resolv.conf 2>/dev/null; then
+                _flux_log "Writing Android active-network DNS to /etc/resolv.conf"
+                mv -f "$_flux_dns_tmp" /etc/resolv.conf
+            else
+                rm -f "$_flux_dns_tmp"
+            fi
+            return 0
+        fi
+        rm -f "$_flux_dns_tmp"
+    fi
     if [ ! -s /etc/resolv.conf ] || ! grep -q nameserver /etc/resolv.conf 2>/dev/null; then
-        _flux_log "Writing /etc/resolv.conf"
+        _flux_log "Android DNS unavailable; using final public DNS fallback"
         printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 8.8.4.4\n' > /etc/resolv.conf
     fi
 }
