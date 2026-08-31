@@ -1,61 +1,10 @@
-# Worker 09 — CI Policy Gates and Compliance Evidence
+# DEPRECATED — Use Canonical Worker 09
 
-## Goal
+This file belongs to the superseded QEMU-first worker sequence.
 
-Turn the execution/delivery architecture into enforceable release gates and reviewer evidence.
+Use:
 
-## CI source checks
+- `../workers/09_ci_policy_gate.md`
+- `../v2_0_compliance_roadmap.md`
 
-Fail Play builds if they introduce/reintroduce:
-
-- `REQUEST_INSTALL_PACKAGES`
-- `ACCESS_SUPERUSER`
-- Android chroot/root integration
-- direct third-party APK/ZIP installer paths
-- Play host rootfs GitHub downloader
-- host execution-engine download/update URL
-- guest path passed to direct exec APIs
-- guest `.so` passed to host loader APIs
-- native fallback from interpreted engine
-
-## Artifact checks
-
-Build `zenithblueRelease` AAB and inspect generated APK/splits using bundletool.
-
-Verify:
-
-- expected dynamic feature modules
-- expected app id/version
-- no nested APK
-- only approved native engine libs
-- exact permissions/services
-- no external engine updater
-- no direct native guest executor in Play runtime graph where it should be flavor-excluded
-
-## Dependency check
-
-Review `zenithblueReleaseRuntimeClasspath` and native dependencies.
-
-## Evidence docs
-
-Create/update:
-
-```text
-docs/playstore/evidence/architecture.md
-docs/playstore/evidence/execution-boundary.md
-docs/playstore/evidence/delivery-flow.md
-docs/playstore/evidence/package-manager-flow.md
-docs/playstore/evidence/permissions.md
-docs/playstore/evidence/artifact-scan.md
-docs/playstore/evidence/reviewer-notes.md
-```
-
-Reviewer notes must explain the VM/interpreter exception accurately without claiming Google approval that has not been granted.
-
-## Acceptance
-
-- [ ] CI fails on simulated direct-exec regression.
-- [ ] CI fails on simulated remote engine download regression.
-- [ ] AAB/split inspection passes.
-- [ ] Evidence package describes actual implementation.
-- [ ] No evidence statement overclaims compliance approval.
+The canonical CI gate validates the `zenithblue` source/wiring and final AAB, checks Play Feature Delivery modules/provenance, distinguishes expected guest ELF in rootfs archives from unexpected Android-host executable payloads, and blocks remote Play rootfs/bootstrap fallbacks, root/install permissions, nested APKs and obsolete external-Termux integration.
