@@ -123,7 +123,7 @@ until the pre-existing bootstrap/source-input failures are resolved.
 
 | Criterion | Result | Evidence |
 |---|---|---|
-| Rollback branch exists remotely | NOT TESTED | Local `backup/playstore-v1.8p` exists at the verified old reference; remote push is pending this commit. |
+| Rollback branch exists remotely | PASS | `origin/backup/playstore-v1.8p` was pushed at `816371bba62535fc3fc3b433fba47e5dcf9bda74`. |
 | Integration branch is based on the exact v2 baseline | PASS | `playstore-v2-compliance` starts at `c83cb17e7a5d4713f8e0b931761061902e9dd345`, matching `v2.0.0^{commit}`. |
 | Planning docs are available on the integration branch | PASS | Current `docs/playstore/**` tree was restored from `playstore`; Worker 01 records and status file are included. |
 | No wholesale old-Play code merge occurred | PASS | Diff is documentation-only; no application source/config files were changed. |
@@ -131,9 +131,9 @@ until the pre-existing bootstrap/source-input failures are resolved.
 | Next Play versionCode is planned as `> 11` | PASS | v2 baseline is `versionCode 12`, and the report records the old Play value as `11`. |
 | Baseline build/test status is recorded honestly | PASS | All required commands attempted; failures and pre-existing missing inputs are recorded without claiming a build artifact. |
 
-The first criterion will be rechecked after the focused commit is pushed. The
-overall result remains `PARTIAL` until the baseline build inputs are restored or
-the repository owner explicitly accepts the documented pre-existing failures.
+The rollback criterion is now verified remotely. The overall result remains
+`PARTIAL` until the baseline build inputs are restored or the repository owner
+explicitly accepts the documented pre-existing failures.
 
 ## Diff review
 
@@ -161,8 +161,11 @@ loader change, callback change, FGS redesign, privacy rewrite, or CI policy gate
 
 ## Commit
 
-Pending until the focused Worker 01 documentation commit is created and the
-rollback ref is pushed.
+- Initial Worker 01 documentation commit:
+  `b9029a9d3ba51bac473bfbcdce0bb2ed311b08b6`.
+- Follow-up report/status evidence commit: recorded after the initial push.
+- Published integration branch: `origin/playstore-v2-compliance`.
+- Published rollback branch: `origin/backup/playstore-v1.8p`.
 
 ## Next worker
 

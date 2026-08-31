@@ -5,6 +5,7 @@ Last updated: 2026-08-31
 ## Baseline
 
 - Integration branch: `playstore-v2-compliance`
+- Integration commit: `b9029a9`
 - Exact v2.0.0 baseline: `c83cb17e7a5d4713f8e0b931761061902e9dd345`
 - Rollback branch: `backup/playstore-v1.8p` at `816371bba62535fc3fc3b433fba47e5dcf9bda74`
 - Play package: `com.zenithblue.fluxlinux`
