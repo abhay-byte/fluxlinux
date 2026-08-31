@@ -5,21 +5,20 @@ Last updated: 2026-08-31
 ## Baseline
 
 - Integration branch: `playstore-v2-compliance`
-- Integration commit: `b9029a9`
 - Exact v2.0.0 baseline: `c83cb17e7a5d4713f8e0b931761061902e9dd345`
 - Rollback branch: `backup/playstore-v1.8p` at `816371bba62535fc3fc3b433fba47e5dcf9bda74`
 - Play package: `com.zenithblue.fluxlinux`
 - v2 version: `versionCode 12`, `versionName 2.0.0`
 - SDK baseline: `compileSdk 36`, `targetSdk 36`, `minSdk 26`
 
-Worker 01 establishes the branch and records the untouched v2 build blockers. No
+Worker 01 establishes the branch and records the prepared v2 baseline. No
 compliance implementation worker has started.
 
 ## Worker sequence
 
 | Worker | State | Notes |
 |---|---|---|
-| 01 `branch_baseline` | in-progress | Branch/docs established; untouched v2 Play and non-Play builds have pre-existing missing-input failures. |
+| 01 `branch_baseline` | pass | Exact v2 baseline prepared with pinned submodules and generated ignored bootstrap input; Play/non-Play builds and tests pass. |
 | 02 `play_flavor_boundary` | pending | Do not start until Worker 01 is resolved. |
 | 03 `remove_remote_executable_delivery` | pending |  |
 | 04 `remove_nested_and_writable_executables` | pending |  |
