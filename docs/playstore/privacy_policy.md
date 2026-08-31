@@ -1,5 +1,7 @@
 # FluxLinux Pro Privacy Policy
 
+> **Release applicability:** this text describes the existing v1.8-era Play implementation and must **not** be copied unchanged to the v2 Play release. The reviewed v2 plan moves to an embedded PRoot runtime with Google Play Feature Delivery modules and removes the external-Termux/root/chroot Play architecture. `workers/08_privacy_and_store_metadata.md` must rewrite and reconcile this policy against the exact final v2 AAB before submission.
+
 _Last updated: 2026-06-17._
 
 FluxLinux Pro ("the App") is a desktop-environment installer for Android.
