@@ -217,7 +217,8 @@ loader change, callback change, FGS redesign, privacy rewrite, or CI policy gate
 - Initial Worker 01 documentation commit:
   `b9029a9d3ba51bac473bfbcdce0bb2ed311b08b6`.
 - Follow-up report/status evidence commit: `12e33fc39e7a8bbd0cb1483d8555c2fd2f5f76e2`.
-- Final validation/report update commit: pending this update.
+- Final validation/report update commit:
+  `0a53096accce549bd18d756b073b5d6350e95b05`.
 - Published integration branch: `origin/playstore-v2-compliance`.
 - Published rollback branch: `origin/backup/playstore-v1.8p`.
 
