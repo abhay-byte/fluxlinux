@@ -18,6 +18,7 @@ class IvarnaPayloadProviderTest {
     fun flavorWiring_retainsReleaseProviders() {
         assertSame(IvarnaRootfsPayloadProvider, PayloadProviders.rootfs)
         assertSame(IvarnaHostRuntimePayloadProvider, PayloadProviders.hostRuntime)
+        assertTrue(PayloadProviders.androidRoot.enabled)
         assertTrue(PayloadProviders.rootfs.id.contains("remote"))
         assertTrue(PayloadProviders.hostRuntime.id.contains("remote"))
 

@@ -6,6 +6,7 @@ import com.ivarna.fluxlinux.R
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.utils.TerminalPreferences
 import com.termux.terminal.TerminalSession
 
@@ -31,6 +32,7 @@ object GuestSessionFactory {
         method: String,
         distroId: String? = null
     ): Boolean {
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) return false
         if (!SessionRegistry.hasFreeTab()) return false
         // Patch guest .zshrc if it still hard-sources missing oh-my-zsh / pokemon,
         // or create a missing Flux profile (Alpine installs that never wrote one).
@@ -121,6 +123,7 @@ object GuestSessionFactory {
         onFinished: (() -> Unit)? = null
     ): Boolean {
         val method = terminalComponentFor(distro.id).method
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) return false
         val b64 = android.util.Base64.encodeToString(
             scriptContent.toByteArray(Charsets.UTF_8),
             android.util.Base64.NO_WRAP

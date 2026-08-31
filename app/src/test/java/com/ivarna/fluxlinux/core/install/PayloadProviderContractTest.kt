@@ -29,7 +29,9 @@ class PayloadProviderContractTest {
         assertTrue(onboarding.contains("PayloadProviders.rootfs"))
         assertFalse(onboarding.contains("RootfsDownloader"))
         assertFalse(onboarding.contains("FLUX_ROOTFS_URL"))
+        assertTrue(onboarding.contains("PayloadProviders.androidRoot"))
         assertFalse(sessions.contains("FLUX_ROOTFS_URL"))
+        assertTrue(sessions.contains("PayloadProviders.androidRoot"))
         assertTrue(bootstrap.contains("PayloadProviders.hostRuntime"))
         assertFalse(bootstrap.contains("RootfsDownloader"))
     }

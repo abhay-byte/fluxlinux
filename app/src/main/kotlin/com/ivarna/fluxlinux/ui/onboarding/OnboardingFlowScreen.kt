@@ -61,6 +61,7 @@ import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.install.HostBootstrap
 import com.ivarna.fluxlinux.core.install.OnboardingInstallRunner
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.ui.components.CompactDistroCard
 import com.ivarna.fluxlinux.ui.components.MethodChip
@@ -399,6 +400,12 @@ private fun DistroPickPage(
     }
 
     fun probeRoot(openChrootIfGranted: Boolean) {
+        if (!PayloadProviders.androidRoot.enabled) {
+            probingRoot = false
+            rootAvailable = false
+            if (openChrootIfGranted) showRootHint = true
+            return
+        }
         probingRoot = true
         RootShell.probeRootAvailable(forceClearCache = openChrootIfGranted) { ok ->
             rootAvailable = ok
@@ -464,6 +471,8 @@ private fun DistroPickPage(
             Text(
                 if (probingRoot) {
                     "Checking superuser access…"
+                } else if (!PayloadProviders.androidRoot.enabled) {
+                    PayloadProviders.androidRoot.unavailableMessage
                 } else {
                     "Grant superuser to FluxLinux in Magisk or KernelSU, then tap Chroot again."
                 },

@@ -60,6 +60,16 @@ interface HostRuntimePayloadProvider {
     ): HostRuntimePayload?
 }
 
+/**
+ * Build-time capability for policy-sensitive Android-root/chroot execution.
+ * The common runtime can keep its session plumbing while refusing to select
+ * rooted paths in a flavor that does not ship that integration.
+ */
+interface AndroidRootCapability {
+    val enabled: Boolean
+    val unavailableMessage: String
+}
+
 data class HostRuntimePayload(
     val stream: InputStream,
     val totalBytes: Long,
@@ -153,4 +163,7 @@ object PayloadProviders {
 
     val hostRuntime: HostRuntimePayloadProvider
         get() = StorePayloadProviders.hostRuntime
+
+    val androidRoot: AndroidRootCapability
+        get() = StorePayloadProviders.androidRoot
 }

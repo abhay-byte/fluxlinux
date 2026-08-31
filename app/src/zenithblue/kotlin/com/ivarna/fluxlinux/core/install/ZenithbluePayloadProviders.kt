@@ -92,4 +92,9 @@ object PlayFeatureHostRuntimeProvider : HostRuntimePayloadProvider {
 internal object StorePayloadProviders {
     val rootfs: RootfsPayloadProvider = PlayFeatureRootfsProvider
     val hostRuntime: HostRuntimePayloadProvider = PlayFeatureHostRuntimeProvider
+    val androidRoot: AndroidRootCapability = object : AndroidRootCapability {
+        override val enabled: Boolean = false
+        override val unavailableMessage: String =
+            "Chroot and Android-root integration are not available in this flavor"
+    }
 }

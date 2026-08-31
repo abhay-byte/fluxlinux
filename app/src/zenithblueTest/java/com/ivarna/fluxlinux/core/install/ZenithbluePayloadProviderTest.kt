@@ -49,6 +49,7 @@ class ZenithbluePayloadProviderTest {
     fun flavorWiring_isPlayLocalOnly() {
         assertSame(PlayFeatureRootfsProvider, PayloadProviders.rootfs)
         assertSame(PlayFeatureHostRuntimeProvider, PayloadProviders.hostRuntime)
+        assertFalse(PayloadProviders.androidRoot.enabled)
         assertEquals("zenithblue-local-only", PayloadProviders.rootfs.id)
         assertEquals("zenithblue-packaged-or-local", PayloadProviders.hostRuntime.id)
 

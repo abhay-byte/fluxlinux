@@ -108,6 +108,11 @@ class OnboardingInstallRunner(private val ctx: Context) {
         }
         val method = profile.method
         val phases = BaseDesktopInstallPlan.phasesFor(method, profile.displayName)
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) {
+            busy.set(false)
+            postFail(onProgress, phases, PayloadProviders.androidRoot.unavailableMessage)
+            return
+        }
         busy.set(true)
         lastNotifPercent = -1
         lastNotifLabel = ""

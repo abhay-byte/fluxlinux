@@ -25,8 +25,9 @@ cleanup, manifest cleanup, or other later-worker work was included.
 Common provider contracts and verification:
 
 - app/src/main/kotlin/com/ivarna/fluxlinux/core/install/PayloadProvider.kt
-  adds RootfsPayloadProvider, HostRuntimePayloadProvider, source-neutral
-  progress/results, and local SHA/size-gated materialization.
+  adds RootfsPayloadProvider, HostRuntimePayloadProvider, the build-time
+  AndroidRootCapability seam, source-neutral progress/results, and local
+  SHA/size-gated materialization.
 - app/src/main/kotlin/com/ivarna/fluxlinux/core/install/DistroInstallProfile.kt
   now contains common distro identity/setup and payload verification metadata;
   release URLs are no longer part of the common profile.
@@ -44,21 +45,27 @@ Common provider contracts and verification:
 Flavor boundaries:
 
 - app/src/ivarna/kotlin/com/ivarna/fluxlinux/core/install/IvarnaPayloadProviders.kt
-  wraps the existing remote rootfs/bootstrap implementation.
+  wraps the existing remote rootfs/bootstrap implementation and enables the
+  non-Play Android-root capability.
 - app/src/ivarna/kotlin/com/ivarna/fluxlinux/core/install/RootfsDownloader.kt
   and app/src/ivarna/kotlin/com/ivarna/fluxlinux/core/install/PinnedReleaseArchive.kt
   are now ivarna-only source inputs.
 - app/src/zenithblue/kotlin/com/ivarna/fluxlinux/core/install/ZenithbluePayloadProviders.kt
-  provides the packaged/local-only Play placeholder; it contains no release
-  URL or remote downloader reference.
+  provides the packaged/local-only Play placeholder, disables the
+  Android-root capability, and contains no release URL or remote downloader
+  reference.
+- Common onboarding, session, uninstall, desktop, and installed-state entry
+  points refuse chroot/rooted selection when that capability is disabled;
+  common PRoot/fake-root, terminal, X11, and Pulse code remains intact for the
+  later Worker 05 cleanup boundary.
 
 Regression tests:
 
 - app/src/test/java/com/ivarna/fluxlinux/core/install/PayloadProviderContractTest.kt
   locks the common installer/session/host boundary.
 - app/src/zenithblueTest/java/com/ivarna/fluxlinux/core/install/ZenithbluePayloadProviderTest.kt
-  proves Play wiring, verified local acceptance, cancellation, and fail-closed
-  behavior.
+  proves Play wiring, Android-root disabled state, verified local acceptance,
+  cancellation, and fail-closed behavior.
 - app/src/ivarnaTest/java/com/ivarna/fluxlinux/core/install/IvarnaPayloadProviderTest.kt
   proves non-Play release-provider wiring remains selected.
 - Existing downloader tests moved with the ivarna-only downloader to
@@ -99,8 +106,8 @@ Final Play artifacts inspected:
 
 Final artifact SHA-256 values:
 
-- APK: a3019dbb1a2c84f6260a9f32fdb5b518a25b4e50e3e51072e2e2ba9cc246a1ab
-- AAB: c33729bcd614fcd242e24de3275333b08309e5f825efa81bb8e5d3722443dff6
+- APK: b710939cecd604371ec58be8e2cfd88ba44a373687f9d8d65eca58463811bdb9
+- AAB: 37d50dc6ee38372d0c790905e8f89db7936ff1e46eb5b1cb862c2d7f4276e8f7
 
 ## Acceptance criteria
 
@@ -110,6 +117,7 @@ Final artifact SHA-256 values:
 | Play still uses the embedded PRoot/terminal/X11/Pulse backend | PASS | Existing common launch/session code remains; dependency report retains embedded termux-app and :termux-x11; APK retains libproot.so, libbash.so, Pulse libraries, and loader libraries. |
 | installer accepts a local payload from an abstraction | PASS | OnboardingInstallRunner calls PayloadProviders.rootfs; PlayFeatureRootfsProvider accepts only VerifiedPayloadStore results. |
 | Play cannot select the non-Play remote provider | PASS | Flavor tests assert Play provider identity; final Play dex has no ivarna provider/downloader/archive classes. |
+| Play cannot select Android-root/chroot behavior | PASS | Play flavor capability is disabled and common onboarding/session/desktop/state entry points fail closed before rooted execution. |
 | non-Play behavior remains available behind its source/dependency boundary | PASS | Ivarna provider and downloader compile, test, and retain release URL construction only under src/ivarna. |
 | no major installer/UI rewrite was introduced | PASS | Changes are limited to provider contracts, source-set wiring, URL-contract removal, and focused tests; UI and backend behavior remain common. |
 
@@ -119,8 +127,9 @@ Final artifact SHA-256 values:
   through the ivarna provider; downloader tests remain green.
 - Terminal, native PRoot, extraction/configuration, X11, Pulse, session state,
   logging, and distro setup code were preserved.
-- Android-root/chroot code was not removed in this worker; the roadmap assigns
-  Play removal to Worker 05.
+- Android-root/chroot code was not removed in this worker; the minimum
+  flavor-selection gate is present, while full Play artifact/source cleanup is
+  assigned to Worker 05.
 - Play Feature Delivery/dynamic features were not added; Worker 03 owns that
   follow-up.
 
@@ -130,8 +139,8 @@ Final artifact SHA-256 values:
   the approved Play delivery implementation.
 - Common shell assets still contain legacy FLUX_ROOTFS_URL fallback logic;
   removing that executable fallback is Worker 03 scope.
-- Android-root/chroot and related Play manifest/policy cleanup remain assigned
-  to later workers.
+- Android-root/chroot implementation and related Play manifest/policy cleanup
+  remain assigned to Worker 05.
 
 ## Next worker
 

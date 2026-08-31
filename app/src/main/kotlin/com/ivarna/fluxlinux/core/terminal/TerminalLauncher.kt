@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.ivarna.fluxlinux.core.chroot.ChrootDetection
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -79,7 +80,7 @@ object TerminalLauncher {
         isChrootInstalled(com.ivarna.fluxlinux.core.root.ChrootPaths.DEBIAN_CHROOT_PATH)
 
     fun isChrootInstalled(chrootPath: String): Boolean =
-        ChrootDetection.isInstalled(chrootPath)
+        PayloadProviders.androidRoot.enabled && ChrootDetection.isInstalled(chrootPath)
 
     fun invalidateChrootInstalledCache() {
         ChrootDetection.invalidate()
@@ -97,7 +98,7 @@ object TerminalLauncher {
     fun refreshInstalledAfterUninstall(ctx: Context, distroId: String) {
         val appCtx = ctx.applicationContext
         val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
-        if (profile?.method == "chroot") {
+        if (profile?.method == "chroot" && PayloadProviders.androidRoot.enabled) {
             val path = profile.chrootPath
             if (!path.isNullOrEmpty()) {
                 ChrootDetection.invalidate(path)
@@ -113,7 +114,9 @@ object TerminalLauncher {
         com.ivarna.fluxlinux.core.utils.StateManager.triggerRefresh()
 
         val chrootPath = profile?.chrootPath
-        if (profile?.method == "chroot" && !chrootPath.isNullOrEmpty()) {
+        if (profile?.method == "chroot" && PayloadProviders.androidRoot.enabled &&
+            !chrootPath.isNullOrEmpty()
+        ) {
             executor.execute {
                 val still = try {
                     ChrootDetection.probe(forceRoot = true, path = chrootPath).installed
@@ -133,14 +136,15 @@ object TerminalLauncher {
         isChrootXfceInstalled(com.ivarna.fluxlinux.core.root.ChrootPaths.DEBIAN_CHROOT_PATH)
 
     fun isChrootXfceInstalled(chrootPath: String): Boolean =
-        ChrootDetection.isXfceInstalled(chrootPath)
+        PayloadProviders.androidRoot.enabled && ChrootDetection.isXfceInstalled(chrootPath)
 
     /** @return true when the distro rootfs exists on disk for [distroId]. */
     fun isDistroInstalledOnFs(ctx: Context, distroId: String): Boolean {
         val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
             ?: return false
         return when (profile.method) {
-            "chroot" -> isChrootInstalled(profile.chrootPath ?: return false)
+            "chroot" -> PayloadProviders.androidRoot.enabled &&
+                isChrootInstalled(profile.chrootPath ?: return false)
             else -> isProotInstalled(ctx, profile.prootName)
         }
     }

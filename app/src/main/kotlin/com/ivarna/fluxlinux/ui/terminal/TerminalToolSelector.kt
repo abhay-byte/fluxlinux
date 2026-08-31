@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.root.RootShell
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.terminal.TerminalShellCardUi
 import com.ivarna.fluxlinux.core.terminal.TerminalShellCatalog
 import com.ivarna.fluxlinux.ui.components.MethodChip
@@ -94,7 +95,9 @@ fun TerminalToolSelector(
     val context = LocalContext.current
     var rootAvailable by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        RootShell.probeRootAvailable { ok -> rootAvailable = ok }
+        if (PayloadProviders.androidRoot.enabled) {
+            RootShell.probeRootAvailable { ok -> rootAvailable = ok }
+        }
     }
 
     val sections = remember(context, rootAvailable) {

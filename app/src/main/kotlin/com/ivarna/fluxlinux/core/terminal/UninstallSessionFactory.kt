@@ -4,6 +4,7 @@ import android.content.Context
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
 import com.ivarna.fluxlinux.core.install.DistroInstallProfile
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.root.BusyBoxPaths
 import com.ivarna.fluxlinux.core.root.RootShell
 
@@ -19,6 +20,7 @@ object UninstallSessionFactory {
         distro: Distro
     ): Boolean {
         val method = terminalComponentFor(distro.id).method
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) return false
         val profile = DistroInstallProfile.forId(distro.id)
         val appCtx = ctx.applicationContext
         val onClosed: (Int) -> Unit = {

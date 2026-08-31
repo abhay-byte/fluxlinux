@@ -20,7 +20,7 @@ leaving Play Feature Delivery and later policy removals to the assigned workers.
 | Worker | State | Notes |
 |---|---|---|
 | 01 `branch_baseline` | pass | Exact v2 baseline prepared with pinned submodules and generated ignored bootstrap input; Play/non-Play builds and tests pass. |
-| 02 `play_flavor_boundary` | pass | Common installers consume verified payload abstractions; zenithblue is packaged/local-only and ivarna retains release-backed providers. |
+| 02 `play_flavor_boundary` | pass | Common installers consume verified payload abstractions; zenithblue is packaged/local-only with rooted paths gated off, and ivarna retains release-backed providers. |
 | 03 `remove_remote_executable_delivery` | pending | Worker 03 owns the final Play executable delivery path / PFD integration. |
 | 04 `remove_nested_and_writable_executables` | pending |  |
 | 05 `remove_root_chroot_from_play` | pending |  |

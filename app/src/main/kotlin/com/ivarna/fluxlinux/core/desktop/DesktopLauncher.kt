@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.service.DesktopSessionService
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.ivarna.fluxlinux.core.terminal.HostScriptDeployer
@@ -135,6 +136,18 @@ object DesktopLauncher {
 
             val method = methodFor(distroId)
             val profile = com.ivarna.fluxlinux.core.install.DistroInstallProfile.forId(distroId)
+            if (method == "chroot" && !PayloadProviders.androidRoot.enabled) {
+                startInFlight = false
+                toast(app, PayloadProviders.androidRoot.unavailableMessage)
+                finishStart(
+                    app,
+                    distroId,
+                    false,
+                    PayloadProviders.androidRoot.unavailableMessage,
+                    onResult
+                )
+                return@prepareHost
+            }
             // Chroot FS probe may need root (SELinux hides /data/local/tmp from app uid).
             // Never call isChrootInstalled on the main thread without a warm cache.
             if (method == "chroot") {
@@ -288,6 +301,13 @@ object DesktopLauncher {
         val method = methodFor(distroId)
         guiUserStopping = true
         startInFlight = false
+
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) {
+            StateManager.setGuiRunning(app, distroId, false)
+            StateManager.setGuiRunningType(app, distroId, "")
+            onDone?.invoke()
+            return
+        }
 
         try {
             val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")

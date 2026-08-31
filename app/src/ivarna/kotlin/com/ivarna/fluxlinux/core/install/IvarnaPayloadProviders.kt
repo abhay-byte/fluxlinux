@@ -110,4 +110,8 @@ object IvarnaHostRuntimePayloadProvider : HostRuntimePayloadProvider {
 internal object StorePayloadProviders {
     val rootfs: RootfsPayloadProvider = IvarnaRootfsPayloadProvider
     val hostRuntime: HostRuntimePayloadProvider = IvarnaHostRuntimePayloadProvider
+    val androidRoot: AndroidRootCapability = object : AndroidRootCapability {
+        override val enabled: Boolean = true
+        override val unavailableMessage: String = "Android-root integration is unavailable"
+    }
 }

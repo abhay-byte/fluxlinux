@@ -4,6 +4,7 @@ import android.content.Context
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.terminalComponentFor
 import com.ivarna.fluxlinux.core.install.DistroInstallProfile
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.root.RootShell
 import com.termux.terminal.TerminalSession
 
@@ -21,6 +22,7 @@ object InstallSessionFactory {
         onFinished: (() -> Unit)? = null
     ): Boolean {
         val method = terminalComponentFor(distro.id).method
+        if (method == "chroot" && !PayloadProviders.androidRoot.enabled) return false
         return when (method) {
             "chroot" -> openChrootInstall(ctx, distro.id, onFinished)
             else -> openProotInstall(ctx, distro.id, setupB64, onFinished)
@@ -94,6 +96,7 @@ object InstallSessionFactory {
         wrapWinch: Boolean = true,
         onClosed: ((Int) -> Unit)? = null
     ): Boolean {
+        if (!PayloadProviders.androidRoot.enabled) return false
         val rootInner = RootShell.shellRootCommand(innerCmd)
         // Uninstall is non-interactive; the WINCH trap has made toybox sh
         // SIGSEGV after the script already succeeded (signal 11).
@@ -182,6 +185,7 @@ object InstallSessionFactory {
         onFinished: (() -> Unit)?
     ): Boolean {
         val profile = DistroInstallProfile.require(distroId)
+        if (!PayloadProviders.androidRoot.enabled) return false
         val asset = profile.chrootSetupAsset
             ?: return false
         val staged = RootShell.stageAsset(ctx, asset)
