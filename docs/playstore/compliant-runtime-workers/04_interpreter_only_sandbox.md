@@ -1,53 +1,13 @@
-# Worker 04 — Interpreter-Only Sandbox and Fail-Closed Guard
+# DEPRECATED — Do Not Execute
 
-## Goal
+The interpreter-only/QEMU sandbox is no longer the reviewed Play architecture.
 
-Make it structurally impossible for the Play build to execute guest Linux code directly on Android.
+The canonical design keeps same-architecture native PRoot, removes Android-level root/chroot, removes unsafe external command/callback bridges, and hardens PRoot filesystem exposure.
 
-## Implement
+Use:
 
-Create a central policy/execution guard around all Play guest launches.
+- `../workers/05_remove_root_chroot_from_play.md`
+- `../workers/06_links_permissions_and_callbacks.md`
+- `../v2_0_compliance_roadmap.md`
 
-Required invariants:
-
-- guest ELF -> QEMU/interpreter only
-- guest `.so` -> never Android `System.load`/`dlopen`
-- guest script interpreter -> guest/interpreted shell only
-- missing/crashed QEMU -> stop
-- no `/system/bin/linker64 <guest ELF>` fallback
-- no Android chroot/root path
-
-## Filesystem boundary
-
-For QEMU-user + PRoot:
-
-- guest `/` maps only to distro tree
-- no bind of Android `/system`, `/vendor`, app native-lib directory or broad `/dev`
-- expose only explicit app-private/shared paths
-- prevent `..`/symlink escape to host
-
-Add a `GuestPolicyGuard` or equivalent to validate requests before starting them.
-
-## Negative tests
-
-Attempt all of these and require failure/isolation:
-
-1. direct host path to guest ELF
-2. guest points to `/system/bin/sh`
-3. guest points to app `nativeLibraryDir`
-4. guest ELF renamed `.so`
-5. symlink escape from guest root
-6. missing QEMU engine
-7. QEMU crash
-8. malformed argv/path
-
-Instrument process-launch wrappers in tests where possible to prove no fallback process is spawned.
-
-## Acceptance
-
-- [ ] Central Play execution guard exists.
-- [ ] Every Play guest launch flows through it.
-- [ ] No guest direct-exec fallback.
-- [ ] Host system/native-lib paths are inaccessible to guest launch resolution.
-- [ ] Negative escape tests pass.
-- [ ] `ivarna` remains unaffected.
+Do not introduce QEMU as a compatibility fallback in the Play flavor without a new architecture review.
