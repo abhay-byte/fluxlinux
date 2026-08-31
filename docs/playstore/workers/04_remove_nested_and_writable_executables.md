@@ -1,31 +1,52 @@
-# Worker 04 — Remove Nested APKs & Writable Executables
+# Worker 04 — Package Host Executables Safely and Remove Nested APK
 
 ## Goal
-Make the Play AAB free of nested APK payloads and executable binaries copied into writable app storage.
+Keep the embedded host backend, but ensure Android-host executables are installed by Google Play in executable native-library locations instead of copied from writable assets.
 
-## Do
-1. Remove `assets/loader.apk` from the Play source set.
-2. Remove `assets/loader.bin` if it is APK-identical content.
-3. Replace loader deployment with normal Android module/dependency integration, or compile it out of Play.
-4. Audit `assets/` with `file`/magic checks for ELF, APK, DEX, JAR, and executable payloads.
-5. Move any Play-required `.so` to `jniLibs/<abi>` / native module and access through `nativeLibraryDir`.
-6. Remove Play paths that copy `.so`/ELF to `$filesDir` and chmod executable.
-7. Exclude non-Play binaries such as chroot helpers from `zenithblue`.
+## Tasks
+1. Inventory every executable/ELF/native library currently shipped under `assets`, scripts, bootstrap tarballs, or writable host-prefix setup.
+2. Classify each file as:
+   - Android host executable/native library;
+   - guest/rootfs binary;
+   - interpreted script/config/data;
+   - obsolete.
+3. Move Android-host executables required by Play into `jniLibs/<abi>` or a proper native module. Use `applicationInfo.nativeLibraryDir` as the canonical runtime location.
+4. Where existing scripts expect stable paths such as `$PREFIX/axs`/PRoot helpers, create symlinks to `nativeLibraryDir`; **do not copy the executable bytes into `$filesDir`**.
+5. Preserve the existing PRoot environment variables/loaders, adapting only their source paths.
+6. Remove `assets/loader.apk` and `loader.bin` if it contains the same APK bytes.
+7. Integrate required X11 loader code as a normal Android dependency/module or replace the nested-loader mechanism with an in-process implementation.
+8. Split `bootstrap.tar` contents:
+   - host executable -> `jniLibs`;
+   - non-executable scripts/config -> normal Play assets;
+   - large guest data -> PAD if appropriate.
+9. Remove Play code that `chmod +x` copies of host ELF/`.so` content from generic assets.
+10. Add tests/audit for ELF/APK magic under generic assets.
 
 ## Tests
 ```bash
-./gradlew :app:bundleZenithblueRelease
-unzip -l app/build/outputs/bundle/zenithblueRelease/*.aab | grep -Ei '\.(apk|dex|jar)$' || true
-# scan extracted assets with file(1)
-rm -rf /tmp/flux-aab && mkdir /tmp/flux-aab
-unzip -q app/build/outputs/bundle/zenithblueRelease/*.aab -d /tmp/flux-aab
-find /tmp/flux-aab -path '*/assets/*' -type f -print0 | xargs -0 file | grep -Ei 'ELF|Android package|Dalvik|Java archive' && exit 1 || true
+./gradlew test
+./gradlew bundleZenithblueRelease
+unzip -l <aab>
 ```
-Allow only explicitly reviewed artifacts and document every exception.
+
+Inspect generated APKs/AAB:
+- expected host `.so` files are under native library locations;
+- no nested `.apk` exists;
+- no APK disguised as `.bin`;
+- no unexpected host ELF exists under generic assets.
+
+Device smoke test:
+- embedded shell starts;
+- PRoot starts;
+- one PAD-delivered distro launches;
+- X11/Pulse startup still works.
 
 ## Acceptance
-- No nested APK in Play AAB.
-- No APK-disguised `.bin`.
-- No unexpected ELF under assets.
-- Required Play native code is packaged via Android native-library mechanisms.
-- App starts and required Play functionality still works.
+- Android host executables are Play-installed native code;
+- no writable executable-copy path remains for host binaries;
+- nested loader APK is gone;
+- existing backend uses native-library paths/symlinks successfully;
+- rootfs guest binaries remain handled by PRoot after PAD extraction.
+
+## Do not
+Do not remove the embedded host simply to make the audit easier. Do not convert same-architecture PRoot execution to QEMU.
