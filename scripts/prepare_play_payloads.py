@@ -159,6 +159,20 @@ def verify_one(path: Path, expected_hash: str, min_bytes: int, expected_name: st
     return digest, size, expanded
 
 
+def packaged_asset_name(archive_name: str) -> str:
+    """Return the filename that aapt2 will preserve byte-for-byte.
+
+    aapt2 treats an asset ending in ``.gz`` as a gzip-compressed asset: it
+    inflates the bytes and removes the suffix when it packages the App Bundle.
+    Alpine must remain a gzip archive because its provenance/hash and installer
+    contract are for the original ``.tar.gz`` bytes, so use a neutral asset
+    suffix while retaining the original archive name in provenance.
+    """
+    if archive_name.endswith(".tar.gz"):
+        return f"{archive_name[:-len('.tar.gz')]}.minirootfs"
+    return archive_name
+
+
 def stage_payload(
     source: Path,
     module: str,
@@ -238,7 +252,13 @@ def main() -> None:
             date,
         )
         if not args.verify_only:
-            stage_payload(source, module, archive_name, metadata, output_root)
+            stage_payload(
+                source,
+                module,
+                packaged_asset_name(archive_name),
+                metadata,
+                output_root,
+            )
 
     print(f"PASS: verified {len(ROOTFS)} distro payloads + runtime_host")
     if not args.verify_only:

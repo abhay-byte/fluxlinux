@@ -39,7 +39,7 @@ object PlayPayloadRegistry {
 
     private val rootfs = listOf(
         PlayFeaturePayloadSpec("distro_debian", "rootfs.debian", "debian", "payloads/distro_debian/${DistroInstallProfile.DEBIAN_ROOTFS_NAME}", DistroInstallProfile.DEBIAN_ROOTFS_NAME, DistroInstallProfile.DEBIAN_ROOTFS_SHA256, DistroInstallProfile.DEBIAN_ROOTFS_MIN_BYTES),
-        PlayFeaturePayloadSpec("distro_alpine", "rootfs.alpine", "alpine", "payloads/distro_alpine/${DistroInstallProfile.ALPINE_ROOTFS_NAME}", DistroInstallProfile.ALPINE_ROOTFS_NAME, DistroInstallProfile.ALPINE_ROOTFS_SHA256, DistroInstallProfile.ALPINE_ROOTFS_MIN_BYTES),
+        PlayFeaturePayloadSpec("distro_alpine", "rootfs.alpine", "alpine", "payloads/distro_alpine/${DistroInstallProfile.ALPINE_ROOTFS_PLAY_ASSET_NAME}", DistroInstallProfile.ALPINE_ROOTFS_NAME, DistroInstallProfile.ALPINE_ROOTFS_SHA256, DistroInstallProfile.ALPINE_ROOTFS_MIN_BYTES),
         PlayFeaturePayloadSpec("distro_fedora", "rootfs.fedora", "fedora", "payloads/distro_fedora/${DistroInstallProfile.FEDORA_ROOTFS_NAME}", DistroInstallProfile.FEDORA_ROOTFS_NAME, DistroInstallProfile.FEDORA_ROOTFS_SHA256, DistroInstallProfile.FEDORA_ROOTFS_MIN_BYTES),
         PlayFeaturePayloadSpec("distro_void", "rootfs.void", "void", "payloads/distro_void/${DistroInstallProfile.VOID_ROOTFS_NAME}", DistroInstallProfile.VOID_ROOTFS_NAME, DistroInstallProfile.VOID_ROOTFS_SHA256, DistroInstallProfile.VOID_ROOTFS_MIN_BYTES),
         PlayFeaturePayloadSpec("distro_opensuse", "rootfs.opensuse", "opensuse", "payloads/distro_opensuse/${DistroInstallProfile.OPENSUSE_ROOTFS_NAME}", DistroInstallProfile.OPENSUSE_ROOTFS_NAME, DistroInstallProfile.OPENSUSE_ROOTFS_SHA256, DistroInstallProfile.OPENSUSE_ROOTFS_MIN_BYTES),

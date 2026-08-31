@@ -58,12 +58,15 @@ data class DistroInstallProfile(
 
         // Alpine 3.24.1 minirootfs aarch64
         // Deployed home name stays *.tar.gz (scripts / proot-distro / tar -xzf).
-        // APK asset must NOT end in .gz — aapt2 auto-decompresses and renames
-        // *.tar.gz → *.tar, breaking SHA and AssetManager.open(path).
+        // Play/ APK asset must NOT end in .gz — aapt2 auto-decompresses and
+        // renames *.tar.gz → *.tar, breaking SHA and AssetManager.open(path).
         // The release asset keeps the real .tar.gz name (D8); .minirootfs was
-        // APK-packaging-only and is never used on the runtime/release path.
+        // APK/feature-packaging-only and is never used on the runtime/release
+        // path.
         const val ALPINE_ROOTFS_NAME = "alpine_3.24_rootfs.tar.gz"
-        /** Packaged asset path (gzip bytes, non-.gz name) — legacy APK name. */
+        /** Packaged asset basename (gzip bytes, non-.gz name). */
+        const val ALPINE_ROOTFS_PLAY_ASSET_NAME = "alpine_3.24_rootfs.minirootfs"
+        /** Legacy APK asset path retained for non-Play profile compatibility. */
         const val ALPINE_ROOTFS_ASSET = "rootfs/alpine_3.24_rootfs.minirootfs"
         const val ALPINE_ROOTFS_SHA256 =
             "f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259"

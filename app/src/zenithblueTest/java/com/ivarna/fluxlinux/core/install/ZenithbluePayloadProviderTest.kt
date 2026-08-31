@@ -87,4 +87,14 @@ class ZenithbluePayloadProviderTest {
         assertEquals(HostBootstrap.ZENITHBLUE.fileName, host.archiveFileName)
         assertNotNull(PlayPayloadRegistry.forProfile(DistroInstallProfile.require("debian")))
     }
+
+    @Test
+    fun alpineRegistrySeparatesPackagedAssetNameFromArchiveIdentity() {
+        val alpine = PlayPayloadRegistry.forProfile(DistroInstallProfile.require("alpine"))!!
+        assertEquals(
+            "payloads/distro_alpine/alpine_3.24_rootfs.minirootfs",
+            alpine.assetPath
+        )
+        assertEquals("alpine_3.24_rootfs.tar.gz", alpine.archiveFileName)
+    }
 }

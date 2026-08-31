@@ -33,7 +33,7 @@ The Play flavor now requests the exact selected module through
 |---|---|---|
 | Host runtime | `runtime_host` | `payloads/runtime_host/bootstrap.tar` |
 | Debian | `distro_debian` | `payloads/distro_debian/debian_13_rootfs.tar.xz` |
-| Alpine | `distro_alpine` | `payloads/distro_alpine/alpine_3.24_rootfs.tar` |
+| Alpine | `distro_alpine` | `payloads/distro_alpine/alpine_3.24_rootfs.minirootfs` |
 | Fedora | `distro_fedora` | `payloads/distro_fedora/fedora_44_rootfs.tar.xz` |
 | Void | `distro_void` | `payloads/distro_void/void_20250202_rootfs.tar.xz` |
 | openSUSE | `distro_opensuse` | `payloads/distro_opensuse/opensuse_tumbleweed_rootfs.tar.xz` |
@@ -50,6 +50,33 @@ All thirteen modules are flavor-matched dynamic-feature modules with
 host runtime first, then only the selected distro module. It does not know
 about HTTP, release URLs, split storage paths, or shared-storage payload
 locations.
+
+### Alpine asset identity follow-up
+
+The Worker 03 artifact preflight found that a `.tar.gz` asset is handled by
+`aapt2` as a gzip asset: the built entry was renamed to `.tar` and contained
+expanded tar bytes, so it no longer matched the pinned gzip SHA-256. This was
+a packaging bug, not a source-input discrepancy. The focused correction keeps
+the original source and provenance `archiveFileName` as
+`alpine_3.24_rootfs.tar.gz`, but stages those exact gzip bytes under the
+neutral feature asset name:
+
+```text
+source input:
+  assets/rootfs/alpine_3.24_rootfs.tar.gz
+feature/AAB/split asset:
+  payloads/distro_alpine/alpine_3.24_rootfs.minirootfs
+runtime AssetManager lookup:
+  payloads/distro_alpine/alpine_3.24_rootfs.minirootfs
+materialized app-private filename:
+  alpine_3.24_rootfs.tar.gz
+SHA-256:
+  f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259
+```
+
+The corrected AAB and feature asset were inspected byte-for-byte; the old
+`.tar` entry is absent. The correction is recorded in the Worker 04 change
+set because it was discovered by that mandatory preflight.
 
 `PlayFeatureDeliveryCoordinator` handles already-installed modules, active
 session re-entry after process death, progress callbacks, cancellation, failed
