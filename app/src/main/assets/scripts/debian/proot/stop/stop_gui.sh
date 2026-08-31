@@ -39,14 +39,8 @@ echo "[2/4] Skipping proot shell kill (terminal sessions stay alive)"
 
 # Step 3: Stop Termux X11 server
 echo "[3/4] Stopping Termux X11..."
-# Restore write permissions to allow clean updates/deployments
-chmod 0700 "$TERMUX__PREFIX/libexec/termux-x11" 2>/dev/null || true
-chmod 0600 "$TERMUX__PREFIX/libexec/termux-x11/loader.apk" 2>/dev/null || true
 # Send ACTION_STOP broadcast to close the X11 activity in our app
 am broadcast -a com.termux.x11.ACTION_STOP -p "$PKG" >/dev/null 2>&1
-# Kill the app_process X server
-pkill -9 -f "termux-x11" 2>/dev/null || true
-pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 killall -9 Xwayland 2>/dev/null || true
 
 # Step 4: Stop VirGL only. Host Pulse stays up so CLI / next desktop has audio.

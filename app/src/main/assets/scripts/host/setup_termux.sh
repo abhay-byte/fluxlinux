@@ -9,7 +9,7 @@
 set -e
 set -o pipefail
 
-SETUP_VERSION="2"
+SETUP_VERSION="3"
 
 # Bootstrap package identity until SSOT env file is sourced
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
@@ -117,12 +117,15 @@ for bin in "${required_bins[@]}"; do
     echo "FluxLinux: OK $bin -> $bin_path"
 done
 
-# Pulse must actually exec — a present binary with missing .so was a false green.
-# Mode 600 overlay .so files also fail to mmap as untrusted_app.
-for _so in libsoxr.so libsoxr-lsr.so libandroid-execinfo.so libFLAC.so libmp3lame.so; do
-    [ -f "$PREFIX/lib/$_so" ] || continue
-    chmod 755 "$PREFIX/lib/$_so" 2>/dev/null || true
+# libacl is pulled by the bundled coreutils applets. Its DT_NEEDED edge to
+# libattr must be satisfied inside this verified prefix; do not overlay either
+# library from generic writable assets.
+for _so in libacl.so libattr.so; do
+    [ -f "$PREFIX/lib/$_so" ] || fail "Missing bundled host library: $_so"
+    echo "FluxLinux: OK $PREFIX/lib/$_so"
 done
+
+# Pulse must actually exec — a present binary with missing .so was a false green.
 _PA="${PD_PULSEAUDIO_BIN:-pulseaudio}"
 if ! "$_PA" --version >/dev/null 2>&1; then
     fail "pulseaudio cannot exec (need libpulseaudio.so in nativeLibraryDir + runtime libs)"
@@ -150,13 +153,6 @@ fi
 if [ -n "${PROOT_LOADER_32:-}" ] && [ -e "$PROOT_LOADER_32" ]; then
     echo "FluxLinux: OK PROOT_LOADER_32=$PROOT_LOADER_32"
 fi
-
-LOADER_APK="$PREFIX/libexec/termux-x11/loader.apk"
-[ -f "$LOADER_APK" ] || fail "Missing Termux:X11 loader at $LOADER_APK"
-[ -s "$LOADER_APK" ] || fail "Termux:X11 loader is empty: $LOADER_APK"
-chmod 0400 "$LOADER_APK" 2>/dev/null || true
-chmod 0500 "$PREFIX/libexec/termux-x11" 2>/dev/null || true
-echo "FluxLinux: OK loader.apk ($(wc -c < "$LOADER_APK" | tr -d ' ') bytes)"
 
 touch "$TMPDIR/.flux_setup_write_test" 2>/dev/null \
     || fail "TMPDIR not writable: $TMPDIR"

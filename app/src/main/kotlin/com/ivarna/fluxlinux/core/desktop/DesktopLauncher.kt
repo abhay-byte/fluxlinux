@@ -16,6 +16,7 @@ import com.ivarna.fluxlinux.core.terminal.ShellJob
 import com.ivarna.fluxlinux.core.terminal.TerminalLauncher
 import com.ivarna.fluxlinux.core.terminal.TermuxHostPaths
 import com.ivarna.fluxlinux.core.utils.StateManager
+import com.ivarna.fluxlinux.core.utils.EmbeddedX11
 import com.ivarna.fluxlinux.core.utils.TermuxX11Preferences
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -247,6 +248,10 @@ object DesktopLauncher {
             )
         }
 
+        // The X server is part of the app's normal Android module. Start it
+        // before the host script so the script never needs an APK/app_process
+        // loader or a writable native-library copy.
+        EmbeddedX11.startServer(app)
         startFgs(app)
         toast(app, "Starting desktop…")
         Log.i(TAG, "startGui method=$method script=${script.absolutePath}")
@@ -309,13 +314,7 @@ object DesktopLauncher {
             return
         }
 
-        try {
-            val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
-            stopBroadcast.setPackage(app.packageName)
-            app.sendBroadcast(stopBroadcast)
-        } catch (e: Exception) {
-            Log.w(TAG, "ACTION_STOP failed", e)
-        }
+        EmbeddedX11.stopDisplay(app)
         stopFgs(app)
         guiShellJob?.cancel()
 
@@ -550,26 +549,9 @@ object DesktopLauncher {
     }
 
     private fun openX11(ctx: Context) {
-        try {
-            val x11 = Intent(ctx, com.termux.x11.MainActivity::class.java)
-            // Match nativecode when started from an Activity (no NEW_TASK).
-            // Application context (auto-open after healthy line) still needs NEW_TASK.
-            if (ctx is android.app.Activity) {
-                x11.addFlags(
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-                )
-            } else {
-                x11.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-                )
-            }
-            ctx.startActivity(x11)
-        } catch (e: Exception) {
-            Log.e(TAG, "Open X11 activity failed", e)
-            toast(ctx.applicationContext, "Failed to open display: ${e.message}")
+        if (!EmbeddedX11.launchDisplay(ctx)) {
+            Log.e(TAG, "Open embedded X11 activity failed")
+            toast(ctx.applicationContext, "Failed to open embedded display")
         }
     }
 

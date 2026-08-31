@@ -18,15 +18,12 @@ mkdir -p "$FLUX_RUNTIME_DIR"
 chmod 700 "$FLUX_RUNTIME_DIR"
 export XDG_RUNTIME_DIR="$FLUX_RUNTIME_DIR"
 
-# Prepare embedded termux-x11 session (X11 server runs in-process with the host app).
-# The host app launches the X11 activity; here we spawn the X server entry point
-# from the app's own APK (TERMUX_X11_APK_PATH is set by the app's host env).
-if [ -n "$TERMUX_X11_APK_PATH" ] && [ -f "$TERMUX_X11_APK_PATH" ]; then
-    CLASSPATH="$TERMUX_X11_APK_PATH" app_process / com.termux.x11.CmdEntryPoint :0 -legacy-drawing >/dev/null 2>&1 &
-    echo "FluxLinux: Embedded X11 server started from app APK"
-else
-    termux-x11 :0 >/dev/null &
+# X11 is started in-process by DesktopLauncher through the compiled module.
+if [ "${FLUX_EMBEDDED_X11:-0}" != "1" ]; then
+    echo "FluxLinux: embedded X11 server was not started by the app" >&2
+    exit 1
 fi
+echo "FluxLinux: Embedded X11 server is owned by the FluxLinux app process"
 
 # Wait until the X11 session gets started
 sleep 3

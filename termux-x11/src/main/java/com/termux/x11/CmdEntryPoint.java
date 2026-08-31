@@ -25,7 +25,6 @@ import androidx.annotation.Keep;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.net.URL;
 
 @Keep @SuppressLint({"StaticFieldLeak", "UnsafeDynamicallyLoadedCode"})
 public class CmdEntryPoint extends ICmdEntryInterface.Stub {
@@ -41,7 +40,12 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
      */
     public static void main(String[] args) {
         android.util.Log.i("CmdEntryPoint", "commit " + BuildConfig.COMMIT);
-        handler.post(() -> new CmdEntryPoint(args));
+        // EmbeddedX11 calls this from its dedicated server thread. Posting to
+        // the app main looper would make server startup dependent on UI work.
+        if (Looper.myLooper() == handler.getLooper())
+            handler.post(() -> new CmdEntryPoint(args));
+        else
+            new CmdEntryPoint(args);
         Looper.loop();
     }
 
@@ -143,6 +147,18 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         Context context;
         PrintStream err = System.err;
         try {
+            // Normal library integration: use the current app context so
+            // ACTION_START and native-library lookup stay same-package.
+            Object application = Class.forName("android.app.ActivityThread")
+                    .getMethod("currentApplication")
+                    .invoke(null);
+            if (application instanceof Context)
+                return (Context) application;
+        } catch (Exception ignored) {
+            // app_process compatibility fallback below is retained for tests
+            // and downstream consumers, but FluxLinux no longer invokes it.
+        }
+        try {
             java.lang.reflect.Field f = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
             f.setAccessible(true);
             Object unsafe = f.get(null);
@@ -183,33 +199,15 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         handler = new Handler();
         ctx = createContext();
 
-        String path = "lib/" + Build.SUPPORTED_ABIS[0] + "/libXlorie.so";
-        ClassLoader loader = CmdEntryPoint.class.getClassLoader();
-        URL res = loader != null ? loader.getResource(path) : null;
-        String libPath = res != null ? res.getFile().replace("file:", "") : null;
-        if (libPath == null || libPath.contains("base.apk!")) {
-            // Under targetSdk 36, library loading from apk inside app_process namespace fails.
-            // Fall back to the extracted library directory of the host app package
-            // (embedded X11: the host app is the package that carries libXlorie.so).
-            String pkg = getenv("TERMUX_X11_OVERRIDE_PACKAGE");
-            if (pkg == null)
-                pkg = "com.termux.x11";
-            libPath = "/data/data/" + pkg + "/lib/libXlorie.so";
-        }
-        if (libPath != null) {
-            try {
-                System.load(libPath);
-            } catch (UnsatisfiedLinkError | Exception e) {
-                Log.e("CmdEntryPoint", "Failed to dlopen " + libPath, e);
-                System.err.println("Failed to load native library. Did you install the right apk? Try the universal one.");
-                System.exit(134);
-            }
-        } else {
-            // It is critical only when it is not running in Android application process
-            if (MainActivity.getInstance() == null) {
-                System.err.println("Failed to acquire native library. Did you install the right apk? Try the universal one.");
-                System.exit(134);
-            }
+        try {
+            // :termux-x11 is an Android library dependency. System.loadLibrary
+            // resolves its compiled libXlorie.so from applicationInfo.nativeLibraryDir;
+            // no APK path, extracted app-data copy, or app_process is involved.
+            System.loadLibrary("Xlorie");
+        } catch (UnsatisfiedLinkError | Exception e) {
+            Log.e("CmdEntryPoint", "Failed to load embedded libXlorie.so", e);
+            System.err.println("Failed to load embedded X11 native library.");
+            System.exit(134);
         }
     }
 }

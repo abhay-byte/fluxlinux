@@ -20,10 +20,10 @@ object HostBootstrap {
     )
 
     val ZENITHBLUE = VerifiedPayloadSpec(
-        fileName = "bootstrap_com.zenithblue.fluxlinux.tar",
-        // Measured from the reproducible bootstrap produced by
-        // scripts/assemble_bootstrap.py (Worker 01 baseline).
-        sha256 = "3ffef7f92820341e2a74b739fb15695a16fe4622e80cfc81d18bd98461712609",
+        fileName = "bootstrap_com.zenithblue.fluxlinux.v2.tar",
+        // Measured from the Worker 04 reproducible bootstrap. It includes the
+        // libacl -> libattr dependency and no nested X11 loader APK.
+        sha256 = "87da10cf99613c00b6841200c29be1d9bcebaf36a2e7c5e312660807e9f965bd",
         minBytes = 50L * 1024L * 1024L
     )
 

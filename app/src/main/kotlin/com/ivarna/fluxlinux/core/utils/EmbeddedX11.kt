@@ -29,9 +29,14 @@ object EmbeddedX11 {
 
     fun startServer(context: Context) {
         if (serverThread?.isAlive == true) return
+        val app = context.applicationContext
         serverThread = Thread({
             try {
                 android.os.Looper.prepare()
+                // CmdEntryPoint normally discovers the current application,
+                // but pin the same-package context explicitly for the module's
+                // ACTION_START broadcast.
+                com.termux.x11.CmdEntryPoint.ctx = app
                 com.termux.x11.CmdEntryPoint.main(arrayOf(":0", "-legacy-drawing"))
                 android.os.Looper.loop()
             } catch (e: Exception) {
@@ -50,7 +55,7 @@ object EmbeddedX11 {
     /** Ask the in-app X11 session to stop. */
     fun stopDisplay(context: Context) {
         runCatching {
-            context.sendBroadcast(Intent("com.termux.x11.ACTION_STOP"))
+            context.sendBroadcast(Intent("com.termux.x11.ACTION_STOP").setPackage(context.packageName))
         }
     }
 

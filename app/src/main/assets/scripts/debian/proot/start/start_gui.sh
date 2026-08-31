@@ -33,10 +33,8 @@ mkdir -p "$PULSE_RUNTIME_PATH" 2>/dev/null
 # (that would kill FluxLinux itself if the package name matches).
 # Pulse is a host service: do not pkill it here (CLI audio stays up).
 pkill -f "virgl_test_server" 2>/dev/null || true
-pkill -f termux-x11 2>/dev/null || true
-pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 2
-# Stale UNIX sockets make Loader fail with "server already running"
+# Stale UNIX sockets make the embedded X11 server fail with "server already running"
 rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" \
   "$TMPDIR/.X11-unix/X0" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
 # PREFIX/tmp must stay app_data_file. A leftover tmpfs:s0 label (older chroot
@@ -74,14 +72,16 @@ else
   echo "FluxLinux: VirGL unavailable; using software rendering"
 fi
 
-# Start X server via app_process (needs system context)
-echo "FluxLinux: Starting termux-x11 server..."
+# X11 is started in-process by DesktopLauncher through the compiled :termux-x11
+# Android library. The host script only prepares its shared socket and opens the
+# same-package display activity; it never executes an APK or app_process.
+if [ "${FLUX_EMBEDDED_X11:-0}" != "1" ]; then
+  echo "FluxLinux: embedded X11 server was not started by the app" >&2
+  exit 1
+fi
+echo "FluxLinux: Embedded X11 server is owned by the FluxLinux app process"
 export XDG_RUNTIME_DIR="$TMPDIR"
 export DISPLAY=:0
-
-# Fix Android 14 SecurityException for writable dex files (loader.apk must be read-only)
-chmod 0400 "$TERMUX_PREFIX/libexec/termux-x11/loader.apk" 2>/dev/null || true
-chmod 0500 "$TERMUX_PREFIX/libexec/termux-x11" 2>/dev/null || true
 
 # Fix broken xkb symlink if pointing to old com.termux prefix
 if [ -L "$TERMUX_PREFIX/share/X11/xkb" ] && [ ! -e "$TERMUX_PREFIX/share/X11/xkb" ]; then
@@ -89,48 +89,7 @@ if [ -L "$TERMUX_PREFIX/share/X11/xkb" ] && [ ! -e "$TERMUX_PREFIX/share/X11/xkb
   ln -s "$TERMUX_PREFIX/share/xkeyboard-config-2" "$TERMUX_PREFIX/share/X11/xkb"
 fi
 
-# Resolve our installed APK path so Loader can dlopen CmdEntryPoint classes
-# tr -d '\r' strips Windows carriage returns from pm path output
-if [ -z "$TERMUX_X11_APK_PATH" ]; then
-  # /system/bin/pm — termux-exec rewrites bare "pm" to $PREFIX/bin/pm (missing).
-  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
-fi
-if [ -z "$TERMUX_X11_APK_PATH" ] || [ ! -f "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(/system/bin/find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
-fi
-export TERMUX_X11_APK_PATH
-echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
-
-# Extract libXlorie.so from our APK to /data/data app lib dir
-# This is the only location app_process can dlopen without corrupting its linker namespace
-APP_LIB_DIR="/data/data/$PKG/lib"
-mkdir -p "$APP_LIB_DIR" 2>/dev/null
-if [ ! -f "$APP_LIB_DIR/libXlorie.so" ] && [ -n "$TERMUX_X11_APK_PATH" ]; then
-  echo "FluxLinux: Extracting libXlorie.so from APK..."
-  # Try arm64 first, then armeabi-v7a
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/arm64-v8a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/arm64-v8a/libXlorie.so . && rm -rf lib ) || \
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/armeabi-v7a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
-  ls -la "$APP_LIB_DIR/libXlorie.so" 2>/dev/null && \
-    echo "FluxLinux: libXlorie.so ready in $APP_LIB_DIR" || \
-    echo "FluxLinux: [WARN] libXlorie.so extraction failed"
-fi
-
-# Launch the X server via app_process
-# CLEAR LD_LIBRARY_PATH — setting it to Termux libs breaks system linker (libunwindstack.so)
-# CmdEntryPoint finds libXlorie.so via ClassLoader resource lookup inside our APK
-LD_LIBRARY_PATH="" LD_PRELOAD="" \
-CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
-TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
-TERMUX_X11_OVERRIDE_PACKAGE="$PKG" \
-LANG=en_US.UTF-8 \
-/system/bin/app_process / \
-  --nice-name="termux-x11" com.termux.x11.Loader :0 -legacy-drawing &
-XSERVER_PID=$!
-echo "FluxLinux: X server PID=$XSERVER_PID"
+echo "FluxLinux: X server PID=embedded"
 sleep 3
 
 # Open X11 display activity in our app

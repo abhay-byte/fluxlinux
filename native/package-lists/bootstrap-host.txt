@@ -83,6 +83,7 @@ gdbm
 libandroid-selinux
 libandroid-glob
 libacl
+attr
 libx11
 libxau
 libxcb

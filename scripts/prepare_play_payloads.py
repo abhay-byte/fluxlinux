@@ -215,18 +215,18 @@ def main() -> None:
 
     host_digest, host_size, host_expanded = verify_one(
         host_source,
-        "3ffef7f92820341e2a74b739fb15695a16fe4622e80cfc81d18bd98461712609",
+        "87da10cf99613c00b6841200c29be1d9bcebaf36a2e7c5e312660807e9f965bd",
         50 * 1024 * 1024,
-        "bootstrap_com.zenithblue.fluxlinux.tar",
+        "bootstrap_com.zenithblue.fluxlinux.v2.tar",
     )
     host_manifest = manifest_for(
         "host_bootstrap_com.zenithblue.fluxlinux",
         "host",
-        "bootstrap_com.zenithblue.fluxlinux.tar",
+        "bootstrap_com.zenithblue.fluxlinux.v2.tar",
         host_digest,
         host_size,
         host_expanded,
-        "FluxLinux Termux package set assembled from tracked package inputs",
+        "FluxLinux Termux package set assembled from tracked package inputs; Worker 04 libattr and embedded-X11 hardening",
         None,
         "scripts/assemble_bootstrap.py and native/package-lists/termux-lib-ssot.txt",
         commit,

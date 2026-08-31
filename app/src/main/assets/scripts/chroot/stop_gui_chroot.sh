@@ -94,7 +94,6 @@ echo "Stopping VirGL (app uid; Pulse stays running)..."
 pkill -f "virgl_test_server" 2>/dev/null || true
 
 pkill -9 -f "termux-x11" 2>/dev/null || true
-pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 
 echo "Chroot GUI stop complete."
 echo "========================================"

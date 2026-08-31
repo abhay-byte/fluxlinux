@@ -43,7 +43,9 @@ object HostCommandBuilder {
         TermuxHostPaths.ensureHostTmpDirs()
         env["TERMUX_APP__PACKAGE_NAME"] = TermuxHostPaths.PACKAGE
         env["TERMUX_VERSION"] = TermuxHostPaths.TERMUX_VERSION
-        env["TERMUX_X11_APK_PATH"] = ctx.applicationInfo.sourceDir
+        // X11 is compiled into the app module and started by EmbeddedX11 from
+        // this process; there is no APK-on-disk loader or app_process fallback.
+        env["FLUX_EMBEDDED_X11"] = "1"
         env["TERMUX_X11_OVERRIDE_PACKAGE"] = TermuxHostPaths.PACKAGE
         env["TERMUX__PREFIX"] = TermuxHostPaths.PREFIX
         env["TERMUX__HOME"] = TermuxHostPaths.HOME

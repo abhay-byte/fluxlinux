@@ -319,7 +319,6 @@ echo "Terminating Debian 13 Chroot GUI processes..."
 \$BB chroot \$DEBIANPATH /bin/su - root -c "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon" >/dev/null 2>&1
 
 pkill -9 -f termux-x11 >/dev/null 2>&1
-pkill -9 -f "app_process.*termux-x11" >/dev/null 2>&1
 rm -rf \$TARGET_TERMUX_PREFIX/tmp/.X11-unix \$TARGET_TERMUX_PREFIX/tmp/.X0-lock 2>/dev/null
 echo "Debian 13 GUI Stopped."
 EOF

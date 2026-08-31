@@ -114,8 +114,6 @@ mkdir -p "$PULSE_RUNTIME_PATH" "$TMPDIR" 2>/dev/null
 
 # Stale host graphics only — do NOT force-stop $PKG and do not kill Pulse.
 pkill -f "virgl_test_server" 2>/dev/null || true
-pkill -f termux-x11 2>/dev/null || true
-pkill -f "app_process.*termux-x11" 2>/dev/null || true
 sleep 1
 
 # Host Pulse (app uid) before su. Supervisor prints FluxLinux: [AUDIO] …
@@ -136,39 +134,19 @@ else
   echo "FluxLinux: VirGL unavailable; software GL in guest"
 fi
 
-# Embedded termux-x11 (same as proot start_gui.sh)
-echo "FluxLinux: Starting termux-x11 server..."
+# X11 is started in-process by DesktopLauncher through the compiled :termux-x11
+# Android library. This root wrapper only opens the same-package display.
+if [ "${FLUX_EMBEDDED_X11:-0}" != "1" ]; then
+  echo "FluxLinux: embedded X11 server was not started by the app" >&2
+  exit 1
+fi
+echo "FluxLinux: Embedded X11 server is owned by the FluxLinux app process"
 export XDG_RUNTIME_DIR="$TMPDIR"
 export DISPLAY=:0
-
-chmod 0400 "$TERMUX_PREFIX/libexec/termux-x11/loader.apk" 2>/dev/null || true
-chmod 0500 "$TERMUX_PREFIX/libexec/termux-x11" 2>/dev/null || true
 
 if [ -L "$TERMUX_PREFIX/share/X11/xkb" ] && [ ! -e "$TERMUX_PREFIX/share/X11/xkb" ]; then
   rm -f "$TERMUX_PREFIX/share/X11/xkb"
   ln -s "$TERMUX_PREFIX/share/xkeyboard-config-2" "$TERMUX_PREFIX/share/X11/xkb"
-fi
-
-if [ -z "$TERMUX_X11_APK_PATH" ]; then
-  # /system/bin/pm — termux-exec rewrites bare "pm" to $PREFIX/bin/pm (missing).
-  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
-fi
-if [ -z "$TERMUX_X11_APK_PATH" ] || [ ! -f "$TERMUX_X11_APK_PATH" ]; then
-  TERMUX_X11_APK_PATH=$(/system/bin/find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
-fi
-export TERMUX_X11_APK_PATH
-echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
-
-APP_LIB_DIR="/data/data/$PKG/lib"
-mkdir -p "$APP_LIB_DIR" 2>/dev/null
-if [ ! -f "$APP_LIB_DIR/libXlorie.so" ] && [ -n "$TERMUX_X11_APK_PATH" ]; then
-  echo "FluxLinux: Extracting libXlorie.so..."
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/arm64-v8a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/arm64-v8a/libXlorie.so . && rm -rf lib ) || \
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/armeabi-v7a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
 fi
 
 rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" 2>/dev/null || true
@@ -185,15 +163,7 @@ if [ -n "$_ctx" ] && command -v chcon >/dev/null 2>&1; then
   chcon -R "$_ctx" "$TMPDIR" 2>/dev/null || chcon "$_ctx" "$TMPDIR" 2>/dev/null || true
 fi
 
-LD_LIBRARY_PATH="" LD_PRELOAD="" \
-CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
-TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
-TERMUX_X11_OVERRIDE_PACKAGE="$PKG" \
-LANG=en_US.UTF-8 \
-/system/bin/app_process / \
-  --nice-name="termux-x11" com.termux.x11.Loader :0 -legacy-drawing &
-XSERVER_PID=$!
-echo "FluxLinux: X server PID=$XSERVER_PID"
+echo "FluxLinux: X server PID=embedded"
 sleep 3
 
 echo "FluxLinux: Opening X11 activity..."

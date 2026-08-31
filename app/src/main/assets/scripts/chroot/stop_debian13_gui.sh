@@ -71,11 +71,7 @@ if [ -n "$BB" ] && [ -d "$DEBIANPATH" ]; then
 fi
 
 echo "[2/4] Stop Termux X11 host processes..."
-# Restore loader write bits for redeploy
-chmod 0700 "$TARGET_PREFIX/libexec/termux-x11" 2>/dev/null || true
-chmod 0600 "$TARGET_PREFIX/libexec/termux-x11/loader.apk" 2>/dev/null || true
 pkill -9 -f "termux-x11" 2>/dev/null || true
-pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 killall -9 Xwayland 2>/dev/null || true
 rm -rf "$TARGET_PREFIX/tmp/.X11-unix" "$TARGET_PREFIX/tmp/.X0-lock" "$TARGET_PREFIX/tmp/.X1-lock" 2>/dev/null || true
 

@@ -83,6 +83,7 @@ DEFAULT_PACKAGES = [
     "libandroid-selinux",
     "libandroid-glob",
     "libacl",
+    "attr",
     "libx11",
     "libxau",
     "libxcb",
@@ -149,21 +150,9 @@ def extract_debs(deb_dir: Path, extract_dir: Path, packages: list[str]) -> list[
     return missing
 
 
-def add_loader(extract_dir: Path, target_prefix: str, loader_src: Path) -> None:
-    if not loader_src.is_file():
-        print(f"[!] Warning: loader APK missing at {loader_src} — skip")
-        return
-    dest_dir = extract_dir / target_prefix / "usr/libexec/termux-x11"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / "loader.apk"
-    print(f"[*] Copying loader.apk → {dest}")
-    shutil.copy2(loader_src, dest)
-
-
 def verify_bootstrap(
     extract_dir: Path,
     target_prefix: str,
-    require_loader: bool,
     mode: str = "full",
 ) -> None:
     print(f"[*] Verifying critical files in bootstrap (mode={mode})...")
@@ -184,14 +173,13 @@ def verify_bootstrap(
                 "usr/lib/libandroid-execinfo.so",
                 "usr/lib/libFLAC.so",
                 "usr/lib/libmp3lame.so",
+                "usr/lib/libattr.so",
+                "usr/lib/libacl.so",
                 "usr/lib/pulseaudio/modules/module-aaudio-sink.so",
                 "usr/lib/pulseaudio/modules/module-sles-sink.so",
                 "usr/lib/pulseaudio/modules/module-native-protocol-tcp.so",
             ]
         )
-    if require_loader:
-        required.append("usr/libexec/termux-x11/loader.apk")
-
     base = extract_dir / target_prefix
     ok = True
     for rel in required:
@@ -322,21 +310,9 @@ def main() -> None:
         help="Working extract directory (default: native/bootstrap/<pkg>/root)",
     )
     ap.add_argument(
-        "--loader-apk",
-        type=Path,
-        default=None,
-        help="Path to loader.apk (default: app/src/main/assets/loader.apk, "
-        "or loader.bin if the scanner already deleted the .apk)",
-    )
-    ap.add_argument(
         "--allow-missing",
         action="store_true",
         help="Do not fail if some listed packages are missing from deb-dir",
-    )
-    ap.add_argument(
-        "--skip-loader-check",
-        action="store_true",
-        help="Do not require loader.apk in verification",
     )
     ap.add_argument(
         "--mode",
@@ -345,11 +321,6 @@ def main() -> None:
         help="full = host+GUI (pulse/xkb); terminal-proot = shell+proot only",
     )
     args = ap.parse_args()
-    if args.loader_apk is None:
-        apk = ROOT / "app/src/main/assets/loader.apk"
-        fallback = ROOT / "app/src/main/assets/loader.bin"
-        args.loader_apk = apk if apk.is_file() else fallback
-
     package_name = args.package_name
     deb_dir = (args.deb_dir or ROOT / "native/output" / package_name).resolve()
     out_tar = (
@@ -385,14 +356,9 @@ def main() -> None:
         sys.exit(1)
 
     assert_no_wrong_prefix(extract_dir, package_name)
-    if args.mode == "full" or not args.skip_loader_check:
-        add_loader(extract_dir, target_prefix, args.loader_apk.resolve())
-    elif args.loader_apk.resolve().is_file():
-        add_loader(extract_dir, target_prefix, args.loader_apk.resolve())
     verify_bootstrap(
         extract_dir,
         target_prefix,
-        require_loader=(args.mode == "full" and not args.skip_loader_check),
         mode=args.mode,
     )
     copy_to_jni_libs(extract_dir, target_prefix, jni_dir)

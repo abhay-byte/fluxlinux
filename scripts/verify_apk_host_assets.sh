@@ -19,6 +19,36 @@ fail=0
 
 echo "=== verifying host assets in $APK ==="
 
+# Generic writable assets must not carry Android-host ELF or nested APK bytes.
+# Native host launchers are allowed only below lib/arm64-v8a/.
+asset_entries="$(unzip -Z1 "$APK" | awk '/(^|\/)assets\// {print}')"
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  case "$entry" in
+    */assets/payloads/*) continue ;;
+  esac
+  # Read the complete generic entry before converting its prefix. Stopping
+  # od after four bytes closes unzip early and returns SIGPIPE under pipefail.
+  magic="$(unzip -p "$APK" "$entry" 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+  if [[ "$magic" == 7f454c46* ]]; then
+    case "$entry" in
+      assets/scripts/common/setup/bwrap-proot-shim|assets/scripts/opensuse/common/libevp_md2.so)
+        echo "  [OK] guest-only ELF asset: $entry" ;;
+      *)
+        echo "  [FAIL] ELF in generic asset: $entry"
+        fail=1 ;;
+    esac
+  elif [[ "$magic" == 504b0304* ]]; then
+    # A ZIP is an APK only when it carries Android package entries. Ordinary
+    # guest/theme ZIPs remain data and are not rejected by this gate.
+    nested_listing="$(unzip -p "$APK" "$entry" 2>/dev/null | unzip -l - 2>/dev/null || true)"
+    if grep -Eq 'AndroidManifest.xml|classes\.dex' <<<"$nested_listing"; then
+      echo "  [FAIL] nested APK bytes in generic asset: $entry"
+      fail=1
+    fi
+  fi
+done <<< "$asset_entries"
+
 for entry in \
   "lib/arm64-v8a/libbash.so" \
   "lib/arm64-v8a/libproot.so" \

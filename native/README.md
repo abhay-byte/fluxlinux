@@ -12,10 +12,9 @@ Plan: [`docs/plans/termux-native-packages-dual-appid.md`](../docs/plans/termux-n
 ## Layout
 
 ```text
-native/
+  native/
   termux-packages -> symlink to ~/repos/termux-lib/termux-packages (or a clone)
   package-lists/bootstrap-host.txt
-  loader/shell-loader.apk
   output/<applicationId>/*.deb
   output/logs/
   bootstrap/<applicationId>/bootstrap.tar
@@ -129,4 +128,5 @@ FORCE_DEPS=1 ./scripts/build_packages_for_appid.sh com.ivarna.fluxlinux bash
 1. **Never** ship a bootstrap built for another applicationId.
 2. Changing `TERMUX_APP__PACKAGE_NAME` invalidates reuse of stock `com.termux` repo debs; dependencies are built locally.
 3. Do **not** reuse `com.zenithblue.nativecode` debs from termux-lib for FluxLinux.
-4. Keep `loader.apk` Java class names as `com.termux.x11.Loader` (do not sed class names).
+4. The X11 server is compiled into the app's `:termux-x11` Android library and
+   starts in-process; no nested loader APK is assembled or deployed.

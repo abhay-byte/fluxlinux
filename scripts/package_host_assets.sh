@@ -66,25 +66,20 @@ stage_app_id() {
   done
   if [ "$missing" -eq 1 ]; then exit 1; fi
 
-  # 2-3. Stage assets + jniLibs (flavor source set)
+  # 2-3. Stage only the directly executed jniLibs (flavor source set).
+  # Pulse's dependent libraries belong to the verified runtime_host bootstrap;
+  # never copy ELF fallbacks into writable flavor assets.
   mkdir -p "$flavor_assets" "$flavor_jni/arm64-v8a"
   # Remove a stale pre-Worker-03 tarball from the base source set.
   rm -f "$flavor_assets/bootstrap.tar"
+  # Remove stale pre-Worker-04 Pulse overlays from prior local staging.
+  rm -rf "$flavor_assets/pulse-runtime"
   cp -f "$src/jniLibs/arm64-v8a/"*.so "$flavor_jni/arm64-v8a/"
-
-  # Pulse runtime overlay for already-extracted PREFIX (no EXTRACT_VERSION bump).
-  mkdir -p "$flavor_assets/pulse-runtime"
-  local lib_root="$src/root/data/data/$app_id/files/usr/lib"
-  local so
-  for so in libsoxr.so libsoxr-lsr.so libandroid-execinfo.so libFLAC.so libmp3lame.so; do
-    if [ -e "$lib_root/$so" ]; then
-      cp -fL "$lib_root/$so" "$flavor_assets/pulse-runtime/$so"
-    fi
-  done
 
   # 4. Report
   echo "=== packaged host assets for $app_id (flavor: $flavor) ==="
   echo "  app/src/$flavor/assets/bootstrap.tar  NOT packaged — supplied by PFD runtime_host"
+  echo "  app/src/$flavor/assets/pulse-runtime/ NOT packaged — libraries live in runtime_host"
   echo "  app/src/$flavor/jniLibs/arm64-v8a/    $(ls "$flavor_jni/arm64-v8a" | tr '\n' ' ')"
   echo "  rootfs: supplied by PFD distro_* dynamic features for the Play flavor"
 }

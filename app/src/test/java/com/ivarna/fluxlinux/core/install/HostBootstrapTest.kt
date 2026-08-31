@@ -14,7 +14,7 @@ class HostBootstrapTest {
             HostBootstrap.IVARNA.fileName
         )
         assertEquals(
-            "bootstrap_com.zenithblue.fluxlinux.tar",
+            "bootstrap_com.zenithblue.fluxlinux.v2.tar",
             HostBootstrap.ZENITHBLUE.fileName
         )
         assertTrue(HostBootstrap.IVARNA.sha256.matches(Regex("[0-9a-f]{64}")))

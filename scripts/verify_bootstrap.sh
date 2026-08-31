@@ -26,10 +26,11 @@ required=(
   "usr/lib/libandroid-execinfo.so"
   "usr/lib/libFLAC.so"
   "usr/lib/libmp3lame.so"
+  "usr/lib/libattr.so"
+  "usr/lib/libacl.so"
   "usr/lib/pulseaudio/modules/module-aaudio-sink.so"
   "usr/lib/pulseaudio/modules/module-sles-sink.so"
   "usr/lib/pulseaudio/modules/module-native-protocol-tcp.so"
-  "usr/libexec/termux-x11/loader.apk"
 )
 
 tmp="$(mktemp)"
