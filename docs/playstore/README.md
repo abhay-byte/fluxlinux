@@ -1,53 +1,65 @@
 # Play Store Documentation
 
-Documents related to publishing and maintaining FluxLinux on the Google Play Store.
+These documents define the Google Play build and release process for FluxLinux.
 
-## Current v2 plans
+## Canonical v2 plan
 
-| File | Purpose |
-|------|---------|
-| [`v2_0_compliance_roadmap.md`](v2_0_compliance_roadmap.md) | Immediate v2 Play compliance roadmap: protect the old Play build, isolate risky v2 features, clean permissions/FGS/metadata, and build release gates. |
-| [`full_v2_compliant_delivery_execution_roadmap.md`](full_v2_compliant_delivery_execution_roadmap.md) | Long-term/full-parity architecture: Google Play Feature Delivery for distro payloads plus VM/interpreter-only guest execution so package managers and Linux guest code can remain usable without direct Android execution. |
-| [`workers/`](workers/) | Small workers for the immediate conservative Play compliance migration. |
-| [`compliant-runtime-workers/`](compliant-runtime-workers/) | Small workers for implementing and proving the full v2 Play-compliant delivery/execution architecture. |
-
-## Policy/reference documents
+Use these files for implementation:
 
 | File | Purpose |
-|------|---------|
-| [`policies_and_violations.md`](policies_and_violations.md) | Historical/current repo-specific Google Play findings and remediation guidance. |
-| `privacy_policy.md` | Play-specific privacy policy. Must always match the actual Play artifact and Play Console declarations. |
+|---|---|
+| `v2_0_compliance_roadmap.md` | **Canonical roadmap.** Keeps the embedded v2 PRoot backend and moves Flux-managed runtime delivery to Google Play Feature Delivery dynamic-feature modules. |
+| `full_v2_compliant_delivery_execution_roadmap.md` | Technical supplement for the same PFD + native PRoot architecture. It is not a separate implementation track. |
+| `workers/` | **Canonical worker sequence.** Execute Workers 01 through 10 in order. |
 
-## Recommended workflow
+## Deprecated worker set
 
-### A. Immediate safe Play release
+`compliant-runtime-workers/` is an older QEMU/interpreter-first experiment plan. It was superseded after code and policy review and must not be executed. The files in that directory redirect to the canonical worker sequence.
 
-Use `v2_0_compliance_roadmap.md` and `workers/01...10` to create a conservative v2 Play artifact without carrying policy-risky direct guest execution into production.
+## Current architecture
 
-### B. Restore full v2 Linux functionality
+The Play build remains an embedded Linux environment. Same-architecture native PRoot, terminal, X11, PulseAudio, distro extraction/configuration and session management are preserved. Small directly executed Android-host launchers remain in normal Play-installed native-library locations. The large host bootstrap and each distro rootfs are delivered on demand as **Play Feature Delivery dynamic-feature modules**.
 
-Use `full_v2_compliant_delivery_execution_roadmap.md` and `compliant-runtime-workers/01...10`.
+The Play flavor must not contain a Flux-managed GitHub/HTTP rootfs or bootstrap fallback, Android-level root/chroot, nested loader APK, or obsolete external-Termux bridge.
 
-The critical proof sequence is:
+### Do not use PAD for rootfs/bootstrap
 
-1. QEMU/interpreter POC.
-2. Engine abstraction.
-3. Real Play Feature Delivery POC.
-4. Interpreter-only/fail-closed sandbox.
-5. Install a package from a normal Linux repository and prove the new executable still runs only inside the interpreter.
+Play Asset Delivery is not the canonical mechanism for Linux rootfs/bootstrap payloads. These archives contain executable-bearing runtime content; use Play Feature Delivery dynamic features.
 
-Do not convert all distros or optimize GPU before these five gates pass.
+### QEMU is not the primary backend
 
-## Core Play invariant
+QEMU/interpreter execution is no longer the default same-architecture plan because it adds substantial performance overhead and is unnecessary for the existing native PRoot backend. Reconsider it only if a future explicit policy or platform requirement makes native PRoot unsuitable.
 
-For the full-parity Play architecture:
+## Worker order
 
-> Google Play delivers FluxLinux's Android-side execution engine. Linux guest executables are never directly executed or loaded by Android; they execute only as guest code inside the VM/interpreter boundary.
+1. `workers/01_branch_baseline.md`
+2. `workers/02_play_flavor_boundary.md`
+3. `workers/03_remove_remote_executable_delivery.md`
+4. `workers/04_remove_nested_and_writable_executables.md`
+5. `workers/05_remove_root_chroot_from_play.md`
+6. `workers/06_links_permissions_and_callbacks.md`
+7. `workers/07_foreground_services.md`
+8. `workers/08_privacy_and_store_metadata.md`
+9. `workers/09_ci_policy_gate.md`
+10. `workers/10_release_validation.md`
 
-Do not weaken this invariant for performance or compatibility fallbacks.
+Do not start the next worker until the current worker reports `PASS`, except for a narrowly documented compile/test fix required to unblock it.
 
-## Related
+## Core invariants
 
-- Fastlane metadata lives at `fastlane/metadata/android/en-US/`.
-- Play package identity must remain `com.zenithblue.fluxlinux`.
-- Live Google Play policy always overrides repository snapshots when policies change.
+- Play package remains `com.zenithblue.fluxlinux`.
+- Current Play target-SDK and policy requirements are rechecked before release.
+- The Play app does not fetch Flux-managed executable/rootfs/bootstrap payloads from GitHub/HTTP.
+- PRoot fake guest root is preserved; Android/device root/chroot is absent from Play.
+- Directly executed Android-host code follows the existing API-36/native-library W^X-safe design.
+- Executable-bearing rootfs/bootstrap payloads use Play Feature Delivery, not PAD.
+- PRoot is not described as a VM/interpreter.
+- Another Play app is precedent, not a guarantee of approval.
+- User-initiated guest package-manager behavior is an explicit Internal/Closed Play review gate.
+- Live Google Play policy overrides stale repository assumptions.
+
+## Reference documents
+
+- `policies_and_violations.md`: historical and repo-specific findings. The canonical v2 roadmap overrides stale architecture assumptions in it.
+- `privacy_policy.md`: current published Play privacy text. Worker 08 must reconcile it with the final AAB before release.
+- Fastlane Play metadata lives under `fastlane/metadata/android/en-US/`.
