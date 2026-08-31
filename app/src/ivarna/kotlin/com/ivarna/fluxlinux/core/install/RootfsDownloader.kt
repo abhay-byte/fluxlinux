@@ -15,8 +15,8 @@ import okhttp3.Request
  *
  * Local-first (D7): a verified destination file or a verified local candidate
  * (same locations `flux_install.sh` searches) short-circuits before any network
- * access. Only then does it GET [DistroInstallProfile.rootfsUrl] from the
- * GitHub release tag `rootfs`, streaming into `<name>.partial` with HTTP Range
+ * access. Only then does it GET the matching release asset from the ivarna
+ * transport boundary, streaming into `<name>.partial` with HTTP Range
  * resume (D5), SHA256 + minimum-size gates (D4), cancellation, progress and a
  * free-space precheck (D11).
  *
@@ -26,6 +26,8 @@ import okhttp3.Request
 object RootfsDownloader {
 
     private const val TAG = "RootfsDownloader"
+    private const val RELEASE_BASE =
+        "https://github.com/abhay-byte/fluxlinux/releases/download/rootfs"
 
     /** Free-space slack beyond the expected download size (D11). */
     const val FREE_SPACE_SLACK_BYTES = 8L * 1024L * 1024L
@@ -58,7 +60,14 @@ object RootfsDownloader {
         PinnedReleaseArchive(
             fileName = rootfsFileName,
             sha256 = rootfsSha256,
-            url = rootfsUrl,
+            // rootfsAsset is a legacy path in production profiles. Accepting
+            // an absolute URL here keeps the JVM transport tests injectable
+            // without putting a release URL in common profile metadata.
+            url = if (rootfsAsset.startsWith("http://") || rootfsAsset.startsWith("https://")) {
+                rootfsAsset
+            } else {
+                "$RELEASE_BASE/$rootfsFileName"
+            },
             minBytes = rootfsMinBytes
         )
 

@@ -132,9 +132,8 @@ object InstallSessionFactory {
         if (chrootPath != null) extra["FLUX_CHROOT"] = chrootPath
         // `su -c` does NOT inherit the TerminalSession env map — export the
         // rootfs identity inside the command string so the chroot setup script
-        // can resolve / download / SHA-check the archive (P4-T4).
+        // can resolve and SHA-check the provider materialization.
         if (rootfsProfile != null) {
-            extra["FLUX_ROOTFS_URL"] = rootfsProfile.rootfsUrl
             extra["FLUX_ROOTFS_SHA256"] = rootfsProfile.rootfsSha256
             extra["FLUX_ROOTFS_NAME"] = rootfsProfile.rootfsFileName
         }
@@ -172,8 +171,7 @@ object InstallSessionFactory {
             extraEnv = mapOf(
                 "FLUX_ROOTFS_PATH" to "${TermuxHostPaths.HOME}/${profile.rootfsFileName}",
                 "FLUX_ROOTFS_NAME" to profile.rootfsFileName,
-                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256,
-                "FLUX_ROOTFS_URL" to profile.rootfsUrl
+                "FLUX_ROOTFS_SHA256" to profile.rootfsSha256
             )
         )
     }

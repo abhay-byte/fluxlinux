@@ -37,11 +37,10 @@ class RootfsDownloaderTest {
             distroId = "test",
             prootName = "test",
             method = "proot",
-            rootfsAsset = "rootfs/$name",
+            rootfsAsset = url,
             rootfsFileName = name,
             rootfsSha256 = payloadSha,
             rootfsMinBytes = 1L,
-            rootfsUrl = url,
             familyScript = "scripts/test/setup.sh",
             customizationScript = "scripts/test/custom.sh",
             displayName = "Test"

@@ -13,9 +13,7 @@ import java.util.concurrent.Executors
  * Entry point for card actions that need the embedded host before a terminal
  * session opens: extract bootstrap → deploy scripts/loader → setup_termux
  * validation (host gate). Rootfs archives are NOT part of host readiness —
- * the selected distro's rootfs is downloaded at install time
- * (RootfsDownloader). Ivarna also downloads the host bootstrap tarball from
- * the same GitHub `rootfs` tag when it is not packaged in the APK.
+ * the selected flavor provider materializes the distro payload at install time.
  * All heavy work runs on a background executor; [onDone]
  * is dispatched on the main thread.
  *

@@ -2,8 +2,7 @@ package com.ivarna.fluxlinux.core.terminal
 
 import android.content.Context
 import android.util.Log
-import com.ivarna.fluxlinux.core.install.HostBootstrap
-import com.ivarna.fluxlinux.core.install.RootfsDownloader
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -13,13 +12,9 @@ import java.util.concurrent.atomic.AtomicLong
  * Extracts the host `bootstrap.tar` into the app filesDir as the embedded host PREFIX,
  * then applies the package rewrite + host env SSOT.
  *
- * Local-first (same model as [RootfsDownloader]):
- *  1. APK `assets/bootstrap.tar` when packaged (zenithblue / older APKs)
- *  2. Verified `$HOME/bootstrap_<applicationId>.tar`
- *  3. GitHub release tag `rootfs` download (ivarna default)
- *
- * Ivarna does **not** ship the tarball in the APK. Download only runs from
- * [ensureExtracted], which is always user-initiated (Initialize Host / install).
+ * Payload source selection is delegated to [PayloadProviders]. This common
+ * extractor only consumes the returned stream, preserving the host-prefix
+ * extraction, package rewrite, and installed-guest preservation behavior.
  *
  * Pass 2 hardening:
  *  - version marker (`home/.fluxlinux/bootstrap.extracted`) + [isExtracted] checks BOTH
@@ -33,7 +28,6 @@ import java.util.concurrent.atomic.AtomicLong
 object BootstrapInstaller {
 
     private const val TAG = "BootstrapInstaller"
-    private const val ASSET_NAME = "bootstrap.tar"
     private const val TMP_DIR = ".bootstrap_extract_tmp"
 
     /** Bump when the extract/rewrite pipeline changes (invalidates old trees). */
@@ -95,8 +89,8 @@ object BootstrapInstaller {
             File(ctx.filesDir, "home").mkdirs()
 
             val source = resolveBootstrapSource(ctx, onProgress) ?: throw IllegalStateException(
-                "host bootstrap missing — place ${HostBootstrap.forApplicationId(ctx.packageName).fileName} " +
-                    "in the app home directory or allow the GitHub download"
+                "host bootstrap missing — place ${PayloadProviders.hostRuntime.expectedFileName} " +
+                    "in the app home directory or use the supported provider"
             )
             onProgress(0L, source.totalBytes, "Extracting host bootstrap")
             source.stream.use { input ->
@@ -149,51 +143,13 @@ object BootstrapInstaller {
         }
     }
 
-    private data class BootstrapSource(val stream: InputStream, val totalBytes: Long)
-
-    /**
-     * APK asset first (zenithblue / older builds), then a SHA-pinned file under
-     * `$HOME`, then GitHub `rootfs` download. Network is never used when a
-     * verified local copy exists.
-     */
     private fun resolveBootstrapSource(
         ctx: Context,
         onProgress: (done: Long, total: Long, phase: String) -> Unit
-    ): BootstrapSource? {
-        try {
-            val total = try {
-                ctx.assets.openFd(ASSET_NAME).use { it.length }
-            } catch (_: Exception) {
-                0L
-            }
-            val stream = ctx.assets.open(ASSET_NAME)
-            Log.i(TAG, "Using APK asset $ASSET_NAME ($total bytes)")
-            return BootstrapSource(stream, total)
-        } catch (_: Exception) {
-            Log.i(TAG, "APK has no $ASSET_NAME — resolving release archive")
+    ): com.ivarna.fluxlinux.core.install.HostRuntimePayload? =
+        PayloadProviders.hostRuntime.open(ctx) { progress ->
+            onProgress(progress.completedBytes, progress.totalBytes, progress.phase)
         }
-
-        val pin = HostBootstrap.forApplicationId(ctx.packageName)
-        val destDir = TermuxHostPaths.homeDir(ctx)
-        val ok = RootfsDownloader.ensurePresent(
-            destDir,
-            pin,
-            isCancelled = { false },
-            onProgress = { p ->
-                onProgress(
-                    p.downloadedBytes,
-                    p.totalBytes,
-                    "Downloading host bootstrap from GitHub"
-                )
-            }
-        )
-        if (!ok) {
-            Log.e(TAG, "Host bootstrap download failed for ${pin.fileName}")
-            return null
-        }
-        val file = File(destDir, pin.fileName)
-        return BootstrapSource(file.inputStream(), file.length())
-    }
 
     /**
      * Move `usr/var/lib/proot-distro` aside (same-FS rename) so a re-extract can

@@ -203,24 +203,28 @@ class OnboardingInstallRunner(private val ctx: Context) {
         enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
-        val dlOk = RootfsDownloader.ensurePresent(
-            destDir, profile, RootfsDownloader.defaultClient,
+        val rootfsResult = PayloadProviders.rootfs.ensurePresent(
+            destDir,
+            profile,
             isCancelled = { isStale(gen) }
         ) { p ->
             if (isStale(gen)) return@ensurePresent
-            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+            val frac = if (p.totalBytes > 0) {
+                p.completedBytes.toFloat() / p.totalBytes
+            } else 0f
             updateFraction(
                 phases, dlIdx, frac, onProgress,
-                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
-                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                p.phase.ifBlank {
+                    "Downloaded ${p.completedBytes / 1_048_576} / " +
+                        "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                }
             )
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
-        if (!dlOk) {
+        if (rootfsResult is PayloadAcquireResult.Unavailable) {
             postFail(
                 onProgress, phases,
-                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
-                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+                rootfsResult.message
             )
             return
         }
@@ -236,7 +240,6 @@ class OnboardingInstallRunner(private val ctx: Context) {
             put("FLUX_ROOTFS_PATH", "${TermuxHostPaths.HOME}/${profile.rootfsFileName}")
             put("FLUX_ROOTFS_NAME", profile.rootfsFileName)
             put("FLUX_ROOTFS_SHA256", profile.rootfsSha256)
-            put("FLUX_ROOTFS_URL", profile.rootfsUrl)
         }
         // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
         // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
@@ -382,24 +385,28 @@ class OnboardingInstallRunner(private val ctx: Context) {
         enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
-        val dlOk = RootfsDownloader.ensurePresent(
-            destDir, profile, RootfsDownloader.defaultClient,
+        val rootfsResult = PayloadProviders.rootfs.ensurePresent(
+            destDir,
+            profile,
             isCancelled = { isStale(gen) }
         ) { p ->
             if (isStale(gen)) return@ensurePresent
-            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+            val frac = if (p.totalBytes > 0) {
+                p.completedBytes.toFloat() / p.totalBytes
+            } else 0f
             updateFraction(
                 phases, dlIdx, frac, onProgress,
-                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
-                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                p.phase.ifBlank {
+                    "Downloaded ${p.completedBytes / 1_048_576} / " +
+                        "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                }
             )
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
-        if (!dlOk) {
+        if (rootfsResult is PayloadAcquireResult.Unavailable) {
             postFail(
                 onProgress, phases,
-                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
-                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+                rootfsResult.message
             )
             return
         }
@@ -424,7 +431,6 @@ class OnboardingInstallRunner(private val ctx: Context) {
             "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +
-                "export FLUX_ROOTFS_URL='${profile.rootfsUrl}'; " +
                 "export FLUX_CHROOT='$chrootPath'; " +
                 "export FLUX_DISTRO_LABEL='$label'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +

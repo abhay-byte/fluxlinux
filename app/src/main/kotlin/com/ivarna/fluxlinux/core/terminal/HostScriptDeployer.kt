@@ -11,10 +11,9 @@ import java.io.FileOutputStream
  * termux-x11 loader APK.
  *
  * Host readiness (D6) = scripts + loader + bootstrap only. Rootfs archives are
- * **not** owned here anymore — [com.ivarna.fluxlinux.core.install.RootfsDownloader]
- * fetches the selected distro's rootfs on demand from the GitHub release tag
- * `rootfs`. Ivarna also fetches `bootstrap_<applicationId>.tar` from that tag
- * (see [com.ivarna.fluxlinux.core.install.HostBootstrap]).
+ * **not** owned here anymore — the flavor payload provider materializes the
+ * selected distro's verified rootfs and the host bootstrap before this deployer
+ * runs. This class only copies the common scripts and loader.
  *
  * Fail-closed: a missing [HostScript.required] asset or loader makes
  * [deployScripts] return false so [TerminalLauncher.prepareHost] fails.

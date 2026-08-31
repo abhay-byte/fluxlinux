@@ -11,16 +11,17 @@ Last updated: 2026-08-31
 - v2 version: `versionCode 12`, `versionName 2.0.0`
 - SDK baseline: `compileSdk 36`, `targetSdk 36`, `minSdk 26`
 
-Worker 01 establishes the branch and records the prepared v2 baseline. No
-compliance implementation worker has started.
+Worker 01 established the branch and recorded the prepared v2 baseline. Worker
+02 now isolates payload acquisition behind flavor-specific providers while
+leaving Play Feature Delivery and later policy removals to the assigned workers.
 
 ## Worker sequence
 
 | Worker | State | Notes |
 |---|---|---|
 | 01 `branch_baseline` | pass | Exact v2 baseline prepared with pinned submodules and generated ignored bootstrap input; Play/non-Play builds and tests pass. |
-| 02 `play_flavor_boundary` | pending | Do not start until Worker 01 is resolved. |
-| 03 `remove_remote_executable_delivery` | pending |  |
+| 02 `play_flavor_boundary` | pass | Common installers consume verified payload abstractions; zenithblue is packaged/local-only and ivarna retains release-backed providers. |
+| 03 `remove_remote_executable_delivery` | pending | Worker 03 owns the final Play executable delivery path / PFD integration. |
 | 04 `remove_nested_and_writable_executables` | pending |  |
 | 05 `remove_root_chroot_from_play` | pending |  |
 | 06 `links_permissions_and_callbacks` | pending |  |
@@ -29,5 +30,6 @@ compliance implementation worker has started.
 | 09 `ci_policy_gate` | pending |  |
 | 10 `release_validation` | pending |  |
 
-See `worker_reports/01_branch_baseline_report.md` for the evidence and
-acceptance-criteria review.
+See `worker_reports/01_branch_baseline_report.md` and
+`worker_reports/02_play_flavor_boundary_report.md` for the evidence and
+acceptance-criteria reviews.
