@@ -1,746 +1,618 @@
 # FluxLinux v2.0 — Google Play Compliance Roadmap
 
-> **Decision:** keep the v2 embedded Linux architecture and native PRoot backend. For the Google Play build, change the **distribution boundary**, not the Linux execution backend: all FluxLinux-managed executable/runtime payloads must originate from Google Play, using the base AAB/APK for small host components and Play Asset Delivery (PAD) for large distro/rootfs payloads.
+> **Canonical implementation plan.** This document supersedes earlier PAD-first, QEMU-first, and external-Termux-first proposals for the Play build.
 >
-> **Baseline:** `v2.0.0` (`c83cb17e7a5d4713f8e0b931761061902e9dd345`).
+> **Decision:** keep FluxLinux v2's embedded same-architecture PRoot backend and most of its existing terminal/X11/Pulse/install pipeline. Change the **delivery boundary and Android integration surface**, not the Linux backend.
 >
-> **Play package:** preserve `com.zenithblue.fluxlinux` and version-code continuity.
+> **Play delivery rule:** executable-bearing FluxLinux runtime payloads must be delivered as part of the Google Play app bundle using the base module or **Play Feature Delivery (PFD) dynamic-feature modules**. Do **not** use Play Asset Delivery for Linux rootfs/bootstrap payloads because Google documents asset packs as asset-only and not a vehicle for executable code.
 >
-> **Rollback:** preserve the v1.8-era Play branch state until this plan passes every build, artifact, device, policy, and Play-track gate.
+> **Baseline:** `v2.0.0` -> `c83cb17e7a5d4713f8e0b931761061902e9dd345`.
 >
-> **Policy source of truth:** `abhay-byte/abhay-kb/Google_Play_Store_Policy_Compliance_Guide.md` plus current Google Play policy. Live Google policy always wins if the guide becomes stale.
+> **Play package:** preserve `com.zenithblue.fluxlinux`; next Play `versionCode` must remain greater than the v1.8p Play build's `11`.
+>
+> **Rollback:** preserve the old Play-safe v1.8-era state at `816371bba62535fc3fc3b433fba47e5dcf9bda74` until every gate in Worker 10 passes.
 
 ---
 
-## 1. Executive decision
+## 1. Why the architecture changed after review
 
-The previous roadmap assumed the v2 embedded PRoot backend itself should be removed from the Play build. That is no longer the recommended architecture.
+The first v2 compliance plan was too conservative and removed most of the embedded backend. A later proposal used QEMU to create an interpreter boundary. Code review plus comparison with modern Android terminal/editor apps showed that this would unnecessarily destroy performance for same-architecture ARM64 Linux userspaces.
 
-Acode provides a highly relevant current implementation precedent: it targets modern Android, packages PRoot/native host components as Play-delivered native libraries, packages an Alpine rootfs with the app, extracts it into app-private storage, and starts the Linux userspace through PRoot. FluxLinux already has many of the same technical pieces.
+A second proposal moved distro archives to Play Asset Delivery. That is also not the correct design: a Linux rootfs contains ELF executables, while Google documents PAD asset packs as containing assets and not executable code.
 
-The primary Play blocker in FluxLinux v2 is therefore **where executable/runtime content comes from**, plus a few Android integration details:
+The corrected design uses **Play Feature Delivery** because dynamic-feature modules are Google Play-delivered app modules intended to deliver code and resources on demand.
 
-1. v2 downloads rootfs archives from GitHub.
-2. v2 retains remote bootstrap/repair paths.
-3. some host ELF/`.so` content is copied from assets into writable storage and executed.
-4. `loader.apk`/`loader.bin` creates a nested-APK/scanner risk.
-5. rooted chroot support requests Android-level root capabilities that are unnecessary for the PRoot Play experience.
+### Final architecture rule
 
-The Play redesign should preserve the embedded host, terminal, PRoot, X11, PulseAudio, distro setup scripts, installation state machine, session management, and most UI/business logic.
+Keep:
 
-### New rule
+- embedded terminal;
+- same-architecture native PRoot;
+- PRoot fake root (`-0` / guest uid 0);
+- existing rootfs extraction/configuration flow;
+- distro install state and logs;
+- existing setup/customization scripts where safe;
+- embedded X11 integration;
+- host PulseAudio integration;
+- desktop/session lifecycle;
+- normal guest networking;
+- user-facing package managers (`apt`, `apk`, `dnf`, `pacman`, etc.), subject to the review gate in section 12.
 
-> **For the Google Play flavor, FluxLinux itself must never fetch a host executable, native library, bootstrap executable, rootfs archive, nested APK, or other executable runtime payload from GitHub/HTTP. Google Play must deliver those payloads.**
+Change/remove for the Play flavor:
 
-This is consistent with current Google Play policy language prohibiting executable-code downloads from sources other than Google Play. Play Asset Delivery is a Google Play delivery mechanism.
+- GitHub/HTTP rootfs download by Android code;
+- GitHub/HTTP host bootstrap repair/download;
+- Android-level root/chroot, Magisk/KernelSU/APatch integration;
+- nested/disguised APK assets;
+- obsolete external-Termux bridge permissions/services/queries;
+- unsafe browsable callback behavior;
+- app-owned FGS for Google Play module downloads;
+- any direct Android execution path that copies a host executable to writable storage and `chmod +x` it.
 
 ---
 
-## 2. Answer to the architecture question: is the backend almost the same?
+## 2. Code-proven v2 baseline
 
-**Yes.** The backend is mostly preserved. The main refactor is the **payload provider**.
+The implementation workers must work with the existing v2 structure instead of rebuilding it from scratch.
 
-### Keep essentially unchanged
+Important current paths/classes to inspect before editing:
 
-- embedded terminal process model
-- native same-architecture PRoot execution
-- distro extraction into app-private storage
-- distro configuration scripts
-- distro installed-state tracking
-- filesystem layout where practical
-- host/guest environment setup
-- desktop-session lifecycle
-- embedded X11 integration
-- host PulseAudio integration
-- start/stop/restart flows
-- logs and diagnostics
-- UI distro cards and install/uninstall flows
-- guest package managers (`apt`, `apk`, `dnf`, `pacman`, etc.) as user-facing Linux functionality, subject to the policy guardrails in §12
-- SHA/integrity verification where useful
-- PRoot fake-root behavior
+- `app/build.gradle.kts`
+  - `targetSdk = 36` / `compileSdk = 36`;
+  - flavors `ivarna` and `zenithblue`;
+  - Play application ID is `com.zenithblue.fluxlinux`;
+  - current build logic packages/restores host bootstrap and X11 loader assets;
+  - embedded Termux/X11 dependencies are currently common/global.
+- `DistroInstallProfile`
+  - identifies the supported distro;
+  - currently contains GitHub rootfs URL/checksum/name metadata.
+- `RootfsDownloader`
+  - current OkHttp/resume/hash rootfs source;
+  - must remain available only for non-Play if desired.
+- `OnboardingInstallRunner`
+  - prepares host;
+  - calls `RootfsDownloader.ensurePresent(...)`;
+  - then runs the existing install/configuration path;
+  - currently exports `FLUX_ROOTFS_PATH`, `FLUX_ROOTFS_NAME`, `FLUX_ROOTFS_SHA256`, and `FLUX_ROOTFS_URL`.
+- `HostBootstrap`
+  - Play currently has a bundled bootstrap but also retains remote repair/fallback behavior.
+- `TermuxHostPaths`
+  - already contains the important targetSdk-36 W^X design: directly executed argv0 binaries are resolved through `applicationInfo.nativeLibraryDir` (for example host bash/PRoot loader paths) instead of blindly executing `$PREFIX/bin/*`.
+- `HostScriptDeployer`
+  - copies host scripts/helpers, including the current loader artifact and native support files.
+- Android manifest/services
+  - currently includes old external-Termux/root declarations and `InstallServerService`, `BaseInstallService`, `AppTerminalService`, `DesktopSessionService`.
 
-### Change
+### Key implementation insight
 
-| v2 implementation | Play implementation |
-|---|---|
-| `RootfsDownloader` downloads from GitHub | `PlayAssetRootfsProvider` requests an on-demand asset pack from Google Play |
-| rootfs profile contains HTTP URL | profile contains `assetPackName`, archive name, SHA256, size/version metadata |
-| bootstrap repair can fetch remote executable data | no remote executable repair; restore only from Play-delivered base/PAD content |
-| host ELF/`.so` copied to writable storage and executed | host ELFs live in `jniLibs` / `nativeLibraryDir` and are referenced/symlinked from there |
-| `loader.apk` nested asset | integrate loader normally into app/module, or remove if no longer required |
-| rooted chroot/Magisk/KSU/APatch | compile out of Play flavor |
-| direct rootfs URL/resume logic | Play Asset Delivery state/progress/retry logic |
-
-Conceptually:
+The current installer already has the seam we need:
 
 ```text
-CURRENT v2
-Flux UI -> RootfsDownloader -> GitHub -> archive -> verify -> extract -> configure -> PRoot -> desktop
+CURRENT
+RootfsDownloader -> local archive -> verify/install/configure -> PRoot -> desktop
 
-PLAY v2
-Flux UI -> PlayAssetRootfsProvider -> Google Play PAD -> archive -> verify -> extract -> configure -> PRoot -> desktop
+PLAY
+PlayFeatureRootfsProvider -> local archive -> verify/install/configure -> PRoot -> desktop
 ```
 
-Everything to the right of `archive` should remain as close to the existing implementation as possible.
+Everything after the verified local archive should stay as close to v2 as practical.
 
 ---
 
-## 3. Target Play architecture
+## 3. Target Play AAB/module architecture
 
 ```text
 Google Play App Bundle
 |
-+-- base app (small)
-|   +-- FluxLinux UI/business logic
-|   +-- terminal/session management
++-- base app
+|   +-- Compose/UI/business logic
+|   +-- terminal/session orchestration
 |   +-- X11 Android integration
-|   +-- non-executable scripts/configuration
+|   +-- safe scripts/configuration
+|   +-- Play delivery coordinator
 |   +-- jniLibs/<abi>/
-|       +-- libproot*.so
-|       +-- host helper ELF libraries packaged as .so where required
-|       +-- host X11/Pulse/native components that must execute on Android
+|       +-- directly executed host launchers/loaders
+|       +-- PRoot loaders/runtime pieces that must be executable by Android
+|       +-- host Pulse/X11/native bridge libraries required at app start
 |
-+-- on-demand asset packs
-    +-- distro_debian_arm64/rootfs.tar.*
-    +-- distro_ubuntu_arm64/rootfs.tar.*
-    +-- distro_alpine_arm64/rootfs.tar.*
-    +-- distro_arch_arm64/rootfs.tar.*
-    +-- distro_fedora_arm64/rootfs.tar.*
-    +-- distro_void_arm64/rootfs.tar.*
-    +-- distro_opensuse_arm64/rootfs.tar.*
-    +-- distro_chimera_arm64/rootfs.tar.*
-    +-- distro_deepin_arm64/rootfs.tar.*
-    +-- distro_manjaro_arm64/rootfs.tar.*
-    +-- distro_kali_arm64/rootfs.tar.*
-    +-- distro_parrot_arm64/rootfs.tar.*
++-- :runtime_host                 [on-demand dynamic feature]
+|   +-- bootstrap.tar / large immutable host-prefix payload
+|   +-- provenance manifest
+|
++-- :distro_alpine               [on-demand dynamic feature]
+|   +-- rootfs archive
+|   +-- provenance manifest
+|
++-- :distro_debian               [on-demand dynamic feature]
++-- :distro_ubuntu
++-- :distro_arch
++-- :distro_fedora
++-- :distro_void
++-- :distro_opensuse
++-- :distro_chimera
++-- :distro_deepin
++-- :distro_manjaro
++-- :distro_kali
++-- :distro_parrot
++```
+
+All currently measured v2 distro archives are well below the current per-dynamic-feature size ceiling, and the current host bootstrap is also small enough for a feature module. Worker 03 must re-measure the actual release inputs and re-check current Play limits before implementing the modules; do not rely permanently on numbers recorded in this roadmap.
+
+### Why `:runtime_host` is separate
+
+The host bootstrap is large and not required until the user starts installing/using Linux. Keeping it on demand reduces the initial install while still making the complete Flux-managed runtime originate from Google Play.
+
+Small directly executed host launchers should remain in base `jniLibs` where the current API-36/W^X design expects them.
+
+---
+
+## 4. Flavor and source-set boundary
+
+Use build-time separation. Do not rely on runtime booleans or R8 to hide policy-sensitive code.
+
+Recommended shape:
+
+```text
+app/src/main/          common safe backend/UI
+app/src/ivarna/        non-Play remote/root/chroot integrations
+app/src/zenithblue/    Play delivery + Play-safe integrations
 ```
 
-The initial app stays small. A distro is downloaded only when the user chooses it.
+The Play artifact must be incapable of selecting the HTTP rootfs/bootstrap providers.
 
-Current Google Play limits are compatible with this model: individual asset packs may be up to 1.5 GB compressed, on-demand/fast-follow asset packs have a large cumulative allowance, and an app bundle can contain many asset packs. Verify current limits again before every major release.
-
----
-
-## 4. Delivery classification: what goes where
-
-### 4.1 Base app / normal AAB modules
-
-Put small, always-required content here:
-
-- Kotlin/Java application code
-- Compose/UI resources
-- session/service code
-- distro metadata
-- shell scripts and text configuration that ship with the release
-- small immutable templates
-- integrated X11 Android code
-- small non-executable assets
-
-### 4.2 `jniLibs` / native library directory
-
-Put Android-host native code that is actually executed by Android/Linux host processes here:
-
-- PRoot loader/runtime
-- PRoot host binary packaged in an Android-compatible native-library form
-- AXS/host shell helper if retained
-- native X11 helper libraries
-- PulseAudio host native libraries where applicable
-- required host-side graphics/native bridge libraries
-
-Do **not** extract these from generic assets into `$filesDir` and then `chmod +x` them.
-
-Use `applicationInfo.nativeLibraryDir` as the canonical executable location. If legacy scripts require stable paths such as `$PREFIX/axs`, create a symlink to the Play-installed native-library path rather than copying the executable bytes.
-
-### 4.3 Play Asset Delivery — on-demand
-
-Put large immutable guest payloads here:
-
-- distro rootfs archives
-- optional large guest support bundles that are required to create a distro install
-- large immutable data tightly coupled to a specific distro/version
-
-Default to **one on-demand asset pack per distro/ABI**. This makes installs independent, keeps the initial download small, and allows clean per-distro progress/error handling.
-
-### 4.4 Optional install-time asset pack
-
-Use only if the base app becomes too large because of a non-code shared data payload that every user needs. Do not move Android host executables into an asset pack just to avoid `jniLibs`; host W^X/execution rules still matter.
-
----
-
-## 5. New distro source abstraction
-
-Do not rewrite the distro installer around Play APIs. Introduce a narrow source/provider boundary.
-
-Recommended interfaces:
+Introduce narrow provider boundaries, for example:
 
 ```kotlin
 interface RootfsPayloadProvider {
     suspend fun ensureAvailable(profile: DistroInstallProfile): PayloadResult
     fun observe(profile: DistroInstallProfile): Flow<PayloadState>
-    suspend fun removeCachedPayload(profile: DistroInstallProfile)
+}
+
+interface HostRuntimePayloadProvider {
+    suspend fun ensureAvailable(): PayloadResult
+    fun observe(): Flow<PayloadState>
 }
 
 data class PayloadResult(
-    val archive: File,
+    val file: File,
     val source: PayloadSource,
 )
 
 enum class PayloadSource {
-    PLAY_ASSET_DELIVERY,
+    PLAY_FEATURE,
     LOCAL_BUNDLED,
     REMOTE_NON_PLAY,
 }
 ```
 
-Flavor mapping:
-
-- `zenithblue` -> `PlayAssetRootfsProvider`
-- `ivarna` -> existing HTTP/GitHub provider if desired
-
-The common installer then receives a local archive and continues the existing extraction/configuration path.
-
-### Distro profile changes
-
-Replace Play-facing URLs with pack metadata:
-
-```kotlin
-data class DistroPayload(
-    val assetPackName: String,
-    val archiveName: String,
-    val sha256: String,
-    val minBytes: Long,
-    val payloadVersion: Int,
-)
-```
-
-The non-Play flavor may separately retain URL metadata.
-
-Do not leave `releases/download/rootfs` strings or executable repair URLs in the Play artifact.
-
----
-
-## 6. Play Asset Delivery install state machine
-
-Reuse the existing install UI and map Play states into Flux states.
-
-Recommended state machine:
+Mappings:
 
 ```text
-NOT_INSTALLED
-   |
-   v
-REQUESTING_PLAY_PACK
-   |
-   +--> WAITING_FOR_WIFI / USER_CONFIRMATION
-   |
-   +--> DOWNLOADING(progress)
-   |
-   +--> PLAY_PACK_AVAILABLE
-   |
-   v
-VERIFYING_ARCHIVE
-   |
-   v
-EXTRACTING_ROOTFS
-   |
-   v
-CONFIGURING_DISTRO
-   |
-   v
-INSTALLED
+zenithblue -> PlayFeatureHostRuntimeProvider + PlayFeatureRootfsProvider
+ivarna    -> existing bundled/HTTP behavior if desired
 ```
 
-Failure states must remain recoverable:
-
-- network unavailable
-- Play Store unavailable/outdated
-- user cancels download
-- insufficient storage
-- pack not found
-- archive missing inside pack
-- checksum mismatch
-- interrupted extraction
-- app update changes payload version
-- partially installed distro
-
-Rules:
-
-1. never mark a distro installed merely because the asset pack downloaded;
-2. verify/extract atomically using staging paths;
-3. write the installed marker only after configuration completes;
-4. clean stale staging directories after failure;
-5. query Play for the current pack location instead of persisting a pack filesystem path forever;
-6. preserve the existing installation logs for diagnostics;
-7. optionally remove the downloaded asset pack after a verified extraction to reduce duplicate storage, while keeping the extracted distro; a repair/reinstall can request the pack again from Play.
+Keep distro identity/setup metadata common. Split delivery metadata by flavor so Play DEX/resources do not retain executable rootfs fallback URLs.
 
 ---
 
-## 7. Asset-pack module layout
+## 5. Play Feature Delivery implementation model
 
-Example:
+Use the current official Play Core Feature Delivery APIs compatible with the repository's AGP/Gradle versions. Worker 03 must verify the exact current dependency/API instead of copying an old version from a blog post.
+
+Primary concept:
 
 ```text
-settings.gradle.kts
-app/
-assetpacks/
-  distro_debian_arm64/
-    build.gradle.kts
-    src/main/assets/rootfs/debian.tar.zst
-  distro_ubuntu_arm64/
-    build.gradle.kts
-    src/main/assets/rootfs/ubuntu.tar.zst
-  ...
+user taps distro
+   |
+   v
+ensure :runtime_host installed
+   |
+   v
+ensure :distro_<id> installed
+   |
+   v
+materialize archive into app-private staging
+   |
+   v
+verify SHA-256 + expected metadata
+   |
+   v
+existing extraction/configuration path
+   |
+   v
+installed marker
 ```
 
-Each pack:
+Use `SplitInstallManager`/current official equivalent for on-demand module requests and state updates.
 
-```kotlin
-plugins {
-    id("com.android.asset-pack")
-}
+### Important filesystem rule
 
-assetPack {
-    packName = "distro_debian_arm64"
-    dynamicDelivery {
-        deliveryType = "on-demand"
-    }
-}
-```
+Do not persist an internal Play split/module filesystem path as durable application state. After the feature is installed, access its packaged asset/resource through supported Android split/module APIs and copy/stream it into an app-private staging file if the existing installer requires a normal `File`.
 
-Register packs in the app module and `settings.gradle.kts` according to the Android Gradle Plugin/Play Asset Delivery version used by the repository.
+During materialization:
 
-Do not hard-code a dependency version from this document; worker 03 must select the currently supported Play Asset Delivery dependency compatible with the project's AGP and lock it in Gradle.
+- calculate SHA-256 while copying;
+- verify expected bytes/checksum before extraction;
+- use a temporary name;
+- atomically promote the verified archive;
+- never mark the distro installed just because the module installation completed.
 
----
-
-## 8. Rootfs build and provenance pipeline
-
-PAD solves delivery, but we still need reproducible payload provenance.
-
-For every distro pack maintain a machine-readable manifest containing:
-
-- distro ID
-- distro release/version
-- architecture
-- upstream source URL used by CI/build maintainers
-- upstream checksum when available
-- Flux-generated archive checksum
-- uncompressed size
-- compressed size
-- payload schema/version
-- build date
-- build script/commit
-- included Flux customization scripts/packages
-
-Recommended generated file:
+### Recommended installation states
 
 ```text
-assetpacks/distro_debian_arm64/src/main/assets/rootfs/manifest.json
+IDLE
+ -> REQUESTING_RUNTIME_FEATURE
+ -> DOWNLOADING_RUNTIME_FEATURE
+ -> REQUESTING_DISTRO_FEATURE
+ -> DOWNLOADING_DISTRO_FEATURE
+ -> MATERIALIZING_PAYLOAD
+ -> VERIFYING
+ -> EXTRACTING
+ -> CONFIGURING
+ -> INSTALLED
 ```
 
-CI should fail if the manifest checksum does not match the archive.
-
-Important distinction: maintainers/CI may obtain upstream Linux files while preparing a new Play release. The **released Play app** must receive its Flux-managed executable payload from Google Play rather than performing that GitHub download at runtime.
+Error states must cover cancellation, Play unavailable/outdated, storage failure, module not found, checksum mismatch, interrupted copy/extraction, app update during install, and stale/partial install state.
 
 ---
 
-## 9. Host bootstrap refactor
+## 6. Rootfs delivery and provenance
 
-The current `bootstrap.tar` concept can remain only after classifying its contents.
+For the Play flavor:
 
-Split it into:
+- no `RootfsDownloader` network path;
+- no `ROOTFS_RELEASE_BASE` use;
+- no GitHub `releases/download/rootfs` fallback;
+- no `/sdcard/Download` rootfs fallback/import as an executable runtime source;
+- remove `FLUX_ROOTFS_URL` from the Play install environment;
+- keep `FLUX_ROOTFS_PATH`, file name, checksum, and payload version metadata.
 
-### Android host executable content
+Each distro dynamic feature must contain a provenance manifest containing at least:
 
-Move to `jniLibs` / normal native modules.
+- distro ID and release/version;
+- architecture;
+- upstream source used by release tooling/maintainers;
+- upstream checksum where available;
+- final Flux archive SHA-256;
+- compressed and uncompressed sizes;
+- payload schema/version;
+- build script + source commit;
+- creation date;
+- Flux customizations included in the image.
 
-### Non-executable scripts/config/data
-
-May remain in base app assets and be copied into the app prefix.
-
-### Large guest/runtime data
-
-Move to an install-time or on-demand Play asset pack if needed.
-
-Remove from the Play flavor:
-
-- executable bootstrap HTTP repair path
-- GitHub fallback URL
-- code that downloads a replacement host runtime
-- recovery UI that fetches executable bootstrap content outside Play
-
-A Play repair operation must reconstruct from currently installed Play content or request the corresponding Play asset pack.
-
----
-
-## 10. Remove nested APK and writable host executables
-
-The Play AAB must not contain a nested `loader.apk` or APK bytes disguised as `loader.bin`.
-
-Required direction:
-
-- integrate the X11 loader/component through the normal Android module/dependency build, **or**
-- replace its behavior with an in-process component if feasible.
-
-Audit every ELF/native file currently under generic assets/scripts.
-
-Host-side executable rule:
-
-> If Android directly executes it, package it as Play-installed native code and execute/reference it from the native library directory. Do not copy executable bytes into app-writable storage and chmod them executable.
-
-Guest rootfs binaries are different: they are delivered by Play inside the rootfs asset pack and subsequently executed under the PRoot guest path.
+Maintainer/CI tooling may download upstream distro material while preparing a release. The important runtime boundary is that the released Play app receives the Flux-managed runtime/rootfs payload from Google Play, not an app-controlled executable download endpoint.
 
 ---
 
-## 11. PRoot sandbox design
+## 7. Host bootstrap and API-36 W^X
 
-Keep PRoot as the Play backend. Do **not** replace it with QEMU for same-architecture devices.
+Do not replace a working v2 mechanism with a blanket "everything in jniLibs" conversion.
 
-PRoot is a userspace filesystem/syscall translation environment. It shares the Android kernel and runs under the FluxLinux Android UID; fake guest UID 0 does not grant Android root.
+Classify the bootstrap contents:
 
-For the Play flavor, minimize host bind mounts.
+### A. Directly executed Android-host ELF/native launcher
 
-Prefer:
+Keep/package through normal native library locations and use `applicationInfo.nativeLibraryDir`. Preserve the existing `TermuxHostPaths` approach.
 
-- guest rootfs
-- minimal `/proc`
-- minimal required `/dev`
-- required temp/shared-memory paths
-- app-controlled home
-- explicit user-selected shared folders via SAF where practical
-- X11/Pulse sockets required for desktop use
+### B. Large host-prefix payload used behind the launcher/termux-exec mechanism
 
-Avoid broad exposure unless demonstrably required:
+Deliver through `:runtime_host`, then extract to the existing app-private prefix layout if the current backend requires it.
 
-- arbitrary `/data`
-- whole Android `/system`/`vendor`
-- whole `/storage`
-- native library directory as a general writable/guest-visible workspace
-- sensitive app-private directories unrelated to the Linux environment
+### C. Interpreted scripts/config/data
 
-Every bind should have a documented reason and test.
+May be copied into the app-private prefix from base or `:runtime_host`.
+
+### D. Obsolete/unsafe executable copies
+
+Remove.
+
+Play must not retain a remote bootstrap repair URL. Repair should re-materialize from the installed/requested `:runtime_host` module.
+
+Worker 04 must audit every direct `ProcessBuilder`, native exec, shell argv0, `chmod +x`, and copied ELF path. Direct execution from writable app data must not be reintroduced.
 
 ---
 
-## 12. Guest package managers: strict boundary
+## 8. Nested X11 loader APK
 
-FluxLinux's core Play payload must be fully Play-delivered, but a Linux distro is useful only if the user can operate its normal package manager.
+The current `loader.apk` / identical or disguised `loader.bin` pattern is a scanner and policy risk.
 
-For the initial Play release:
+Required sequence:
 
-1. bundle enough packages in each Play-delivered rootfs for a complete functional desktop/CLI baseline;
-2. do not have Android/Kotlin app code silently download guest executable packages from GitHub as part of startup/repair;
-3. user-initiated `apt`, `apk`, `dnf`, `pacman`, etc. runs inside the PRoot guest should remain a clearly user-controlled Linux action;
-4. do not expose arbitrary guest scripts as Android APIs, accessibility automation, package-install APIs, root APIs, or device-management capabilities;
-5. do not allow downloaded guest code to escape the FluxLinux app UID/sandbox;
-6. document this behavior accurately in privacy/store/reviewer notes;
-7. treat package-manager behavior as a policy-review item during Internal/Closed testing because Google policy's VM/interpreter exception does not explicitly name PRoot.
+1. identify exactly what the loader provides and all `HostScriptDeployer`/runtime references;
+2. integrate that functionality as a normal Android module/dependency or safe in-process component;
+3. prove X11 startup works with the replacement;
+4. only then remove `loader.apk`, `loader.bin`, reconstruction build tasks, and deploy/copy logic;
+5. add a CI magic-byte scan so nested/disguised APKs cannot return.
 
-Acode is useful practical precedent, but it is not a written exemption. Do not describe it as guaranteed approval.
+Do not delete the loader first and leave X11 broken.
 
 ---
 
-## 13. Remove Android-root/chroot from Play
+## 9. Android root/chroot versus PRoot fake root
 
-The Play flavor should provide PRoot fake-root only.
+The Play flavor should be PRoot-only.
 
-Compile out:
+Compile out/remove from Play:
 
-- `ACCESS_SUPERUSER`
-- Magisk integration
-- KernelSU integration
-- APatch integration
-- root shell manager
-- real `chroot`
-- root-only mount management
-- root-only UI/cards/settings
+- `ACCESS_SUPERUSER`;
+- `RootShell` integration;
+- Magisk;
+- KernelSU;
+- APatch;
+- real `chroot`;
+- root-only mounts/helpers;
+- root grant prompts/settings/cards/onboarding.
 
-Keep full chroot/root capabilities in the non-Play flavor if desired.
-
-This makes the Play security story much simpler:
+Preserve:
 
 ```text
-Linux guest UID 0 (fake PRoot root)
-        !=
-Android UID 0 / device root
+PRoot -0 / guest uid 0
 ```
 
----
-
-## 14. Foreground services and long-running sessions
-
-Because the embedded terminal/desktop remains in Play, do not assume all v2 services can be deleted.
-
-Review each retained service against current Android 14–16/Play foreground-service requirements:
-
-- `InstallServerService`
-- `BaseInstallService`
-- `AppTerminalService`
-- `DesktopSessionService`
-
-PAD downloads themselves should use the Play delivery mechanism rather than a custom HTTP foreground downloader.
-
-A retained foreground service must be:
-
-- directly connected to visible core functionality
-- user initiated where required
-- represented by an accurate ongoing notification
-- stoppable
-- stopped when the terminal/session ends
-- declared with the correct FGS type and type-specific permission
-- declared consistently in Play Console
-
-Remove `specialUse` if a more specific valid type or no FGS is appropriate; otherwise document the exact use-case text and test Android 14–16 behavior.
+PRoot fake root does not turn the FluxLinux Android process into Android uid 0. Device tests must demonstrate that a guest can report uid 0 while the host app still runs under its normal sandbox UID.
 
 ---
 
-## 15. External links, APK installation, callbacks
+## 10. Remove obsolete external-Termux surface
 
-Never regress the v1.8 Play fixes.
+The new Play architecture is embedded. Therefore audit and remove when no embedded component truly requires them:
 
-Play flavor must not:
+- `com.termux.permission.RUN_COMMAND`;
+- Termux/Termux:X11 package queries;
+- external-Termux prerequisite UI;
+- deprecated `InstallServerService` external bridge;
+- old external callback/install-server flows.
 
-- request `REQUEST_INSTALL_PACKAGES`
-- download another app APK
-- call `PackageInstaller` for external apps
-- direct users to raw APK/ZIP/XAPK/APKS installation payloads
-- tell users to disable Play Protect/security
-- self-update outside Play
+Also ensure the Play build does not regain:
 
-Because the new Play architecture is embedded, the Play flavor should no longer require external Termux/Termux:X11 as its normal runtime. Remove obsolete prerequisite UI/queries/permission usage where no longer needed.
-
-Harden `fluxlinux://callback` and any other browsable intents:
-
-- only accept expected fields
-- bind callbacks to active app-created requests
-- reject arbitrary shell commands/paths/URLs
-- reject stale/replayed callbacks
-- add negative tests
+- `REQUEST_INSTALL_PACKAGES`;
+- `PackageInstaller`/unknown-sources workflow;
+- APK/APKS/XAPK installer CTAs;
+- direct links whose purpose is to install executable Android packages outside Play.
 
 ---
 
-## 16. Privacy, Data Safety, store metadata
+## 11. Callback/deep-link security
 
-Rewrite Play-facing text for the new architecture.
+The legacy `fluxlinux://callback` surface must not be allowed to mutate install state from arbitrary browsable URIs.
 
-Accurately state:
+Preferred Play result: remove the BROWSABLE callback entirely if it existed only for the external-Termux integration.
 
-- FluxLinux contains an embedded Linux userspace runtime
-- selected distro packages are downloaded through Google Play's delivery infrastructure
-- distro files are extracted into app-private storage
-- network access inside a Linux distro may occur when the user explicitly runs Linux tools/package managers
-- whether analytics/crash reporting/telemetry exists
-- local diagnostic/log retention
-- foreground session behavior
-- exact permissions
-- no Android root/chroot support in the Play flavor
+If a callback is truly still needed:
 
-Update Fastlane/Play description so it does not claim GitHub rootfs downloads or external Termux prerequisites.
+- generate an unpredictable app-created operation nonce;
+- bind it to one current active operation;
+- accept only fixed enums/fields;
+- make it single-use and expire it;
+- reject stale/replayed callbacks;
+- reject command/script/path/URL parameters unless an exact allowlisted value is required;
+- never pass callback input to a shell;
+- never keep legacy fallbacks that simply mark a distro/script complete.
 
-Re-run Data Safety after final dependency inspection.
-
----
-
-## 17. CI policy gate
-
-Add/expand `scripts/verify_play_policy.sh` and CI.
-
-### Source-level deny checks for Play flavor
-
-Reject:
-
-- `REQUEST_INSTALL_PACKAGES`
-- `ACCESS_SUPERUSER`
-- `PackageInstaller`
-- unknown-source install APIs
-- Play-flavor `releases/download/rootfs`
-- Play-flavor HTTP bootstrap repair URLs
-- direct APK download/install flows
-- nested `loader.apk`
-- nested APK magic bytes in generic assets
-
-### Artifact checks
-
-Build:
-
-```bash
-./gradlew test
-./gradlew lintZenithblueRelease
-./gradlew bundleZenithblueRelease
-```
-
-Inspect the AAB and generated device APKs:
-
-- package ID is `com.zenithblue.fluxlinux`
-- target SDK is current requirement
-- asset packs are present and `on-demand`
-- every expected distro archive is in its Play asset pack
-- no root/chroot permission
-- no nested APK
-- host native libraries are under native-lib delivery locations
-- no unexpected host ELF under generic writable-copy assets
-- no GitHub rootfs/bootstrap download strings in Play dex/resources
-
-### PAD local testing
-
-Use official bundletool local testing:
-
-```bash
-bundletool build-apks \
-  --bundle app-zenithblue-release.aab \
-  --output fluxlinux-play.apks \
-  --local-testing
-
-bundletool install-apks --apks fluxlinux-play.apks
-```
-
-Then test on-demand pack request/download/extraction locally. Internal App Sharing/Play Internal track must still test real Google Play network behavior, cancellation, cellular confirmation, updates, and pack availability.
+Add negative ADB tests for arbitrary command strings, metacharacters, paths, URLs, stale IDs, replay, missing nonce, and malformed values.
 
 ---
 
-## 18. Device test matrix
+## 12. Guest package managers — explicit policy review gate
 
-Minimum:
+Acode and similar apps provide useful practical precedent for a bundled PRoot userspace with package managers, but that precedent is not a written Google exemption.
 
-- Android 13 / API 33
-- Android 14 / API 34
-- Android 15 / API 35
-- Android 16 / API 36
+Facts that reviewer notes and documentation must state correctly:
 
-For each supported ABI/device class test:
+- PRoot is not a VM and not a CPU interpreter;
+- it is userspace filesystem/syscall translation;
+- it shares the Android kernel;
+- guest processes remain under the FluxLinux Android application UID/security boundary;
+- guest uid 0 is fake PRoot root, not Android root;
+- a user may explicitly run distro package managers that contact normal Linux repositories.
 
-1. fresh install with no distro
-2. app initial download remains small
-3. request one distro
-4. progress UI
-5. cancel and retry
-6. lose network and retry
-7. insufficient-storage path
-8. checksum/integrity failure fixture
-9. extract/configure
-10. launch terminal
-11. execute native guest commands
-12. install/start desktop
-13. X11 rendering
-14. PulseAudio
-15. stop/restart
-16. app process death during PAD download
-17. app process death during extraction
-18. reboot
-19. uninstall/reinstall distro
-20. app update with existing distro
-21. payload-version update
-22. optional package-manager operation inside guest
-23. verify no Android root prompt
-24. verify no external APK install request
+Guardrails:
 
-Also upgrade from the existing Play `versionCode 11` build and validate state migration.
+- the Android/Kotlin app must not silently use Linux repositories as its own executable self-update/repair mechanism;
+- no downloaded guest package may be turned into an Android app plugin/native library or privileged Android integration;
+- no arbitrary guest command bridge may be exposed to other Android apps;
+- keep Android sandbox/file bindings narrow and documented;
+- test package-manager behavior in Internal/Closed Play tracks before Production.
+
+If Play review explicitly rejects the PRoot package-manager model, stop and reassess. Do not hide or obfuscate the behavior.
 
 ---
 
-## 19. Storage and update behavior
+## 13. PRoot filesystem bridge
 
-Use separate concepts:
+Audit the actual bind list required by the existing guest scripts.
 
-- **Play pack cache/source** — immutable archive delivered by Google Play
-- **staging extraction** — temporary app-private directory
-- **installed distro** — mutable app-private Linux filesystem
+Prefer only what is functionally required:
 
-Never run the mutable distro directly out of an asset-pack path.
+- guest rootfs;
+- minimal `/proc` and required `/dev` views;
+- temp/shared-memory paths;
+- app-controlled guest home;
+- X11/Pulse sockets;
+- explicit shared/user file access.
 
-Recommended install transaction:
+Avoid gratuitous broad bindings of unrelated app-private directories or Android system/vendor data. If user storage access is required, prefer a controlled app-owned/shared-folder model or SAF bridge where practical without breaking Linux workflows.
 
-```text
-PAD archive
- -> verify
- -> extract to <distro>.staging
- -> configure staging
- -> fsync/validate critical files
- -> atomically promote to installed path
- -> write installed metadata
- -> optionally request PAD cache removal
-```
-
-Persist installed metadata:
-
-- distro ID
-- payload version
-- archive SHA256
-- install timestamp
-- app version installed by
-- configuration schema version
-
-On app update, migrate only when required. Do not automatically erase user Linux files merely because a newer asset pack exists.
+Every retained broad bind must have a documented reason and a regression test.
 
 ---
 
-## 20. Branch strategy
+## 14. Foreground-service redesign
 
-1. preserve the old Play rollback branch/ref;
-2. build this work on `playstore-v2-compliance` based on v2;
-3. workers commit independently and keep both flavors buildable;
-4. do not move production `playstore` until all gates pass;
-5. use Internal App Sharing/Internal testing for real PAD behavior before production.
+Feature downloads are owned by Google Play Feature Delivery, not by a Flux HTTP download FGS.
 
-The non-Play flavor can keep GitHub rootfs downloading/chroot features, but source-set boundaries must prevent those paths from leaking into the Play artifact.
+### `BaseInstallService`
 
----
+Do not start it merely because the user requested a dynamic feature. Start it only after required modules are installed, if verify/materialize/extract/configure work genuinely needs a foreground service. Stop it on success, failure, cancellation, and process/session teardown.
 
-## 21. Worker execution order
+### `InstallServerService`
 
-Execute strictly in order:
+Expected Play result: remove it with the external-Termux bridge.
 
-1. `01_branch_baseline.md` — preserve rollback and establish v2 Play integration baseline.
-2. `02_play_flavor_boundary.md` — preserve embedded backend but create clean Play/non-Play source/provider boundaries.
-3. `03_remove_remote_executable_delivery.md` — implement PAD rootfs provider and distro asset packs; eliminate Play runtime rootfs/bootstrap HTTP delivery.
-4. `04_remove_nested_and_writable_executables.md` — move Android host ELFs to `jniLibs/nativeLibraryDir`, remove nested loader APK, preserve backend paths through symlinks/adapters.
-5. `05_remove_root_chroot_from_play.md` — remove Android-root/chroot while preserving PRoot fake root.
-6. `06_links_permissions_and_callbacks.md` — clean obsolete Termux/install permissions/links and harden callbacks/sandbox bridges.
-7. `07_foreground_services.md` — adapt install/session services to PAD and current FGS rules.
-8. `08_privacy_and_store_metadata.md` — document embedded PRoot + Play-delivered distros accurately.
-9. `09_ci_policy_gate.md` — enforce PAD-only Flux runtime delivery and artifact rules in CI.
-10. `10_release_validation.md` — bundletool PAD testing, API 33–36 matrix, upgrade test, Internal Play track, final policy reconciliation.
+### `AppTerminalService` / `DesktopSessionService`
 
-Workers must not opportunistically redesign unrelated UI/backend code. The goal is to retain v2 behavior while changing its distribution/security boundary.
+Audit independently. Retain an FGS only when necessary for user-visible long-running terminal/desktop work. For each retained service record:
+
+- exact user action that starts it;
+- exact stop condition;
+- notification title/body/actions;
+- visible stop action;
+- FGS type/permission;
+- why no narrower supported type/lifecycle is sufficient;
+- Play Console declaration wording.
+
+Prefer a specific supported type when valid. If `specialUse` remains necessary, document it precisely and test API 34/35/36 behavior.
 
 ---
 
-## 22. Definition of done
+## 15. Privacy, Data Safety, metadata and reviewer notes
 
-The Play v2 work is complete only when all are true:
+Worker 08 must rewrite these from the **final AAB**, not from this roadmap or old v1.8 answers.
 
-- [ ] embedded terminal works without external Termux
-- [ ] native PRoot backend remains functional
-- [ ] all Flux-managed distro rootfs payloads used by Play build are delivered by Google Play
-- [ ] Play build has no GitHub/HTTP rootfs downloader
-- [ ] Play build has no remote executable bootstrap repair
-- [ ] Android host executables are Play-installed native code, not writable copied ELFs
-- [ ] no nested APK or APK-disguised asset exists
-- [ ] PRoot fake root works
-- [ ] Android-level root/chroot is absent from Play
-- [ ] distro install/extract/configure/start flow works for all supported distros
-- [ ] X11 and PulseAudio work
-- [ ] PAD cancel/retry/update/storage flows work
-- [ ] no `REQUEST_INSTALL_PACKAGES`
-- [ ] no `ACCESS_SUPERUSER`
-- [ ] browsable callback inputs are constrained
-- [ ] FGS declarations match actual behavior
-- [ ] privacy/Data Safety/store text match the final AAB
-- [ ] policy CI gate passes
-- [ ] bundletool local PAD tests pass
-- [ ] API 33–36 device matrix passes
-- [ ] upgrade from v1.8 Play succeeds
-- [ ] Internal App Sharing/Internal Play test validates real Play delivery
-- [ ] final AAB SHA256 and policy evidence are recorded
+Play-facing statements should accurately describe:
+
+- embedded PRoot Linux environment;
+- selected host runtime/distro modules delivered by Google Play Feature Delivery;
+- extraction into app-private storage;
+- no Android-level root/chroot in the Play flavor;
+- user-run guest programs/package managers can make network requests;
+- logs/diagnostics and retention/deletion;
+- any analytics/crash/ads/account/identifier behavior actually present;
+- required foreground services.
+
+Remove stale store/help/screenshot claims about external Termux, GitHub rootfs downloads, Android root/chroot, or APK installation.
+
+Do not claim "Google approved PRoot" or "Acode proves compliance." State implementation facts only.
 
 ---
 
-## 23. Current external references to re-check before release
+## 16. CI policy gate
 
-- Google Play Device and Network Abuse policy: https://support.google.com/googleplay/android-developer/answer/16559646
-- Play Asset Delivery integration: https://developer.android.com/guide/playcore/asset-delivery
-- Play Asset Delivery testing: https://developer.android.com/guide/playcore/asset-delivery/test
-- Google Play app/asset size limits: https://support.google.com/googleplay/android-developer/answer/9859372
-- Target API requirements: current Play Console target API policy
+Create one release gate, e.g. `scripts/verify_play_policy.sh`, that validates **the zenithblue Play variant and its final AAB**, not every non-Play source file.
 
-Do not treat this roadmap as permanent policy text. Re-check the live pages immediately before production submission.
+Required source/config checks:
+
+- Play provider wiring cannot instantiate `RootfsDownloader`/remote bootstrap provider;
+- no Play `FLUX_ROOTFS_URL` fallback;
+- no Play root/chroot integration;
+- no obsolete external-Termux bridge;
+- every supported distro maps to a PFD feature module;
+- `:runtime_host` is defined and on demand;
+- module payload/checksum/provenance registry is complete.
+
+Required final artifact checks:
+
+- package ID/version/target SDK correct;
+- required dynamic feature modules exist and are on demand;
+- feature compressed size stays under the current Play limit with safety margin;
+- expected rootfs/bootstrap archives exist only in their intended modules;
+- no nested/disguised APK;
+- no `REQUEST_INSTALL_PACKAGES` or `ACCESS_SUPERUSER`;
+- no unexpected host executable under generic base assets;
+- directly executed host native code is in normal native-lib locations;
+- no old executable GitHub fallback strings in Play DEX/resources.
+
+### ELF scanning rule
+
+Do **not** fail merely because a distro rootfs archive contains Linux ELF files. Those are expected guest payloads. Fail unexpected Android-host ELF/native executable materialization paths outside the documented native/PFD design.
+
+Add negative fixtures proving the gate catches regressions.
+
+---
+
+## 17. Worker execution order and hard gates
+
+Execute exactly in this order:
+
+1. `workers/01_branch_baseline.md`
+2. `workers/02_play_flavor_boundary.md`
+3. `workers/03_remove_remote_executable_delivery.md`
+4. `workers/04_remove_nested_and_writable_executables.md`
+5. `workers/05_remove_root_chroot_from_play.md`
+6. `workers/06_links_permissions_and_callbacks.md`
+7. `workers/07_foreground_services.md`
+8. `workers/08_privacy_and_store_metadata.md`
+9. `workers/09_ci_policy_gate.md`
+10. `workers/10_release_validation.md`
+
+Do not start worker N+1 until worker N is `PASS`, except for a narrowly documented compile/test fix required to unblock it.
+
+The old `compliant-runtime-workers/` QEMU-first sequence is deprecated and must not be executed.
+
+---
+
+## 18. Final release gates
+
+Production promotion is blocked until all of these pass:
+
+### Technical
+
+- clean `zenithblue` release build;
+- tests/lint and policy gate green;
+- API 33/34/35/36 device coverage;
+- current supported ABI coverage;
+- all 12 distro modules tested;
+- terminal/X11/Pulse smoke tests;
+- PRoot fake root verified;
+- package manager test recorded;
+- no direct Android root/chroot behavior;
+- no remote Flux-managed executable/rootfs fallback.
+
+### Delivery
+
+- clean install from actual Google Play Internal track/App Sharing;
+- base app starts without preinstalled optional features;
+- first distro request installs `:runtime_host` and distro feature through Play;
+- cancellation/retry/offline/storage/error paths work;
+- app/process death during materialization/extraction recovers safely;
+- app update + installed distro behavior works;
+- feature update/version mismatch behavior is defined.
+
+### Upgrade
+
+Upgrade from v1.8p `versionCode 11` and confirm:
+
+- package continuity;
+- user data preserved as intended;
+- old external-Termux state does not deadlock onboarding;
+- new embedded host can be installed through Play;
+- old obsolete permissions/flows are gone.
+
+### Console/policy
+
+- privacy policy matches exact release;
+- Data Safety re-audited;
+- FGS declarations match manifest/runtime;
+- store text/screenshots match features;
+- reviewer notes explain PFD + PRoot accurately;
+- Internal/Closed testing has not produced a policy objection to the package-manager model.
+
+Record the final AAB SHA-256 and retain release evidence.
+
+---
+
+## 19. Non-negotiable rules for agents
+
+- Do not use PAD for executable-bearing rootfs/bootstrap payloads.
+- Do not restore QEMU as the default same-architecture backend.
+- Do not revert the Play product to an external-Termux dependency.
+- Do not hide prohibited behavior behind a build flag, obfuscation, renamed extension, or scanner trick.
+- Do not add an HTTP fallback "temporarily" to the Play flavor.
+- Do not remove PRoot/X11/Pulse functionality unless the assigned worker proves a specific Play blocker that cannot be fixed safely.
+- Do not break `ivarna` unnecessarily; keep non-Play functionality behind source/dependency boundaries.
+- Do not call PRoot a VM/interpreter.
+- Do not treat another Play app as a guarantee of approval.
+- Live Google Play policy and current Android documentation override stale assumptions in repository docs.
+
+---
+
+## 20. Reference links
+
+- FluxLinux policy guide: `https://github.com/abhay-byte/abhay-kb/blob/main/Google_Play_Store_Policy_Compliance_Guide.md`
+- Play Feature Delivery: `https://developer.android.com/guide/playcore/feature-delivery`
+- On-demand feature delivery: `https://developer.android.com/guide/playcore/feature-delivery/on-demand`
+- Play Asset Delivery: `https://developer.android.com/guide/playcore/asset-delivery`
+- Android App Bundle size/configuration guidance: `https://developer.android.com/guide/app-bundle`
+
+Re-check all current limits/policy wording before final release.
