@@ -10,6 +10,7 @@ Use these files for implementation:
 |---|---|
 | `v2_0_compliance_roadmap.md` | **Canonical roadmap.** Keeps the embedded v2 PRoot backend and moves Flux-managed runtime delivery to Google Play Feature Delivery dynamic-feature modules. |
 | `full_v2_compliant_delivery_execution_roadmap.md` | Technical supplement for the same PFD + native PRoot architecture. It is not a separate implementation track. |
+| `WORKER_PROMPT.md` | Reusable execution contract to give an agent together with exactly one canonical worker file. |
 | `workers/` | **Canonical worker sequence.** Execute Workers 01 through 10 in order. |
 
 ## Deprecated worker set
@@ -61,5 +62,5 @@ Do not start the next worker until the current worker reports `PASS`, except for
 ## Reference documents
 
 - `policies_and_violations.md`: historical and repo-specific findings. The canonical v2 roadmap overrides stale architecture assumptions in it.
-- `privacy_policy.md`: current published Play privacy text. Worker 08 must reconcile it with the final AAB before release.
+- `privacy_policy.md`: current v1.8-era published Play privacy text. Worker 08 must rewrite/reconcile it with the exact final v2 AAB before release.
 - Fastlane Play metadata lives under `fastlane/metadata/android/en-US/`.
