@@ -21,7 +21,9 @@ object HostBootstrap {
 
     val ZENITHBLUE = VerifiedPayloadSpec(
         fileName = "bootstrap_com.zenithblue.fluxlinux.tar",
-        sha256 = "b0856e1009b8718455bfaf6cb5332e57473ab7d58200f8c28a6db89b30a30cfd",
+        // Measured from the reproducible bootstrap produced by
+        // scripts/assemble_bootstrap.py (Worker 01 baseline).
+        sha256 = "3ffef7f92820341e2a74b739fb15695a16fe4622e80cfc81d18bd98461712609",
         minBytes = 50L * 1024L * 1024L
     )
 

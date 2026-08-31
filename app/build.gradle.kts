@@ -29,8 +29,8 @@ android {
     }
 
     // Dual app-id flavors: ivarna (F-Droid/GitHub) + zenithblue (Play).
-    // Host bootstrap + jniLibs ship per flavor from native/bootstrap/<applicationId>/
-    // staged by :app:packageHostAssets* (runs scripts/package_host_assets.sh).
+    // Directly executed host launchers remain in base jniLibs. The large Play
+    // bootstrap/rootfs archives are staged into on-demand dynamic features.
     flavorDimensions += "store"
     productFlavors {
         create("ivarna") {
@@ -51,11 +51,27 @@ android {
         @Suppress("UnstableApiUsage")
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~"
         // Critical — do not recompress archives; they must stay STORED in the APK.
-        // Rootfs archives are no longer packaged (GitHub release download) —
-        // only bootstrap.tar and the xfce theme assets remain.
+        // Executable-bearing archives are not base-module assets. Feature
+        // modules use the same no-compress policy for byte-exact staging.
         @Suppress("UnstableApiUsage")
-        noCompress += listOf("xz", "tar")
+        noCompress += listOf("gz", "xz", "tar")
     }
+
+    dynamicFeatures += listOf(
+        ":runtime_host",
+        ":distro_debian",
+        ":distro_alpine",
+        ":distro_fedora",
+        ":distro_void",
+        ":distro_opensuse",
+        ":distro_chimera",
+        ":distro_deepin",
+        ":distro_manjaro",
+        ":distro_ubuntu",
+        ":distro_kali",
+        ":distro_parrot",
+        ":distro_arch"
+    )
 
     // Disable dependency metadata block for F-Droid
     dependenciesInfo {
@@ -144,13 +160,12 @@ tasks.withType<AbstractArchiveTask>().configureEach {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Package host assets per flavor (Pass 2 fail-closed gate, plan P0-T6/T7)
+// Package directly executed host assets per flavor (Pass 2 fail-closed gate)
 //   :app:packageHostAssetsIvarna     — stages native/bootstrap/com.ivarna.fluxlinux
 //   :app:packageHostAssetsZenithblue — stages native/bootstrap/com.zenithblue.fluxlinux
-// Fails assemble with a clear error when bootstrap.tar / jniLibs are missing.
-// Rootfs archives are NOT packaged: the selected distro's rootfs is downloaded
-// on demand from the GitHub release tag `rootfs` at install time
-// (docs/plans/rootfs-github-release-no-apk-bloat.md).
+// Fails assemble with a clear error when native jniLibs are missing. Play
+// bootstrap/rootfs inputs are staged into on-demand dynamic features by
+// preparePlayPayloads, never into the base module.
 // ─────────────────────────────────────────────────────────────────────────────
 val flavorAppIds = mapOf(
     "ivarna" to "com.ivarna.fluxlinux",
@@ -178,15 +193,12 @@ for ((flavorName, appId) in flavorAppIds) {
     val taskName = "packageHostAssets" + flavorName.replaceFirstChar { it.uppercase() }
     tasks.register<Exec>(taskName) {
         group = "build"
-        description = "Stage host bootstrap + jniLibs for flavor '$flavorName' from native/bootstrap/$appId"
+        description = "Stage directly executed host jniLibs for flavor '$flavorName' from native/bootstrap/$appId"
         workingDir = rootProject.projectDir
         commandLine("bash", "scripts/package_host_assets.sh", appId)
 
         val bootstrapTree = fileTree(rootProject.file("native/bootstrap/$appId"))
         inputs.files(bootstrapTree)
-        if (flavorName != "ivarna") {
-            outputs.file(file("src/$flavorName/assets/bootstrap.tar"))
-        }
         outputs.dir(file("src/$flavorName/jniLibs"))
 
         doFirst {
@@ -198,15 +210,7 @@ for ((flavorName, appId) in flavorAppIds) {
                 rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libpulseaudio.so"),
                 rootProject.file("native/bootstrap/$appId/jniLibs/arm64-v8a/libpactl.so")
             )
-            // Ivarna downloads bootstrap.tar from the GitHub `rootfs` release at
-            // first host setup. Zenithblue still packages it in the APK.
-            val missing = if (flavorName == "ivarna") {
-                jniRequired.filter { !it.isFile }
-            } else {
-                (
-                    jniRequired + rootProject.file("native/bootstrap/$appId/bootstrap.tar")
-                    ).filter { !it.isFile }
-            }
+            val missing = jniRequired.filter { !it.isFile }
             if (missing.isNotEmpty()) {
                 throw GradleException(
                     "Host bootstrap assets missing for applicationId '$appId':\n" +
@@ -221,8 +225,68 @@ for ((flavorName, appId) in flavorAppIds) {
     }
 }
 
-// Every assemble / bundle / pre-build for a flavor depends on its package task so
-// mergeAssets / mergeJniLibFolders never see an empty host (P0-T7).
+val playPayloadSourceRoot = providers.gradleProperty("playPayloadSourceRoot")
+    .orElse(rootProject.file("assets/rootfs").absolutePath)
+val playHostBootstrapSource = providers.gradleProperty("playHostBootstrapSource")
+    .orElse(rootProject.file("native/bootstrap/com.zenithblue.fluxlinux/bootstrap.tar").absolutePath)
+val playPayloadOutputDirs = listOf(
+    "runtime_host",
+    "distro_debian",
+    "distro_alpine",
+    "distro_fedora",
+    "distro_void",
+    "distro_opensuse",
+    "distro_chimera",
+    "distro_deepin",
+    "distro_manjaro",
+    "distro_ubuntu",
+    "distro_kali",
+    "distro_parrot",
+    "distro_arch"
+).map { rootProject.file("$it/src/zenithblue/assets/payloads") }
+
+tasks.register<Exec>("preparePlayPayloads") {
+    group = "build"
+    description = "Verify and stage Play payloads into ignored dynamic-feature assets"
+    workingDir = rootProject.projectDir
+    commandLine(
+        "python3",
+        "scripts/prepare_play_payloads.py",
+        "--source-root", playPayloadSourceRoot.get(),
+        "--host-source", playHostBootstrapSource.get()
+    )
+    inputs.files(fileTree(playPayloadSourceRoot))
+    inputs.file(playHostBootstrapSource)
+    outputs.dirs(playPayloadOutputDirs)
+}
+
+// The generated payload directories are outputs of this app task but are
+// consumed by the dynamic-feature projects. Wire the cross-project dependency
+// explicitly so Gradle cannot run a feature asset merge before staging finishes.
+gradle.projectsEvaluated {
+    listOf(
+        ":runtime_host",
+        ":distro_debian",
+        ":distro_alpine",
+        ":distro_fedora",
+        ":distro_void",
+        ":distro_opensuse",
+        ":distro_chimera",
+        ":distro_deepin",
+        ":distro_manjaro",
+        ":distro_ubuntu",
+        ":distro_kali",
+        ":distro_parrot",
+        ":distro_arch"
+    ).forEach { featurePath ->
+        rootProject.project(featurePath).tasks
+            .matching { it.name.contains("Zenithblue") }
+            .configureEach { dependsOn(":app:preparePlayPayloads") }
+    }
+}
+
+// Every assemble / bundle / pre-build for a flavor depends on its native
+// package task. Play builds additionally stage all dynamic-feature payloads.
 for (flavorName in flavorAppIds.keys) {
     val cap = flavorName.replaceFirstChar { it.uppercase() }
     tasks.matching {
@@ -231,6 +295,7 @@ for (flavorName in flavorAppIds.keys) {
             it.name.startsWith("pre${cap}")
     }.configureEach {
         dependsOn("packageHostAssets$cap")
+        if (flavorName == "zenithblue") dependsOn("preparePlayPayloads")
     }
 }
 
@@ -261,6 +326,11 @@ dependencies {
 
     // Embedded Termux:X11 (cloned + integrated directly, same-package rendering)
     implementation(project(":termux-x11"))
+
+    // Google Play Feature Delivery is referenced only by the zenithblue source
+    // set at runtime; the dependency is harmless in the non-Play variant and
+    // keeps the provider boundary compile-time separated.
+    implementation(libs.play.feature.delivery)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

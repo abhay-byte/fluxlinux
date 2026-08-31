@@ -1,4 +1,17 @@
 <resources>
     <string name="app_name">FluxLinux</string>
     <string name="accessibility_service_description">FluxLinux Keyboard Toggle allows you to toggle the keyboard in Termux:X11 using a floating button.</string>
+    <string name="feature_title_runtime_host">FluxLinux host runtime</string>
+    <string name="feature_title_distro_alpine">FluxLinux Alpine rootfs</string>
+    <string name="feature_title_distro_arch">FluxLinux Arch rootfs</string>
+    <string name="feature_title_distro_chimera">FluxLinux Chimera rootfs</string>
+    <string name="feature_title_distro_debian">FluxLinux Debian rootfs</string>
+    <string name="feature_title_distro_deepin">FluxLinux Deepin rootfs</string>
+    <string name="feature_title_distro_fedora">FluxLinux Fedora rootfs</string>
+    <string name="feature_title_distro_kali">FluxLinux Kali rootfs</string>
+    <string name="feature_title_distro_manjaro">FluxLinux Manjaro rootfs</string>
+    <string name="feature_title_distro_opensuse">FluxLinux openSUSE rootfs</string>
+    <string name="feature_title_distro_parrot">FluxLinux Parrot rootfs</string>
+    <string name="feature_title_distro_ubuntu">FluxLinux Ubuntu rootfs</string>
+    <string name="feature_title_distro_void">FluxLinux Void rootfs</string>
 </resources>

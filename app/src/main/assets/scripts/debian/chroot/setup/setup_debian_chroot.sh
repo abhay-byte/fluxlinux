@@ -43,30 +43,6 @@ goodbye() {
     exit 1
 }
 
-# Download Helper
-download_file() {
-    progress "Downloading file..."
-    if [ -e "$1/$2" ]; then
-        printf "\033[1;33m[!] File already exists: %s\033[0m\n" "$2"
-        printf "\033[1;33m[!] Skipping download...\033[0m\n"
-    else
-        # Try standard wget first (if available and working)
-        wget -O "$1/$2" "$3"
-        if [ $? -eq 0 ]; then
-            success "File downloaded successfully: $2"
-        else
-            error "Standard wget failed: $2."
-            progress "Trying fallback to Busybox wget..."
-            $BB wget -O "$1/$2" "$3"
-            if [ $? -eq 0 ]; then
-                 success "File downloaded successfully (Fallback)"
-            else
-                 goodbye
-            fi
-        fi
-    fi
-}
-
 # Extraction Helper
 extract_file() {
     progress "Extracting file..."
@@ -324,21 +300,13 @@ EOF
             success "Created directory: $DEBIANPATH"
         fi
 
-        # Check for manual download in /sdcard/Download
-        MANUAL_FILE="/sdcard/Download/debian12-arm64.tar.gz"
-        if [ -f "$MANUAL_FILE" ]; then
-            progress "Found manual file: $MANUAL_FILE"
-            progress "Copying..."
-            cp "$MANUAL_FILE" "$DEBIANPATH/debian12-arm64.tar.gz"
-            if [ $? -eq 0 ]; then
-                success "File copied successfully."
-            else
-                printf "\033[1;31m[!] Error copying file. Will attempt download.\033[0m\n"
-            fi
+        # The Kotlin payload provider supplies a verified app-private archive.
+        ROOTFS_ARCHIVE="${FLUX_ROOTFS_PATH:-}"
+        if [ -z "$ROOTFS_ARCHIVE" ] || [ ! -f "$ROOTFS_ARCHIVE" ] || [ ! -s "$ROOTFS_ARCHIVE" ]; then
+            error "No verified local Debian rootfs supplied via FLUX_ROOTFS_PATH"
+            goodbye
         fi
-        
-        # Download RootFS
-        download_file "$DEBIANPATH" "debian12-arm64.tar.gz" "https://github.com/LinuxDroidMaster/Termux-Desktops/releases/download/Debian/debian12-arm64.tar.gz"
+        cp -f "$ROOTFS_ARCHIVE" "$DEBIANPATH/debian12-arm64.tar.gz" || goodbye
         
         # Extract
         extract_file "$DEBIANPATH"
@@ -480,4 +448,3 @@ EOF
 }
 
 main
-```

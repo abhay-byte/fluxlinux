@@ -1,42 +1,13 @@
 package com.ivarna.fluxlinux.core.install
 
 import java.io.File
-import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 class ZenithbluePayloadProviderTest {
-
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val payload = "verified local rootfs payload".repeat(80).toByteArray()
-
-    private fun profile(): DistroInstallProfile {
-        val name = "test_rootfs.tar.xz"
-        return DistroInstallProfile(
-            distroId = "test",
-            prootName = "test",
-            method = "proot",
-            rootfsAsset = "rootfs/$name",
-            rootfsFileName = name,
-            rootfsSha256 = sha256(payload),
-            rootfsMinBytes = 1L,
-            familyScript = "scripts/test/setup.sh",
-            customizationScript = "scripts/test/custom.sh",
-            displayName = "Test"
-        )
-    }
-
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { "%02x".format(it) }
 
     private fun repoFile(rel: String): File {
         val cwd = File("").absoluteFile
@@ -46,56 +17,74 @@ class ZenithbluePayloadProviderTest {
     }
 
     @Test
-    fun flavorWiring_isPlayLocalOnly() {
-        assertSame(PlayFeatureRootfsProvider, PayloadProviders.rootfs)
-        assertSame(PlayFeatureHostRuntimeProvider, PayloadProviders.hostRuntime)
+    fun flavorWiring_usesPlayFeatureDeliveryOnly() {
+        assertEquals("zenithblue-play-feature-delivery", PayloadProviders.rootfs.id)
+        assertEquals("zenithblue-play-feature-delivery", PayloadProviders.hostRuntime.id)
         assertFalse(PayloadProviders.androidRoot.enabled)
-        assertEquals("zenithblue-local-only", PayloadProviders.rootfs.id)
-        assertEquals("zenithblue-packaged-or-local", PayloadProviders.hostRuntime.id)
 
         val source = repoFile(
             "src/zenithblue/kotlin/com/ivarna/fluxlinux/core/install/ZenithbluePayloadProviders.kt"
         ).readText()
+        assertTrue(source.contains("PlayFeatureDelivery"))
+        assertTrue(source.contains("VerifiedPayloadStore.materializeStream"))
         assertFalse(source.contains("RootfsDownloader"))
         assertFalse(source.contains("https://"))
-        assertTrue(source.contains("VerifiedPayloadStore"))
+        assertFalse(source.contains("/sdcard/Download"))
+        assertFalse(source.contains("storage/emulated/0/Download"))
     }
 
     @Test
-    fun localVerifiedRootfs_isAcceptedWithoutTransport() {
-        val home = tmp.newFolder("home")
-        val p = profile()
-        val candidate = File(home, "rootfs/${p.rootfsFileName}").also {
-            it.parentFile.mkdirs()
-            it.writeBytes(payload)
-        }
-        val progress = mutableListOf<PayloadProgress>()
-
-        val result = PlayFeatureRootfsProvider.ensurePresent(home, p, onProgress = progress::add)
-
-        assertTrue(candidate.isFile)
-        assertTrue(result is PayloadAcquireResult.Available)
+    fun registry_mapsEveryDistroToAnOnDemandModule() {
+        assertEquals(12, PlayPayloadRegistry.allRootfs().size)
         assertEquals(
-            File(home, p.rootfsFileName).absolutePath,
-            (result as PayloadAcquireResult.Available).payload.file.absolutePath
+            setOf(
+                "distro_debian", "distro_alpine", "distro_fedora", "distro_void",
+                "distro_opensuse", "distro_chimera", "distro_deepin", "distro_manjaro",
+                "distro_ubuntu", "distro_kali", "distro_parrot", "distro_arch"
+            ),
+            PlayPayloadRegistry.allRootfs().map { it.moduleName }.toSet()
         )
-        assertTrue(VerifiedPayloadStore.isVerified(File(home, p.rootfsFileName), VerifiedPayloadStore.spec(p)))
-        assertTrue(progress.any { it.phase.contains("local verified") })
+        assertTrue(PlayPayloadRegistry.allRootfs().all { it.assetPath.startsWith("payloads/") })
+        assertTrue(PlayPayloadRegistry.allRootfs().all { it.sha256.matches(Regex("[0-9a-f]{64}")) })
     }
 
     @Test
-    fun missingOrCancelledRootfs_failsClosed() {
-        val p = profile()
-        val missing = PlayFeatureRootfsProvider.ensurePresent(tmp.newFolder("missing"), p)
-        assertTrue(missing is PayloadAcquireResult.Unavailable)
-        assertFalse((missing as PayloadAcquireResult.Unavailable).message.contains("http"))
+    fun provenance_rejectsIdentityDrift() {
+        val expected = PlayPayloadRegistry.allRootfs().first()
+        val json = """
+            {
+              "schemaVersion": 1,
+              "payloadId": "${expected.payloadId}",
+              "payloadVersion": "2.0.0",
+              "distroId": "${expected.distroId}",
+              "architecture": "arm64-v8a",
+              "archiveFileName": "${expected.archiveFileName}",
+              "archiveSha256": "${expected.sha256}",
+              "compressedSize": ${expected.minBytes + 1},
+              "uncompressedSize": 1,
+              "upstreamSource": "test fixture",
+              "sourceCommit": "test",
+              "buildScript": "scripts/prepare_play_payloads.py",
+              "buildDate": "2026-01-01T00:00:00Z",
+              "fluxCustomizations": "none"
+            }
+        """.trimIndent()
 
-        val cancelled = PlayFeatureRootfsProvider.ensurePresent(
-            tmp.newFolder("cancelled"),
-            p,
-            isCancelled = { true }
+        assertEquals(null, PlayPayloadProvenance.parse(json).validationError(expected))
+        assertEquals(
+            "archive SHA-256 mismatch",
+            PlayPayloadProvenance.parse(json.replace(expected.sha256, "0".repeat(64)))
+                .validationError(expected)
         )
-        assertTrue(cancelled is PayloadAcquireResult.Unavailable)
-        assertTrue((cancelled as PayloadAcquireResult.Unavailable).cancelled)
+    }
+
+    @Test
+    fun hostRegistry_hasDedicatedRuntimeFeature() {
+        val host = PlayPayloadRegistry.runtimeHost
+        assertEquals("runtime_host", host.moduleName)
+        assertEquals("payloads/runtime_host/bootstrap.tar", host.assetPath)
+        assertEquals("payloads/runtime_host/provenance.json", host.provenanceAssetPath)
+        assertEquals(HostBootstrap.ZENITHBLUE.fileName, host.archiveFileName)
+        assertNotNull(PlayPayloadRegistry.forProfile(DistroInstallProfile.require("debian")))
     }
 }

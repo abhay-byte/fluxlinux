@@ -29,6 +29,10 @@ app/src/*/assets/rootfs/
 assets/rootfs/
 app/src/*/jniLibs/
 
+# Play Feature Delivery payload staging (maintainer/CI inputs are not tracked)
+runtime_host/src/*/assets/payloads/
+distro_*/src/*/assets/payloads/
+
 # Large NDK packages
 packages/android-ndk-r29-aarch64-linux-musl.tar.xz
 packages/android-ndk-r27d-aarch64-linux-musl.tar.xz

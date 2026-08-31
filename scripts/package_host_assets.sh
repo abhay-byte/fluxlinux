@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# package_host_assets.sh — stage host bootstrap + jniLibs into the app APK per flavor.
+# package_host_assets.sh — stage directly executed host jniLibs per flavor.
 #
 # Usage:
 #   ./scripts/package_host_assets.sh com.ivarna.fluxlinux
@@ -7,14 +7,13 @@
 #   ./scripts/package_host_assets.sh --all
 #
 # Actions:
-#   1. Verify native/bootstrap/<id>/{bootstrap.tar,jniLibs/arm64-v8a/*.so}
-#   2. Copy bootstrap.tar   → app/src/<flavor>/assets/bootstrap.tar
-#   3. Copy jniLibs         → app/src/<flavor>/jniLibs/arm64-v8a/
-#   4. Print sizes + SHA256 for CI logs.
+#   1. Verify native/bootstrap/<id>/jniLibs/arm64-v8a/*.so
+#   2. Copy jniLibs → app/src/<flavor>/jniLibs/arm64-v8a/
+#   3. Print the staged native files for CI logs.
 #
-# Rootfs archives are NOT packaged anymore — they ship via the GitHub release
-# tag `rootfs` and are downloaded at install time
-# (docs/plans/rootfs-github-release-no-apk-bloat.md).
+# Bootstrap/rootfs archives are staged separately into Play dynamic features by
+# scripts/prepare_play_payloads.py. Ivarna keeps its existing provider-owned
+# release path; neither flavor puts bootstrap.tar in the base.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -51,21 +50,14 @@ stage_app_id() {
   local flavor_assets="$APP_SRC/$flavor/assets"
   local flavor_jni="$APP_SRC/$flavor/jniLibs"
 
-  # 1. Verify inputs. Ivarna does not package bootstrap.tar (GitHub `rootfs`
-  #    download at first host setup). Zenithblue still ships it in the APK.
+  # 1. Verify directly executed native launchers. The large bootstrap is never
+  #    copied into the base APK by this task.
   local missing=0
-  local require_bootstrap=1
-  if [ "$flavor" = "ivarna" ]; then
-    require_bootstrap=0
-  fi
   local required=("$src/jniLibs/arm64-v8a/libbash.so" \
            "$src/jniLibs/arm64-v8a/libproot.so" "$src/jniLibs/arm64-v8a/libloader.so" \
            "$src/jniLibs/arm64-v8a/libloader32.so" \
            "$src/jniLibs/arm64-v8a/libpulseaudio.so" \
            "$src/jniLibs/arm64-v8a/libpactl.so")
-  if [ "$require_bootstrap" -eq 1 ]; then
-    required+=("$src/bootstrap.tar")
-  fi
   for f in "${required[@]}"; do
     if [ ! -f "$f" ]; then
       echo "ERROR: missing $f — run assemble_bootstrap.py --package-name $app_id first" >&2
@@ -76,12 +68,8 @@ stage_app_id() {
 
   # 2-3. Stage assets + jniLibs (flavor source set)
   mkdir -p "$flavor_assets" "$flavor_jni/arm64-v8a"
-  if [ "$require_bootstrap" -eq 1 ]; then
-    cp -f "$src/bootstrap.tar" "$flavor_assets/bootstrap.tar"
-  else
-    # Leftover staged tarball would still be packaged — delete it.
-    rm -f "$flavor_assets/bootstrap.tar"
-  fi
+  # Remove a stale pre-Worker-03 tarball from the base source set.
+  rm -f "$flavor_assets/bootstrap.tar"
   cp -f "$src/jniLibs/arm64-v8a/"*.so "$flavor_jni/arm64-v8a/"
 
   # Pulse runtime overlay for already-extracted PREFIX (no EXTRACT_VERSION bump).
@@ -96,16 +84,9 @@ stage_app_id() {
 
   # 4. Report
   echo "=== packaged host assets for $app_id (flavor: $flavor) ==="
-  if [ -f "$flavor_assets/bootstrap.tar" ]; then
-    local bootstrap_sha bootstrap_size
-    bootstrap_sha="$(sha256_of "$flavor_assets/bootstrap.tar")"
-    bootstrap_size="$(du -h "$flavor_assets/bootstrap.tar" | awk '{print $1}')"
-    echo "  app/src/$flavor/assets/bootstrap.tar  $bootstrap_size  sha256=$bootstrap_sha"
-  else
-    echo "  app/src/$flavor/assets/bootstrap.tar  NOT packaged — download from GitHub tag 'rootfs'"
-  fi
+  echo "  app/src/$flavor/assets/bootstrap.tar  NOT packaged — supplied by PFD runtime_host"
   echo "  app/src/$flavor/jniLibs/arm64-v8a/    $(ls "$flavor_jni/arm64-v8a" | tr '\n' ' ')"
-  echo "  rootfs: NOT packaged — downloaded at install time from GitHub release tag 'rootfs'"
+  echo "  rootfs: supplied by PFD distro_* dynamic features for the Play flavor"
 }
 
 main() {

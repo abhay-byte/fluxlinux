@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# verify_apk_host_assets.sh — unzip checks that the built APK contains the host
-# jniLibs and — since rootfs (and ivarna bootstrap) moved to GitHub release
-# download — contains ZERO assets/rootfs/* entries. Ivarna must not package
-# assets/bootstrap.tar; zenithblue still must (STORED).
+# verify_apk_host_assets.sh — unzip checks that the built base APK contains the
+# directly executed host jniLibs and no executable payload archives. The Play
+# host/rootfs archives are delivered by runtime_host and distro_* dynamic
+# features and are checked separately in the final AAB.
 #
 # Usage:
 #   ./scripts/verify_apk_host_assets.sh app/build/outputs/apk/ivarna/debug/app-ivarna-debug.apk
@@ -18,12 +18,6 @@ fi
 fail=0
 
 echo "=== verifying host assets in $APK ==="
-
-# Ivarna downloads bootstrap.tar from GitHub; zenithblue still packages it.
-case "$APK" in
-  *ivarna*) expect_bootstrap=0 ;;
-  *) expect_bootstrap=1 ;;
-esac
 
 for entry in \
   "lib/arm64-v8a/libbash.so" \
@@ -42,34 +36,18 @@ for entry in \
 done
 
 bootstrap_count="$(unzip -l "$APK" | grep -c " assets/bootstrap.tar$" || true)"
-if [ "$expect_bootstrap" -eq 1 ]; then
-  if [ "$bootstrap_count" -gt 0 ]; then
-    echo "  [OK] assets/bootstrap.tar"
-    method=$(unzip -v "$APK" | grep " assets/bootstrap.tar$" | awk '{print $2}')
-    if [ "$method" = "Stored" ]; then
-      echo "  [OK] assets/bootstrap.tar stored uncompressed"
-    else
-      echo "  [FAIL] assets/bootstrap.tar compressed ($method) — check androidResources.noCompress"
-      fail=1
-    fi
-  else
-    echo "  [MISSING] assets/bootstrap.tar"
-    fail=1
-  fi
+if [ "$bootstrap_count" -eq 0 ]; then
+  echo "  [OK] zero assets/bootstrap.tar (delivered by PFD runtime_host)"
 else
-  if [ "$bootstrap_count" -eq 0 ]; then
-    echo "  [OK] zero assets/bootstrap.tar (ivarna downloads from GitHub tag rootfs)"
-  else
-    echo "  [FAIL] ivarna APK must not package assets/bootstrap.tar"
-    fail=1
-  fi
+  echo "  [FAIL] base APK contains assets/bootstrap.tar — it belongs in runtime_host"
+  fail=1
 fi
 
-# Negative rootfs gate: rootfs archives ship via the GitHub release tag `rootfs`,
-# never inside the APK.
+# Negative rootfs gate: rootfs archives belong in distro_* dynamic features,
+# never in the base APK.
 rootfs_entries=$(unzip -l "$APK" | grep -c "assets/rootfs/" || true)
 if [ "$rootfs_entries" -eq 0 ]; then
-  echo "  [OK] zero assets/rootfs/* entries (rootfs downloads at install time)"
+  echo "  [OK] zero assets/rootfs/* entries (delivered by PFD distro features)"
 else
   echo "  [FAIL] APK contains $rootfs_entries assets/rootfs/* entries — must be zero"
   unzip -l "$APK" | grep "assets/rootfs/" || true

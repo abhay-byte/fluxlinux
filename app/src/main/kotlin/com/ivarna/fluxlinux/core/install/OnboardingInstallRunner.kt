@@ -185,7 +185,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         val rootfsIdx = phaseIdx(phases, "ROOTFS")
         val customIdx = phaseIdx(phases, "CUSTOM")
 
-        enter(phases, hostIdx, onProgress, "Extracting bootstrap + deploying scripts…")
+        enter(phases, hostIdx, onProgress, "Preparing host runtime + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
@@ -205,10 +205,11 @@ class OnboardingInstallRunner(private val ctx: Context) {
         completePhase(phases, hostIdx, onProgress, "Host ready")
 
         val profile = DistroInstallProfile.require(distroId)
-        enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
+        enter(phases, dlIdx, onProgress, "Acquiring ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
         val rootfsResult = PayloadProviders.rootfs.ensurePresent(
+            appCtx,
             destDir,
             profile,
             isCancelled = { isStale(gen) }
@@ -364,7 +365,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
         RootShell.ensureBusyBoxResolver(appCtx)
         val resolvedBb = RootShell.resolveBusyBox()
 
-        enter(phases, hostIdx, onProgress, "Extracting bootstrap + deploying scripts…")
+        enter(phases, hostIdx, onProgress, "Preparing host runtime + deploying scripts…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         var lastHostPhase = ""
         val hostOk = TerminalLauncher.prepareHostBlocking(appCtx, forceHostSetup = false) { done, total, phase ->
@@ -387,10 +388,11 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         // DL after HOST only — R0 stays first so non-rooted devices fail
         // before any download (R6).
-        enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
+        enter(phases, dlIdx, onProgress, "Acquiring ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
         val rootfsResult = PayloadProviders.rootfs.ensurePresent(
+            appCtx,
             destDir,
             profile,
             isCancelled = { isStale(gen) }

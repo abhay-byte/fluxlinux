@@ -12,8 +12,9 @@ Last updated: 2026-08-31
 - SDK baseline: `compileSdk 36`, `targetSdk 36`, `minSdk 26`
 
 Worker 01 established the branch and recorded the prepared v2 baseline. Worker
-02 now isolates payload acquisition behind flavor-specific providers while
-leaving Play Feature Delivery and later policy removals to the assigned workers.
+02 isolated payload acquisition behind flavor-specific providers. Worker 03
+now supplies the Play executable payload path through on-demand dynamic
+features; later policy-removal workers remain unchanged.
 
 ## Worker sequence
 
@@ -21,7 +22,7 @@ leaving Play Feature Delivery and later policy removals to the assigned workers.
 |---|---|---|
 | 01 `branch_baseline` | pass | Exact v2 baseline prepared with pinned submodules and generated ignored bootstrap input; Play/non-Play builds and tests pass. |
 | 02 `play_flavor_boundary` | pass | Common installers consume verified payload abstractions; zenithblue is packaged/local-only with rooted paths gated off, and ivarna retains release-backed providers. |
-| 03 `remove_remote_executable_delivery` | pending | Worker 03 owns the final Play executable delivery path / PFD integration. |
+| 03 `remove_remote_executable_delivery` | partial | PFD delivery, provenance, atomic app-private staging, and Play AAB boundaries are implemented; no physical Play/device E2E was available in this worker. |
 | 04 `remove_nested_and_writable_executables` | pending |  |
 | 05 `remove_root_chroot_from_play` | pending |  |
 | 06 `links_permissions_and_callbacks` | pending |  |

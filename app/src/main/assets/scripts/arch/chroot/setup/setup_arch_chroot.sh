@@ -103,18 +103,16 @@ fi
         success "Created directory: $ARCHPATH"
     fi
     
-    # 2. Download RootFS
-    URL="http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
-    FILE="ArchLinuxARM-aarch64-latest.tar.gz"
+    # 2. Use the verified app-private rootfs supplied by the payload provider.
+    FILE="${FLUX_ROOTFS_NAME:-archlinux_arm_rootfs.tar.xz}"
+    ROOTFS_ARCHIVE="${FLUX_ROOTFS_PATH:-}"
     
     if [ ! -f "$ARCHPATH/bin/bash" ]; then
-        if [ -f "/sdcard/Download/$FILE" ]; then
-            progress "Found manual file, copying..."
-            cp "/sdcard/Download/$FILE" "$ARCHPATH/$FILE"
-        elif [ ! -f "$ARCHPATH/$FILE" ]; then
-            progress "Downloading Arch Linux ARM64 RootFS..."
-            wget -O "$ARCHPATH/$FILE" "$URL" || $BB wget -O "$ARCHPATH/$FILE" "$URL" || goodbye
+        if [ -z "$ROOTFS_ARCHIVE" ] || [ ! -f "$ROOTFS_ARCHIVE" ] || [ ! -s "$ROOTFS_ARCHIVE" ]; then
+            error "No verified local Arch rootfs supplied via FLUX_ROOTFS_PATH"
+            goodbye
         fi
+        cp -f "$ROOTFS_ARCHIVE" "$ARCHPATH/$FILE" || goodbye
         
         # 3. Extract
         if [ -f "$ARCHPATH/$FILE" ]; then

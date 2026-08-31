@@ -235,14 +235,14 @@ private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
             .padding(24.dp)
     ) {
         Text(
-            "Downloads from GitHub",
+            "Get the Linux runtime",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "The F-Droid APK does not include the Linux host or a distro rootfs. Those archives are downloaded from GitHub when you continue. F-Droid does not check them.",
+            "FluxLinux needs a Linux host and a distro rootfs. The selected store build supplies them through its verified delivery path.",
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             fontSize = 15.sp
         )
@@ -749,9 +749,7 @@ private fun OptionsPage(
 }
 
 /**
- * F-Droid Inclusion: executable downloads (host bootstrap / distro rootfs) must
- * be opt-in, no harder to decline than accept, and must say F-Droid does not
- * verify those files.
+ * Store-specific disclosure for executable payload acquisition.
  */
 @Composable
 private fun DownloadConsentRow(
@@ -763,7 +761,7 @@ private fun DownloadConsentRow(
     val body = if (downloadsHost) {
         "I understand this install downloads Linux system images (host bootstrap and the chosen distro) from GitHub. Those files are not in the F-Droid APK and are not checked by F-Droid."
     } else {
-        "I understand this install downloads the chosen distro's Linux rootfs from GitHub. That archive is not in the Play/F-Droid APK and is not checked by F-Droid."
+        "I understand this install requests the host runtime and chosen distro rootfs through Google Play Feature Delivery. The files are verified before they are installed."
     }
     Row(
         modifier = Modifier

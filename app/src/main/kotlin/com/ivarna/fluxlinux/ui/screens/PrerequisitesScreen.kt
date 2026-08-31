@@ -525,7 +525,7 @@ fun HostBootstrapStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Embedded host card (ivarna: download bootstrap.tar from GitHub; zenithblue: APK asset)
+        // Store-specific host delivery card.
         PrerequisiteItem(
             name = "FluxLinux Host (embedded)",
             isInstalled = bootstrapDone,
@@ -544,7 +544,7 @@ fun HostBootstrapStep(
             "Initialize downloads the Linux host (~124 MiB) from GitHub when you tap the button. " +
                 "That archive is not in the F-Droid APK. No separate Termux APK is required."
         } else {
-            "The Linux host environment (Termux-class prefix + proot-distro) is bundled inside this app — no separate Termux APK is required for Debian installs."
+            "The Linux host environment (Termux-class prefix + proot-distro) is delivered on demand through Google Play Feature Delivery — no separate Termux APK is required."
         }
         Text(
             text = hostHint,

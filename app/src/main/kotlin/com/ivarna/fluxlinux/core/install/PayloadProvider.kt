@@ -2,8 +2,11 @@ package com.ivarna.fluxlinux.core.install
 
 import android.content.Context
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Source-neutral progress reported while a provider materializes a payload.
@@ -18,6 +21,7 @@ data class PayloadProgress(
 
 enum class PayloadSource {
     PACKAGED_ASSET,
+    PLAY_FEATURE,
     LOCAL_VERIFIED,
     REMOTE_RELEASE
 }
@@ -39,6 +43,19 @@ sealed class PayloadAcquireResult {
 /** Rootfs acquisition seam shared by onboarding and all terminal backends. */
 interface RootfsPayloadProvider {
     val id: String
+
+    /**
+     * Context-aware entry point used by providers whose source is Android's
+     * split/module delivery API. The legacy overload remains available to the
+     * non-Play provider and to older callers.
+     */
+    fun ensurePresent(
+        ctx: Context,
+        destDir: File,
+        profile: DistroInstallProfile,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (PayloadProgress) -> Unit = {}
+    ): PayloadAcquireResult = ensurePresent(destDir, profile, isCancelled, onProgress)
 
     fun ensurePresent(
         destDir: File,
@@ -83,7 +100,7 @@ data class VerifiedPayloadSpec(
     val minBytes: Long
 )
 
-/** Local-only verification/materialization used by the Play placeholder. */
+/** Local verification/materialization shared by all transport providers. */
 object VerifiedPayloadStore {
 
     private const val COPY_BUFFER_BYTES = 64 * 1024
@@ -114,27 +131,88 @@ object VerifiedPayloadStore {
             if (!isVerified(candidate, spec)) continue
             try {
                 candidate.inputStream().use { input ->
-                    destination.outputStream().use { output ->
-                        val buffer = ByteArray(COPY_BUFFER_BYTES)
-                        while (true) {
-                            if (isCancelled()) {
-                                destination.delete()
-                                return null
-                            }
-                            val read = input.read(buffer)
-                            if (read == -1) break
-                            output.write(buffer, 0, read)
-                        }
-                    }
+                    val copied = materializeStream(
+                        destDir = destDir,
+                        spec = spec,
+                        input = input,
+                        expectedBytes = candidate.length(),
+                        isCancelled = isCancelled
+                    )
+                    if (copied != null) return copied
                 }
             } catch (_: Exception) {
-                destination.delete()
                 continue
             }
-            if (isVerified(destination, spec)) return destination
-            destination.delete()
         }
         return null
+    }
+
+    /**
+     * Copy a payload stream to a deterministic temporary sibling, verify it,
+     * then atomically promote it to [destDir]/[spec.fileName]. A partial file is
+     * never exposed as a usable payload and no caller needs to know where a
+     * Play split stores its own files.
+     */
+    fun materializeStream(
+        destDir: File,
+        spec: VerifiedPayloadSpec,
+        input: InputStream,
+        expectedBytes: Long? = null,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (PayloadProgress) -> Unit = {}
+    ): File? {
+        destDir.mkdirs()
+        val destination = File(destDir, spec.fileName)
+        if (isVerified(destination, spec) &&
+            (expectedBytes == null || destination.length() == expectedBytes)
+        ) return destination
+
+        val temporary = File(destDir, ".${spec.fileName}.part")
+        temporary.delete()
+        var copiedBytes = 0L
+        try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            FileOutputStream(temporary).use { output ->
+                val buffer = ByteArray(COPY_BUFFER_BYTES)
+                while (true) {
+                    if (isCancelled()) {
+                        temporary.delete()
+                        return null
+                    }
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    output.write(buffer, 0, read)
+                    digest.update(buffer, 0, read)
+                    copiedBytes += read
+                    onProgress(PayloadProgress(copiedBytes, expectedBytes ?: 0L, "Materializing payload"))
+                }
+                output.fd.sync()
+            }
+
+            val hash = digest.digest().joinToString("") { "%02x".format(it) }
+            if (copiedBytes <= spec.minBytes || hash != spec.sha256 ||
+                (expectedBytes != null && copiedBytes != expectedBytes)
+            ) {
+                temporary.delete()
+                return null
+            }
+
+            // The temp file is a sibling of the destination, so an atomic
+            // rename is available on the app-private filesystem. Fail closed
+            // if the platform cannot provide that guarantee.
+            Files.move(
+                temporary.toPath(),
+                destination.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+            return if (isVerified(destination, spec) &&
+                (expectedBytes == null || destination.length() == expectedBytes)
+            ) destination else null
+        } catch (_: Exception) {
+            temporary.delete()
+            return null
+        }
     }
 
     fun sha256(file: File): String = try {

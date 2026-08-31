@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -69,6 +70,16 @@ enum class Screen {
 }
 
 class MainActivity : ComponentActivity() {
+
+    private var playFeatureConfirmationRegistration: com.ivarna.fluxlinux.core.install.PlayFeatureConfirmation.Registration? = null
+
+    private val playFeatureConfirmationLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        com.ivarna.fluxlinux.core.install.PlayFeatureConfirmation.complete(
+            result.resultCode == RESULT_OK
+        )
+    }
     
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
@@ -478,6 +489,10 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        playFeatureConfirmationRegistration =
+            com.ivarna.fluxlinux.core.install.PlayFeatureConfirmation.register { sender ->
+                playFeatureConfirmationLauncher.launch(IntentSenderRequest.Builder(sender).build())
+            }
         if (savedInstanceState == null) {
             dispatchLegacyTermuxCallback(intent)
         }
@@ -1121,5 +1136,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        playFeatureConfirmationRegistration?.let {
+            com.ivarna.fluxlinux.core.install.PlayFeatureConfirmation.unregister(it)
+        }
+        playFeatureConfirmationRegistration = null
+        super.onDestroy()
     }
 }

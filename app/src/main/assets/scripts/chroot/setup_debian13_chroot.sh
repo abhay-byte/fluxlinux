@@ -13,7 +13,6 @@ PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
 APP_HOME="${TERMUX__HOME:-/data/data/${PKG}/files/home}"
 APP_PREFIX="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 ROOTFS_NAME="debian_13_rootfs.tar.xz"
-ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"
 ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803}"
 
 # Function to show progress message
@@ -54,7 +53,7 @@ goodbye() {
     exit 1
 }
 
-# Resolve app-packaged / manual / download rootfs (same file as flux_install.sh)
+# Resolve the app-private verified rootfs staged by the payload provider.
 resolve_rootfs_archive() {
     ROOTFS_ARCHIVE=""
 
@@ -68,10 +67,6 @@ resolve_rootfs_archive() {
         "$APP_HOME/$ROOTFS_NAME" \
         "$APP_HOME/rootfs/$ROOTFS_NAME" \
         "$APP_PREFIX/var/lib/proot-distro/cache/rootfs/$ROOTFS_NAME" \
-        "/sdcard/Download/$ROOTFS_NAME" \
-        "/sdcard/Download/rootfs.tar.xz" \
-        "/storage/emulated/0/Download/$ROOTFS_NAME" \
-        "/storage/emulated/0/Download/rootfs.tar.xz" \
         "$DEBIANPATH/$ROOTFS_NAME" \
         "$DEBIANPATH/rootfs.tar.xz"
     do
@@ -83,33 +78,6 @@ resolve_rootfs_archive() {
     done
 
     return 1
-}
-
-# Download Helper (fallback only — prefer app-local archive)
-download_file() {
-    # $1=dir $2=filename $3=url
-    progress "Downloading file..."
-    if [ -e "$1/$2" ] && [ -s "$1/$2" ]; then
-        printf "\033[1;33m[!] File already exists: %s\033[0m\n" "$2"
-        printf "\033[1;33m[!] Skipping download...\033[0m\n"
-        return 0
-    fi
-    mkdir -p "$1" 2>/dev/null || true
-    if command -v wget >/dev/null 2>&1; then
-        wget -O "$1/$2" "$3"
-        if [ $? -eq 0 ]; then
-            success "File downloaded successfully: $2"
-            return 0
-        fi
-        error "Standard wget failed: $2."
-    fi
-    progress "Trying Busybox wget..."
-    $BB wget -O "$1/$2" "$3"
-    if [ $? -eq 0 ]; then
-        success "File downloaded successfully (Fallback)"
-        return 0
-    fi
-    goodbye
 }
 
 # Extraction Helper — archive path is $2 (or $1/rootfs.tar.xz)
@@ -515,13 +483,9 @@ fi
         success "Created directory: $DEBIANPATH"
     fi
 
-    # Prefer app-deployed rootfs (same as flux_install / assets/rootfs/)
-    if resolve_rootfs_archive; then
-        :
-    else
-        progress "No local rootfs — downloading $ROOTFS_URL"
-        download_file "$DEBIANPATH" "$ROOTFS_NAME" "$ROOTFS_URL"
-        ROOTFS_ARCHIVE="$DEBIANPATH/$ROOTFS_NAME"
+    if ! resolve_rootfs_archive; then
+        error "No verified local rootfs (expected $APP_HOME/$ROOTFS_NAME)"
+        goodbye
     fi
 
     # Optional SHA check (when sha256sum available)
