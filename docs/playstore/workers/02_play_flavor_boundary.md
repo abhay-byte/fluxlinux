@@ -1,28 +1,47 @@
-# Worker 02 — Build-Time Play Capability Boundary
+# Worker 02 — Play Flavor Boundary Without Removing Embedded Backend
 
 ## Goal
-Make prohibited/non-Play v2 functionality physically absent from the `zenithblue` artifact, not merely runtime-disabled.
+Keep FluxLinux v2's embedded terminal/PRoot/X11/Pulse backend in Google Play while isolating **delivery and Android-root behavior** by flavor.
 
-## Do
-1. Keep universally safe APIs/UI primitives in `src/main`.
-2. Move embedded-host/rootfs/chroot/root implementations to `src/ivarna`.
-3. Add Play-safe implementations in `src/zenithblue` for shared interfaces.
-4. Preserve `applicationId = com.zenithblue.fluxlinux` for Play.
-5. Flavor-scope embedded host dependencies where possible (`ivarnaImplementation`).
-6. Keep Play UI coherent: hide excluded actions or mark them unavailable in the Google Play build.
-7. Do not use a runtime-only `BuildConfig` guard for blocker-class features.
+## Architecture rule
+Do not create an external-Termux Play fallback. The Play build should remain embedded.
+
+Common backend stays in `main` where safe. Policy-sensitive providers get flavor implementations.
+
+## Tasks
+1. Inventory these v2 components and classify `common`, `play-only adapter`, or `non-play-only`:
+   - distro installer/state machine;
+   - rootfs downloader/source;
+   - host bootstrap source;
+   - PRoot host runtime;
+   - terminal/session services;
+   - X11/Pulse integration;
+   - chroot/root managers.
+2. Introduce a narrow payload-source abstraction, e.g. `RootfsPayloadProvider`.
+3. Keep extraction/configuration/start logic common; it should receive a **local archive** and not care whether it came from PAD or HTTP.
+4. `zenithblue`: wire a placeholder/real `PlayAssetRootfsProvider` interface for worker 03.
+5. `ivarna`: retain the current remote provider if desired.
+6. Separate bootstrap source the same way if current common code contains a remote repair URL.
+7. Move real Android-root/chroot dependencies behind the non-Play source set; worker 05 completes removal.
+8. Ensure the embedded Termux/terminal/X11 modules required by Play remain dependencies. Do not flavor-scope them out merely because the old roadmap said so.
+9. Add unit tests proving the Play flavor cannot select the remote rootfs provider.
 
 ## Tests
 ```bash
-./gradlew :app:dependencies --configuration zenithblueReleaseRuntimeClasspath
-./gradlew :app:dependencies --configuration ivarnaReleaseRuntimeClasspath
-./gradlew :app:testZenithblueDebugUnitTest
-./gradlew :app:assembleZenithblueDebug
+./gradlew test
+./gradlew assembleZenithblueDebug
+./gradlew assembleIvarnaDebug
+./gradlew dependencies
 ```
-Inspect the Play runtime classpath and APK for embedded-host-only modules/classes.
+
+Search Play sources/artifact for provider wiring that points to HTTP/GitHub rootfs delivery.
 
 ## Acceptance
-- Play and non-Play implementations are source-set separated.
-- Play dependency graph does not include runtime engines used only by F-Droid/GitHub.
-- Excluded features are not reachable or packaged in Play.
-- Both flavors compile after the split.
+- both flavors compile;
+- Play still contains embedded terminal/PRoot backend wiring;
+- distro installer consumes a local payload through an abstraction;
+- Play cannot instantiate the non-Play HTTP rootfs provider;
+- no major UI/backend rewrite was introduced.
+
+## Do not
+Do not implement the asset packs themselves here. Do not remove PRoot, X11, PulseAudio, terminal services, or same-architecture guest execution.
