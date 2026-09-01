@@ -34,6 +34,22 @@ PAYLOAD_VERSION = "2.0.0"
 ARCHITECTURE = "arm64-v8a"
 SCHEMA_VERSION = 1
 
+# The fast Play release carries only the already-proven seven-distro set. The
+# remaining source/build support stays in the repository and in Ivarna.
+PLAY_RELEASE_DISTRO_IDS = (
+    "debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera"
+)
+
+# Debian's existing input came from the FluxLinux rootfs release. The original
+# vendor URL/checksum was not retained, so record the exact immediate input
+# source instead of inventing vendor provenance.
+LEGACY_INPUT_SOURCES = {
+    "debian": (
+        "https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz",
+        "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803",
+    ),
+}
+
 
 # Source records are deliberately descriptive where the original upstream
 # URL/checksum was not captured in the existing release notes. A missing
@@ -109,11 +125,13 @@ def manifest_for(
     digest: str,
     compressed: int,
     expanded: int,
-    upstream_source: str,
+    upstream_source: str | None,
     upstream_checksum: str | None,
     source_record: str,
     commit: str,
     date: str,
+    input_source: str | None = None,
+    input_source_sha256: str | None = None,
 ) -> dict[str, object]:
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -127,9 +145,12 @@ def manifest_for(
         "uncompressedSize": expanded,
         "upstreamSource": upstream_source,
         "upstreamChecksum": upstream_checksum,
+        "inputSource": input_source,
+        "inputSourceSha256": input_source_sha256,
         "sourceCommit": commit,
         "buildScript": "scripts/prepare_play_payloads.py",
         "buildDate": date,
+        "runtimeNetworkRequired": False,
         "fluxCustomizations": (
             "FluxLinux host-prefix package SSOT and app-id rewrite; staged byte-for-byte"
             if distro_id == "host"
@@ -240,7 +261,10 @@ def main() -> None:
     if not args.verify_only:
         stage_payload(host_source, "runtime_host", "bootstrap.tar", host_manifest, output_root)
 
+    verified_count = 0
     for module, payload_id, distro_id, archive_name, expected_hash, min_bytes, upstream, upstream_hash, record in ROOTFS:
+        if distro_id not in PLAY_RELEASE_DISTRO_IDS:
+            continue
         source = (
             args.alpine_source.resolve()
             if distro_id == "alpine" and args.alpine_source
@@ -257,12 +281,19 @@ def main() -> None:
                 f"({sidecar}); refusing to stage a raw rootfs"
             )
         sidecar_data = json.loads(sidecar.read_text(encoding="utf-8"))
+        input_source = sidecar_data.get("inputSource")
+        input_source_sha256 = sidecar_data.get("inputSourceSha256")
         if not sidecar_data.get("upstreamSource") or not (
             sidecar_data.get("upstreamSha256") or sidecar_data.get("upstreamChecksum")
         ):
-            raise SystemExit(
-                f"ERROR: {distro_id} provenance must record upstream source and hash"
-            )
+            legacy = LEGACY_INPUT_SOURCES.get(distro_id)
+            recorded_input_sha256 = sidecar_data.get("inputArchiveSha256")
+            if legacy is None or recorded_input_sha256 != legacy[1]:
+                raise SystemExit(
+                    f"ERROR: {distro_id} provenance must record upstream source/hash "
+                    "or an exact legacy input source/hash"
+                )
+            input_source, input_source_sha256 = legacy
         if sidecar_data.get("runtimeNetworkRequired") is not False:
             raise SystemExit(
                 f"ERROR: {distro_id} provenance permits runtime network access"
@@ -285,6 +316,8 @@ def main() -> None:
             record,
             commit,
             date,
+            input_source=input_source,
+            input_source_sha256=input_source_sha256,
         )
         if not args.verify_only:
             stage_payload(
@@ -294,8 +327,9 @@ def main() -> None:
                 metadata,
                 output_root,
             )
+        verified_count += 1
 
-    print(f"PASS: verified {len(ROOTFS)} distro payloads + runtime_host")
+    print(f"PASS: verified {verified_count} Play distro payloads + runtime_host")
     if not args.verify_only:
         print(f"PASS: staged zenithblue payload assets under {output_root}")
 

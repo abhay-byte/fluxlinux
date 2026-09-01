@@ -44,6 +44,9 @@ sealed class PayloadAcquireResult {
 interface RootfsPayloadProvider {
     val id: String
 
+    /** Whether this store can acquire the selected profile's rootfs. */
+    fun supports(profile: DistroInstallProfile): Boolean = true
+
     /** Identity used by the installer for the provider's verified payload. */
     fun verifiedSpec(profile: DistroInstallProfile): VerifiedPayloadSpec =
         VerifiedPayloadStore.spec(profile)

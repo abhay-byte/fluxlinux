@@ -14,9 +14,14 @@ import java.io.File
 object PlayFeatureRootfsProvider : RootfsPayloadProvider {
     override val id: String = "zenithblue-play-feature-delivery"
 
+    override fun supports(profile: DistroInstallProfile): Boolean =
+        PlayPayloadRegistry.forProfile(profile) != null
+
     override fun verifiedSpec(profile: DistroInstallProfile): VerifiedPayloadSpec =
         PlayPayloadRegistry.forProfile(profile)?.verifiedSpec
-            ?: VerifiedPayloadStore.spec(profile)
+            ?: throw IllegalArgumentException(
+                "${profile.distroId} is not included in the Play v2.0 payload set"
+            )
 
     override fun ensurePresent(
         ctx: Context,

@@ -22,6 +22,10 @@ REQUIRED = (
     "etc/fluxlinux/play-baseline-v1",
 )
 
+PLAY_RELEASE_DISTRO_IDS = {
+    "debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera"
+}
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -67,10 +71,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=Path("scripts/play_rootfs/manifests.json"))
     parser.add_argument("--payload-dir", type=Path, required=True)
+    parser.add_argument(
+        "--release-only",
+        action="store_true",
+        help="validate only the seven distro payloads selected for Play v2.0",
+    )
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     failures: list[str] = []
-    for entry in manifest["distros"]:
+    entries = [
+        entry for entry in manifest["distros"]
+        if not args.release_only or entry["id"] in PLAY_RELEASE_DISTRO_IDS
+    ]
+    for entry in entries:
         archive = args.payload_dir / entry["archive"]
         sidecar = archive.with_name(archive.name + ".provenance.json")
         if not archive.is_file():
@@ -82,12 +95,28 @@ def main() -> int:
         provenance = json.loads(sidecar.read_text(encoding="utf-8"))
         if provenance.get("archiveSha256") != sha256(archive):
             failures.append(f"{entry['id']}: archive hash does not match provenance")
+        expected_input_sha256 = entry.get("inputSha256", entry["sha256"])
+        recorded_input_sha256 = provenance.get("inputArchiveSha256")
+        if recorded_input_sha256 is None and (
+            provenance.get("upstreamSource") == entry.get("inputSource")
+        ):
+            # Older Alpine sidecars used the pinned input as upstreamSource
+            # before the explicit input provenance fields were added.
+            recorded_input_sha256 = provenance.get("upstreamSha256")
+        if recorded_input_sha256 != expected_input_sha256:
+            failures.append(f"{entry['id']}: input archive hash is missing or mismatched")
         if provenance.get("architecture") != "aarch64":
             failures.append(f"{entry['id']}: architecture is not aarch64")
         if provenance.get("runtimeNetworkRequired") is not False:
             failures.append(f"{entry['id']}: runtimeNetworkRequired is not false")
-        if not provenance.get("upstreamSource") or not provenance.get("upstreamSha256"):
-            failures.append(f"{entry['id']}: upstream source/hash provenance is incomplete")
+        has_upstream = provenance.get("upstreamSource") and provenance.get("upstreamSha256")
+        legacy_source = provenance.get("inputSource") or entry.get("inputSource")
+        legacy_sha256 = provenance.get("inputSourceSha256") or entry.get("inputSourceSha256")
+        has_legacy_input = legacy_source and legacy_sha256 == expected_input_sha256
+        if not has_upstream and not has_legacy_input:
+            failures.append(
+                f"{entry['id']}: upstream source/hash or exact legacy input source/hash is incomplete"
+            )
         try:
             with tarfile.open(archive, "r:*") as tar:
                 members = normalized_members(tar)
@@ -106,7 +135,8 @@ def main() -> int:
     if failures:
         print("\n".join(f"FAIL: {failure}" for failure in failures))
         return 1
-    print("PASS: all 12 Play rootfs archives, markers, package databases, and provenance")
+    scope = "seven Play release" if args.release_only else "all 12"
+    print(f"PASS: {scope} rootfs archives, markers, package databases, and provenance")
     return 0
 
 

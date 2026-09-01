@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.ScriptManager
+import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.utils.InstallationQueueManager
 import com.ivarna.fluxlinux.core.utils.StateManager
 import com.ivarna.fluxlinux.ui.components.DistroCard
@@ -63,14 +64,18 @@ fun DistroScreen(
     
     // Distro List — installed state = filesystem truth (plan P4-T13); stale
     // prefs without a rootfs on disk keep the card available for Install.
-    val installedDistroIds = remember(refreshKey.value, stateRefresh) {
-        DistroRepository.supportedDistros
+    val payloadDistros = DistroRepository.filterForPayloadProvider(
+        DistroRepository.supportedDistros,
+        PayloadProviders.rootfs
+    )
+    val installedDistroIds = remember(refreshKey.value, stateRefresh, payloadDistros) {
+        payloadDistros
             .filter { com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id) }
             .map { it.id }
             .toSet()
     }
     
-    val availableDistros = DistroRepository.supportedDistros.filter { 
+    val availableDistros = payloadDistros.filter {
         !installedDistroIds.contains(it.id)
     }
 

@@ -237,6 +237,30 @@ Java_com_termux_x11_CmdEntryPoint_start(JNIEnv *env, __unused jclass cls, jobjec
     return JNI_TRUE;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_termux_x11_CmdEntryPoint_setTmpDir(
+        JNIEnv *env, __unused jclass cls, jstring path) {
+    if (!path)
+        return;
+    const char *value = env->GetStringUTFChars(path, nullptr);
+    if (value) {
+        setenv("TMPDIR", value, 1);
+        env->ReleaseStringUTFChars(path, value);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_termux_x11_CmdEntryPoint_setXkbConfigRoot(
+        JNIEnv *env, __unused jclass cls, jstring path) {
+    if (!path)
+        return;
+    const char *value = env->GetStringUTFChars(path, nullptr);
+    if (value) {
+        setenv("XKB_CONFIG_ROOT", value, 1);
+        env->ReleaseStringUTFChars(path, value);
+    }
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_termux_x11_CmdEntryPoint_waitForServer(__unused JNIEnv *env, __unused jclass clazz) {
     pthread_t thread;

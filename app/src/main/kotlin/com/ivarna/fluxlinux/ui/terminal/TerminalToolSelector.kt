@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.fluxlinux.core.root.RootShell
+import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.install.PayloadProviders
 import com.ivarna.fluxlinux.core.terminal.TerminalShellCardUi
 import com.ivarna.fluxlinux.core.terminal.TerminalShellCatalog
@@ -100,11 +101,22 @@ fun TerminalToolSelector(
         }
     }
 
-    val sections = remember(context, rootAvailable) {
+    val supportedDistroIds = remember(context) {
+        DistroRepository.filterForPayloadProvider(
+            DistroRepository.supportedDistros,
+            PayloadProviders.rootfs
+        ).mapTo(mutableSetOf()) { it.id }
+    }
+    val sections = remember(context, rootAvailable, supportedDistroIds) {
         TerminalShellCatalog.sections(
             context,
             TerminalShellCatalog.availability(context, rootAvailable)
-        )
+        ).mapNotNull { section ->
+            val cards = section.cards.filter { card ->
+                card.def.distroId == null || card.def.distroId in supportedDistroIds
+            }
+            section.takeIf { cards.isNotEmpty() }?.copy(cards = cards)
+        }
     }
     val groups = remember(sections) { groupCatalogByMethod(sections.flatMap { it.cards }) }
     var methodTab by remember { mutableStateOf(MethodTab.PROOT) }

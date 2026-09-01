@@ -213,6 +213,8 @@ def main() -> int:
             "architecture": manifest["architecture"],
             "upstreamSource": entry.get("upstreamSource"),
             "upstreamSha256": entry.get("upstreamSha256"),
+            "inputSource": entry.get("inputSource"),
+            "inputSourceSha256": entry.get("inputSourceSha256"),
             "inputArchive": input_archive,
             "inputArchiveSha256": input_sha256,
             "packageManager": entry["packageManager"],

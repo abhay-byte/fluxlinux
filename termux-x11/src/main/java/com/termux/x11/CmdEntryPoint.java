@@ -206,6 +206,10 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
     }
 
     public static native boolean start(String[] args);
+    /** Supply the app-private shared runtime directory to the embedded native server. */
+    public static native void setTmpDir(String path);
+    /** Supply the app-private XKB tree to the embedded native server. */
+    public static native void setXkbConfigRoot(String path);
     private static native int waitForServer();
     public static native void stop();
     public native ParcelFileDescriptor getXConnection();

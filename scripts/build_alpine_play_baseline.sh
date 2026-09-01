@@ -168,11 +168,11 @@ else
   build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 fi
 
-python3 -c 'import json,sys; from pathlib import Path; out,idx=sys.argv[1:3]; data={"schemaVersion":2,"payloadVersion":"2.0.0","distroId":"alpine","architecture":"aarch64","upstreamSource":sys.argv[3],"upstreamSha256":sys.argv[4],"repository":sys.argv[5],"communityRepository":sys.argv[6],"repositoryIndexSha256":json.loads(idx),"packageManager":"apk","packageTransaction":"apk --root <rootfs> --arch aarch64 --update add","requestedPackageCount":int(sys.argv[7]),"apkInstalledDbSha256":sys.argv[8],"builderImage":sys.argv[9],"builderImageId":Path(sys.argv[10]).read_text().strip(),"sourceCommit":sys.argv[11],"buildDate":sys.argv[12],"archiveFileName":Path(sys.argv[13]).name,"archiveSha256":sys.argv[14],"compressedSize":int(sys.argv[15]),"uncompressedSize":int(sys.argv[16]),"marker":"/etc/fluxlinux/play-baseline-v1","runtimeNetworkRequired":False,"fluxCustomizations":"Flux user, D-Bus machine-id, local package lock, and Play marker"}; Path(out).write_text(json.dumps(data,indent=2,sort_keys=True)+"\n",encoding="utf-8")' \
+python3 -c 'import json,sys; from pathlib import Path; out,idx=sys.argv[1:3]; data={"schemaVersion":2,"payloadVersion":"2.0.0","distroId":"alpine","architecture":"aarch64","upstreamSource":sys.argv[3],"upstreamSha256":sys.argv[4],"inputSource":sys.argv[3],"inputSourceSha256":sys.argv[4],"inputArchive":sys.argv[17],"inputArchiveSha256":sys.argv[18],"repository":sys.argv[5],"communityRepository":sys.argv[6],"repositoryIndexSha256":json.loads(idx),"packageManager":"apk","packageTransaction":"apk --root <rootfs> --arch aarch64 --update add","requestedPackageCount":int(sys.argv[7]),"apkInstalledDbSha256":sys.argv[8],"builderImage":sys.argv[9],"builderImageId":Path(sys.argv[10]).read_text().strip(),"sourceCommit":sys.argv[11],"buildDate":sys.argv[12],"archiveFileName":Path(sys.argv[13]).name,"archiveSha256":sys.argv[14],"compressedSize":int(sys.argv[15]),"uncompressedSize":int(sys.argv[16]),"marker":"/etc/fluxlinux/play-baseline-v1","runtimeNetworkRequired":False,"fluxCustomizations":"Flux user, D-Bus machine-id, local package lock, and Play marker"}; Path(out).write_text(json.dumps(data,indent=2,sort_keys=True)+"\n",encoding="utf-8")' \
   "$provenance" "$apk_indexes" "$ALPINE_MINIROOTFS_URL" "$actual_input_sha" \
   "$ALPINE_REPOSITORY" "$ALPINE_COMMUNITY_REPOSITORY" "$package_count" "$apk_db_sha" \
   "$image" "$stage/work/builder-image-id.txt" "$source_commit" "$build_date" "$output" \
-  "$archive_sha" "$archive_size" "$expanded_size"
+  "$archive_sha" "$archive_size" "$expanded_size" "$input_name" "$actual_input_sha"
 
 echo "PASS: real apk transaction completed"
 echo "PASS: Alpine Play baseline $output ($archive_size bytes)"

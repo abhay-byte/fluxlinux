@@ -1,6 +1,17 @@
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import java.util.Properties
 
+val playReleaseFeatureModules = listOf(
+    "runtime_host",
+    "distro_debian",
+    "distro_alpine",
+    "distro_ubuntu",
+    "distro_kali",
+    "distro_arch",
+    "distro_manjaro",
+    "distro_chimera",
+)
+
 // F-Droid reproducible builds: disable baseline profiles using Groovy script
 apply(from = "fix-baseline-profiles.gradle")
 
@@ -57,21 +68,7 @@ android {
         noCompress += listOf("gz", "xz", "tar")
     }
 
-    dynamicFeatures += listOf(
-        ":runtime_host",
-        ":distro_debian",
-        ":distro_alpine",
-        ":distro_fedora",
-        ":distro_void",
-        ":distro_opensuse",
-        ":distro_chimera",
-        ":distro_deepin",
-        ":distro_manjaro",
-        ":distro_ubuntu",
-        ":distro_kali",
-        ":distro_parrot",
-        ":distro_arch"
-    )
+    dynamicFeatures += playReleaseFeatureModules.map { ":$it" }
 
     // Disable dependency metadata block for F-Droid
     dependenciesInfo {
@@ -228,19 +225,7 @@ val playAlpineSource = providers.gradleProperty("playAlpineSource")
 val playHostBootstrapSource = providers.gradleProperty("playHostBootstrapSource")
     .orElse(rootProject.file("native/bootstrap/com.zenithblue.fluxlinux/bootstrap.tar").absolutePath)
 val playPayloadOutputDirs = listOf(
-    "runtime_host",
-    "distro_debian",
-    "distro_alpine",
-    "distro_fedora",
-    "distro_void",
-    "distro_opensuse",
-    "distro_chimera",
-    "distro_deepin",
-    "distro_manjaro",
-    "distro_ubuntu",
-    "distro_kali",
-    "distro_parrot",
-    "distro_arch"
+    *playReleaseFeatureModules.toTypedArray()
 ).map { rootProject.file("$it/src/zenithblue/assets/payloads") }
 
 tasks.register<Exec>("preparePlayPayloads") {
@@ -262,25 +247,27 @@ tasks.register<Exec>("preparePlayPayloads") {
     outputs.dirs(playPayloadOutputDirs)
 }
 
+tasks.register<Exec>("verifyPlayPayloadSizes") {
+    group = "verification"
+    description = "Enforce Play feature and cumulative payload size safety margins"
+    workingDir = rootProject.projectDir
+    commandLine(
+        "python3",
+        "scripts/verify_play_payload_sizes.py",
+        "--repo-root",
+        rootProject.projectDir.absolutePath,
+        "--base-estimate-bytes",
+        (500L * 1024L * 1024L).toString(),
+    )
+    dependsOn("preparePlayPayloads")
+    inputs.files(playPayloadOutputDirs)
+}
+
 // The generated payload directories are outputs of this app task but are
 // consumed by the dynamic-feature projects. Wire the cross-project dependency
 // explicitly so Gradle cannot run a feature asset merge before staging finishes.
 gradle.projectsEvaluated {
-    listOf(
-        ":runtime_host",
-        ":distro_debian",
-        ":distro_alpine",
-        ":distro_fedora",
-        ":distro_void",
-        ":distro_opensuse",
-        ":distro_chimera",
-        ":distro_deepin",
-        ":distro_manjaro",
-        ":distro_ubuntu",
-        ":distro_kali",
-        ":distro_parrot",
-        ":distro_arch"
-    ).forEach { featurePath ->
+    playReleaseFeatureModules.map { ":$it" }.forEach { featurePath ->
         rootProject.project(featurePath).tasks
             .matching { it.name.contains("Zenithblue") }
             .configureEach { dependsOn(":app:preparePlayPayloads") }
@@ -298,7 +285,7 @@ for (flavorName in flavorAppIds.keys) {
     }.configureEach {
         dependsOn("packageHostAssets$cap")
         dependsOn("prepareTermuxNative16k")
-        if (flavorName == "zenithblue") dependsOn("preparePlayPayloads")
+        if (flavorName == "zenithblue") dependsOn("verifyPlayPayloadSizes")
     }
 }
 

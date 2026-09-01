@@ -1,6 +1,8 @@
 package com.ivarna.fluxlinux.core.data
 
 import com.ivarna.fluxlinux.core.model.SupportedDistro
+import com.ivarna.fluxlinux.core.install.DistroInstallProfile
+import com.ivarna.fluxlinux.core.install.RootfsPayloadProvider
 import com.ivarna.fluxlinux.ui.theme.FluxAccentMagenta
 import com.ivarna.fluxlinux.ui.theme.FluxAccentCyan
 import androidx.compose.ui.graphics.Color
@@ -9,6 +11,18 @@ import java.util.Locale
 
 
 object DistroRepository {
+
+    /**
+     * Keep install cards aligned with the active store's payload capability.
+     * Profiles without a rootfs (for example coming-soon catalog entries) are
+     * retained; the provider decides which provisioned rootfs cards exist.
+     */
+    fun filterForPayloadProvider(
+        distros: List<Distro>,
+        provider: RootfsPayloadProvider,
+    ): List<Distro> = distros.filter { distro ->
+        DistroInstallProfile.forId(distro.id)?.let(provider::supports) ?: true
+    }
 
     fun sortForDistroPage(distros: List<Distro>): List<Distro> =
         distros.sortedWith(

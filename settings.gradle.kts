@@ -27,13 +27,12 @@ include(":stub")
 include(":runtime_host")
 include(":distro_debian")
 include(":distro_alpine")
-include(":distro_fedora")
-include(":distro_void")
-include(":distro_opensuse")
 include(":distro_chimera")
-include(":distro_deepin")
 include(":distro_manjaro")
 include(":distro_ubuntu")
 include(":distro_kali")
-include(":distro_parrot")
 include(":distro_arch")
+
+// Fedora, Void, openSUSE, Deepin, and Parrot source directories remain in the
+// repository for Ivarna/common support, but are not registered as Gradle
+// dynamic-feature projects in the fast Play v2.0 release graph.

@@ -422,7 +422,10 @@ private fun DistroPickPage(
 
     LaunchedEffect(Unit) { probeRoot(openChrootIfGranted = false) }
 
-    val forTab = DistroRepository.supportedDistros.filter { distro ->
+    val forTab = DistroRepository.filterForPayloadProvider(
+        DistroRepository.supportedDistros,
+        PayloadProviders.rootfs
+    ).filter { distro ->
         if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
     }
     val installable = forTab.filter { !it.comingSoon }

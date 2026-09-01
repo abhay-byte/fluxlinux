@@ -1,6 +1,7 @@
 package com.ivarna.fluxlinux.core.install
 
 import java.io.File
+import com.ivarna.fluxlinux.core.data.DistroRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -34,18 +35,46 @@ class ZenithbluePayloadProviderTest {
     }
 
     @Test
-    fun registry_mapsEveryDistroToAnOnDemandModule() {
-        assertEquals(12, PlayPayloadRegistry.allRootfs().size)
+    fun registry_mapsOnlyTheFastReleaseDistrosToOnDemandModules() {
+        assertEquals(7, PlayPayloadRegistry.allRootfs().size)
         assertEquals(
             setOf(
-                "distro_debian", "distro_alpine", "distro_fedora", "distro_void",
-                "distro_opensuse", "distro_chimera", "distro_deepin", "distro_manjaro",
-                "distro_ubuntu", "distro_kali", "distro_parrot", "distro_arch"
+                "distro_debian", "distro_alpine", "distro_ubuntu", "distro_kali",
+                "distro_arch", "distro_manjaro", "distro_chimera"
             ),
             PlayPayloadRegistry.allRootfs().map { it.moduleName }.toSet()
         )
         assertTrue(PlayPayloadRegistry.allRootfs().all { it.assetPath.startsWith("payloads/") })
         assertTrue(PlayPayloadRegistry.allRootfs().all { it.sha256.matches(Regex("[0-9a-f]{64}")) })
+    }
+
+    @Test
+    fun providerPins_separateRawIvarnaAndProvisionedPlayHashes() {
+        val debian = DistroInstallProfile.require("debian")
+        assertEquals(
+            "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803",
+            debian.rootfsSha256
+        )
+        assertEquals(
+            PlayPayloadRegistry.DEBIAN_PLAY_ROOTFS_SHA256,
+            PlayFeatureRootfsProvider.verifiedSpec(debian).sha256
+        )
+        assertFalse(
+            PlayFeatureRootfsProvider.verifiedSpec(debian).sha256 == debian.rootfsSha256
+        )
+        assertTrue(PlayFeatureRootfsProvider.supports(debian))
+        assertFalse(
+            PlayFeatureRootfsProvider.supports(DistroInstallProfile.require("fedora"))
+        )
+        assertEquals(
+            setOf("debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera"),
+            DistroRepository.filterForPayloadProvider(
+                DistroRepository.supportedDistros,
+                PlayFeatureRootfsProvider
+            ).filter { !it.comingSoon && !it.id.endsWith("_chroot") }
+                .map { it.id }
+                .toSet()
+        )
     }
 
     @Test

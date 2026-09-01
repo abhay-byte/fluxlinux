@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.core.install
 
 import java.io.File
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,5 +28,15 @@ class IvarnaPayloadProviderTest {
         ).readText()
         assertTrue(source.contains("RootfsDownloader"))
         assertTrue(source.contains("RELEASE_BASE"))
+    }
+
+    @Test
+    fun providerUsesRawReleasePin() {
+        val profile = DistroInstallProfile.require("debian")
+        assertEquals(
+            "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803",
+            IvarnaRootfsPayloadProvider.verifiedSpec(profile).sha256
+        )
+        assertTrue(IvarnaRootfsPayloadProvider.supports(profile))
     }
 }

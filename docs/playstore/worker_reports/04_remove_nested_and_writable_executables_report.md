@@ -5,19 +5,77 @@ Last updated: 2026-09-01
 ## Result
 
 **PARTIAL.** The host-prefix, source/artifact cleanup, DNS boundary, local-only
-Play setup path, real ARM64 package transactions for 11 of the 12 planned
-baselines, and native 16 KB compatibility contracts pass. Debian, Alpine, Void,
-openSUSE, Chimera, Deepin, Manjaro, Ubuntu, Kali, Parrot, and Arch have
-completed structural transactions. Fedora reached its package transaction but
-was intentionally stopped before final validation/archive handoff. Provenance
-passes for 7/12 baselines; Debian, openSUSE, Deepin, and Parrot have incomplete
-upstream records, and Fedora has no accepted final artifact. Clean
-device-visible Alpine/XFCE/X11, refreshed Play AAB, and offline end-to-end
-evidence remain unproven.
+Play setup path, real ARM64 package transactions, and native 16 KB compatibility
+contracts pass. The 04R closure below accepts seven release-backed Play distro
+modules; Fedora, Void, openSUSE, Deepin, and Parrot remain deferred. The common
+Ivarna provider and source directories remain unchanged in behavior. Worker 05
+remains pending.
 
 The next worker remains pending and was not started:
 
 `docs/playstore/workers/05_remove_root_chroot_from_play.md`
+
+## 04R fast release closure — 2026-09-01
+
+The release boundary is now explicit. Zenithblue/Play packages exactly these
+seven on-demand distro modules:
+
+`distro_debian`, `distro_alpine`, `distro_ubuntu`, `distro_kali`,
+`distro_arch`, `distro_manjaro`, and `distro_chimera`.
+
+Fedora, Void, openSUSE, Deepin, and Parrot are deferred and are rejected by the
+Play payload provider. Their source directories remain for later work; they are
+not included in the Play Gradle graph or release AAB. The runtime host module is
+also included, making the release graph `runtime_host` plus the seven distro
+modules.
+
+Common/Ivarna raw rootfs hashes and Play provisioned hashes are kept separate.
+The Debian Play input is recorded as the exact FluxLinux release asset
+`https://github.com/abhay-byte/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz`
+with SHA-256
+`13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803`.
+The original vendor provenance for that input was unavailable, so it is not
+silently claimed. All seven staged Play payloads pass the provenance verifier;
+no rootfs was rebuilt in this closure.
+
+The payload size gate passes with a per-module limit below 480 MiB and an
+estimated base-plus-feature total below 3.5 GiB. The largest module is Arch at
+448.22 MiB; the estimated total is 3,141.66 MiB.
+
+The final Zenithblue release artifacts were verified as follows:
+
+- AAB: `app/build/outputs/bundle/zenithblueRelease/app-zenithblue-release.aab`
+  (SHA-256
+  `d595a9277a5393a7876d77d7a2f297220e89b257187d2d9b9ced020f712fd797`).
+- Bundletool 1.18.3 local-testing APKS were generated from that AAB and passed
+  the logical-module verifier: base plus eight on-demand modules, with deferred
+  modules absent and no base bootstrap/rootfs/loader payload.
+- Host asset, Play host artifact, runtime-script, and 16 KiB ELF/page-alignment
+  verifiers pass. The full Gradle test task and forced Zenithblue debug/release
+  builds pass. Gradle daemons were stopped and confirmed absent after each
+  invocation.
+
+### Poco X6 Pro device evidence
+
+Testing was restricted to Poco X6 Pro (`2311DRK48I`, serial
+`Y5WWBMJVOZSK4HU8`). The local-testing release split set installed, host
+feature delivery completed, Alpine installed successfully, and the terminal
+chooser exposed exactly the seven release distros with PRoot 7 and Chroot 7.
+With Wi-Fi and mobile data disabled on this device only, an Alpine PRoot shell
+printed `PocoOfflinePass`; networking was restored afterward.
+
+The native X11 handoff was corrected to pass the app-private shared `TMPDIR`
+and guest XKB root into the embedded native server. On the Poco run, logs show
+the server using `/data/data/com.zenithblue.fluxlinux/files/usr/tmp`, starting
+successfully, and launching the same-package X11 activity. `xkbcomp` emitted
+only nonfatal duplicate-symbol warnings. A complete visible XFCE session and
+start/stop/restart lifecycle are not claimed here because the tested XFCE
+session subsequently exited; this remains a follow-up validation item.
+
+An earlier Alpine theme step also logged the optional warning `tar exit 127`
+because `xz` was unavailable; Alpine installation itself completed.
+
+Worker 05 was not started.
 
 ## Inventory and changes
 

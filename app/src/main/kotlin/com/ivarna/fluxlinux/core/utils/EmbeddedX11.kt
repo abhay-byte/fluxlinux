@@ -3,6 +3,8 @@ package com.ivarna.fluxlinux.core.utils
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.ivarna.fluxlinux.core.terminal.TermuxHostPaths
+import java.io.File
 
 /**
  * Launcher for the Termux:X11 clone embedded directly in this app.
@@ -45,6 +47,11 @@ object EmbeddedX11 {
                 try {
                     android.os.Looper.prepare()
                     com.termux.x11.CmdEntryPoint.ctx = app
+                    com.termux.x11.CmdEntryPoint.setTmpDir(TermuxHostPaths.TMPDIR)
+                    val xkbRoot = File(app.filesDir, "usr/share/X11/xkb")
+                    if (xkbRoot.exists()) {
+                        com.termux.x11.CmdEntryPoint.setXkbConfigRoot(xkbRoot.absolutePath)
+                    }
                     val status = com.termux.x11.CmdEntryPoint.main(
                         arrayOf(":0", "-legacy-drawing")
                     ) {
