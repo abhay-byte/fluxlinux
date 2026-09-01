@@ -84,7 +84,7 @@ data class DistroInstallProfile(
 
         const val OPENSUSE_ROOTFS_NAME = "opensuse_tumbleweed_rootfs.tar.xz"
         const val OPENSUSE_ROOTFS_SHA256 =
-            "bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a"
+            "bfadb150ede98afbf8c1cc48425c818f2069ab597c6b3c71407f8417f34b1bfb"
         const val OPENSUSE_ROOTFS_MIN_BYTES = 15L * 1024L * 1024L
 
         // Chimera Linux 2025-12-20 bootstrap (aarch64, musl, apk v3).
@@ -97,13 +97,13 @@ data class DistroInstallProfile(
         // Deepin 25 (crimson/beige) docker rootfs aarch64 (glibc, apt).
         const val DEEPIN_ROOTFS_NAME = "deepin_25_rootfs.tar.xz"
         const val DEEPIN_ROOTFS_SHA256 =
-            "2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698"
+            "2cf02cd46e6c694a5d7aa699048a640a03ccd93cfff9f438ed0f215d02e665d4"
         const val DEEPIN_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
 
         // Manjaro ARM aarch64 rootfs (glibc, pacman).
         const val MANJARO_ROOTFS_NAME = "manjaro_arm_rootfs.tar.xz"
         const val MANJARO_ROOTFS_SHA256 =
-            "b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156"
+            "59ef6613c1e9e3ea63660ba893b49c100d2eb770163759f6b044dd7c75d88e0a"
         const val MANJARO_ROOTFS_MIN_BYTES = 80L * 1024L * 1024L
 
         // Ubuntu 26.04 LTS (Resolute) arm64 base — gzip recompressed to xz
@@ -116,19 +116,19 @@ data class DistroInstallProfile(
         // Kali Rolling 2026.2 (NetHunter-minimal, flattened — no kali-arm64/).
         const val KALI_ROOTFS_NAME = "kali_2026_2_rootfs.tar.xz"
         const val KALI_ROOTFS_SHA256 =
-            "01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689"
+            "562696884422db47c19db561004b6981f9578677cb627ae3d716ad2979e8febe"
         const val KALI_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
 
         // Parrot Security 7.2 (flattened — no parrot-arm64/).
         const val PARROT_ROOTFS_NAME = "parrot_7.2_rootfs.tar.xz"
         const val PARROT_ROOTFS_SHA256 =
-            "49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4"
+            "fb9a58929ab0c790f5e1c03829a5fae481ec282c2dd23e24b174c3314818b55a"
         const val PARROT_ROOTFS_MIN_BYTES = 30L * 1024L * 1024L
 
         // Arch Linux ARM slim userspace (already in tree).
         const val ARCH_ROOTFS_NAME = "archlinux_arm_rootfs.tar.xz"
         const val ARCH_ROOTFS_SHA256 =
-            "40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75"
+            "fb5757ab558b420ca0a5bef3f5a6f9259d3456a3b37f60be052cf221d19de9ca"
         const val ARCH_ROOTFS_MIN_BYTES = 40L * 1024L * 1024L
 
         private const val XFCE_CUSTOM = "common/setup/setup_customization_xfce.sh"

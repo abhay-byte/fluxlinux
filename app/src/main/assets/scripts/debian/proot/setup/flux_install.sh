@@ -30,12 +30,12 @@ case "$DISTRO" in
         ;;
     opensuse)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-opensuse_tumbleweed_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-bfadb150ede98afbf8c1cc48425c818f2069ab597c6b3c71407f8417f34b1bfb}"
         FAMILY_SCRIPT_NAME="setup_opensuse_family.sh"
         ;;
     deepin)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-deepin_25_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-2c7abfe859db36249459251d0b29f853e9ffb79cd1b42c7661e997ba99193698}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-2cf02cd46e6c694a5d7aa699048a640a03ccd93cfff9f438ed0f215d02e665d4}"
         FAMILY_SCRIPT_NAME="setup_deepin_family.sh"
         ;;
     chimera)
@@ -45,7 +45,7 @@ case "$DISTRO" in
         ;;
     manjaro)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-manjaro_arm_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-b7339bcc289e8bbb40d1ffdc6ece4404865383d14d4b7f0fb83aa81e01720156}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-59ef6613c1e9e3ea63660ba893b49c100d2eb770163759f6b044dd7c75d88e0a}"
         FAMILY_SCRIPT_NAME="setup_manjaro_family.sh"
         ;;
     ubuntu)
@@ -55,17 +55,17 @@ case "$DISTRO" in
         ;;
     kali)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-kali_2026_2_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-01c48a29ebb543954ef200e766076a143cf42744760d7ccdc31683a19f670689}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-562696884422db47c19db561004b6981f9578677cb627ae3d716ad2979e8febe}"
         FAMILY_SCRIPT_NAME="setup_kali_family.sh"
         ;;
     parrot)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-parrot_7.2_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-49f4c2899ef9574cc3b0d9aaa6eaff38c4b32a9ac1abea2faec73cfbaf8094d4}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-fb9a58929ab0c790f5e1c03829a5fae481ec282c2dd23e24b174c3314818b55a}"
         FAMILY_SCRIPT_NAME="setup_parrot_family.sh"
         ;;
     archlinux)
         ROOTFS_NAME="${FLUX_ROOTFS_NAME:-archlinux_arm_rootfs.tar.xz}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-40209ef6318d3aad732299d46ce224c6a0ecded80b6f8091f5e38b40fa031d75}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-fb5757ab558b420ca0a5bef3f5a6f9259d3456a3b37f60be052cf221d19de9ca}"
         FAMILY_SCRIPT_NAME="setup_arch_family.sh"
         ;;
     *)

@@ -47,7 +47,11 @@ export LANG=C
 # Scriptlets (gtk-update-icon-cache, udev, systemd) hang under proot.
 export SYSTEMD_OFFLINE=1
 export SYSTEMD_SKIP_UNMOUNTS=1
-DNF_OPTS="-y --setopt=install_weak_deps=False --setopt=tsflags=nodocs,noscripts"
+# Fedora's optional OpenH264 package is currently served by a mirror whose
+# metadata/content length is inconsistent. It is not part of the Flux desktop
+# baseline, so exclude it rather than making the reproducible transaction
+# depend on that optional codec mirror.
+DNF_OPTS="-y --setopt=install_weak_deps=False --setopt=tsflags=nodocs,noscripts --disablerepo=fedora-cisco-openh264 --exclude=openh264"
 
 # fedora-minimal omits the OpenSSL default bundle symlink. Restore before
 # dnf talks to metalink HTTPS.
@@ -59,7 +63,7 @@ if [ ! -e /etc/pki/tls/cert.pem ] && [ -f /etc/pki/ca-trust/extracted/pem/tls-ca
 fi
 
 _flux_log "dnf makecache ($DNF)..."
-$DNF -y --setopt=install_weak_deps=False makecache || {
+$DNF -y --setopt=install_weak_deps=False --disablerepo=fedora-cisco-openh264 makecache || {
     echo "FluxLinux: dnf makecache failed (network / repos)"
     exit 1
 }

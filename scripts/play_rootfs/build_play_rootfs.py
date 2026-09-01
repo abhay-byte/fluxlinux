@@ -110,21 +110,22 @@ chroot /work/rootfs /bin/sh -c '
     *) echo "unknown package manager $2" >&2; exit 2 ;;
   esac > /etc/fluxlinux/play-baseline-packages.lock
 ' sh "$distro" "$package_manager"
-test -e "/work/rootfs$package_db"
+test -e "/work/rootfs$package_db" || { echo "missing package database $package_db" >&2; exit 1; }
 for required in /bin/sh /usr/bin/startxfce4 /usr/bin/dbus-daemon /usr/bin/xfce4-session /usr/bin/xfwm4 /usr/bin/xfce4-panel /usr/bin/xfdesktop /usr/bin/thunar /etc/fluxlinux/play-baseline-v1; do
   test -e "/work/rootfs$required" || { echo "missing required $required" >&2; exit 1; }
 done
-test -e /work/rootfs/home/flux
-test -e /work/rootfs/usr/bin/pactl
+test -e /work/rootfs/home/flux || { echo "missing /home/flux" >&2; exit 1; }
+test -e /work/rootfs/usr/bin/pactl || { echo "missing /usr/bin/pactl" >&2; exit 1; }
 test -e /work/rootfs/usr/lib/libpulse.so.0 || \
   test -e /work/rootfs/usr/lib/aarch64-linux-gnu/libpulse.so.0 || \
-  test -e /work/rootfs/usr/lib64/pulseaudio/libpulse.so.0
+  test -e /work/rootfs/usr/lib64/libpulse.so.0 || \
+  test -e /work/rootfs/usr/lib64/pulseaudio/libpulse.so.0 || { echo "missing Pulse client library" >&2; exit 1; }
 test -e /work/rootfs/usr/lib/libGL.so.1 || \
   test -e /work/rootfs/usr/lib/aarch64-linux-gnu/libGL.so.1 || \
-  test -e /work/rootfs/usr/lib64/libGL.so.1
+  test -e /work/rootfs/usr/lib64/libGL.so.1 || { echo "missing Mesa/OpenGL library" >&2; exit 1; }
 test -e /work/rootfs/etc/ssl/certs/ca-certificates.crt || \
   test -e /work/rootfs/etc/pki/tls/certs/ca-bundle.crt || \
-  test -e /work/rootfs/etc/ssl/ca-bundle.pem
+  test -e /work/rootfs/etc/ssl/ca-bundle.pem || { echo "missing CA bundle" >&2; exit 1; }
 grep -q '^schema=1$' /work/rootfs/etc/fluxlinux/play-baseline-v1
 test -s /work/rootfs/etc/fluxlinux/play-baseline-packages.lock
 apk add --no-cache tar xz >/dev/null

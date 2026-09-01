@@ -5,12 +5,15 @@ Last updated: 2026-09-01
 ## Result
 
 **PARTIAL.** The host-prefix, source/artifact cleanup, DNS boundary, local-only
-Play setup path, build-time ARM64 transactions for Alpine/Void/Chimera/Ubuntu,
-and native 16 KB compatibility contracts pass. A shared 12-distro Play baseline
-framework is present; Debian has a completed transaction with incomplete
-upstream provenance and Fedora, openSUSE, Deepin, Manjaro, Kali, Parrot, and
-Arch have not been provisioned. Clean device-visible Alpine/XFCE/X11,
-refreshed Play AAB, and offline end-to-end evidence remain unproven.
+Play setup path, real ARM64 package transactions for 11 of the 12 planned
+baselines, and native 16 KB compatibility contracts pass. Debian, Alpine, Void,
+openSUSE, Chimera, Deepin, Manjaro, Ubuntu, Kali, Parrot, and Arch have
+completed structural transactions. Fedora reached its package transaction but
+was intentionally stopped before final validation/archive handoff. Provenance
+passes for 7/12 baselines; Debian, openSUSE, Deepin, and Parrot have incomplete
+upstream records, and Fedora has no accepted final artifact. Clean
+device-visible Alpine/XFCE/X11, refreshed Play AAB, and offline end-to-end
+evidence remain unproven.
 
 The next worker remains pending and was not started:
 
@@ -90,13 +93,41 @@ The next worker remains pending and was not started:
 - Ubuntu has a completed `apt` transaction from the exact Canonical Resolute
   ARM64 root archive. Final artifact: `173540316` bytes, SHA-256
   `fd8481763ac0b0f4757a1a3ac51fbc432be52b75c193b194b16dd1f63fb19bd9`.
+- openSUSE Tumbleweed has a completed `zypper` transaction from the pinned
+  ARM64 input. Final artifact: `257368312` bytes, SHA-256
+  `bfadb150ede98afbf8c1cc48425c818f2069ab597c6b3c71407f8417f34b1bfb`.
+  The input hash is recorded, but the original upstream source/checksum record
+  is absent, so provenance remains incomplete.
+- Deepin has a completed `apt` transaction from the pinned ARM64 input. Final
+  artifact: `361955764` bytes, SHA-256
+  `2cf02cd46e6c694a5d7aa699048a640a03ccd93cfff9f438ed0f215d02e665d4`.
+  The input hash is recorded, but the original upstream source/checksum record
+  is absent, so provenance remains incomplete.
+- Manjaro has a completed `pacman` transaction from the official ARM64 input.
+  Final artifact: `420512736` bytes, SHA-256
+  `59ef6613c1e9e3ea63660ba893b49c100d2eb770163759f6b044dd7c75d88e0a`.
+- Kali has a completed `apt` transaction from the official ARM64 input. Final
+  artifact: `436929732` bytes, SHA-256
+  `562696884422db47c19db561004b6981f9578677cb627ae3d716ad2979e8febe`.
+- Parrot has a completed `apt` transaction from the pinned ARM64 input. Final
+  artifact: `418086052` bytes, SHA-256
+  `fb9a58929ab0c790f5e1c03829a5fae481ec282c2dd23e24b174c3314818b55a`.
+  The input hash is recorded, but the original upstream source/checksum record
+  is absent, so provenance remains incomplete.
+- Arch Linux ARM has a completed `pacman` transaction from the official ARM64
+  input. Final artifact: `469977908` bytes, SHA-256
+  `fb5757ab558b420ca0a5bef3f5a6f9259d3456a3b37f60be052cf221d19de9ca`.
+- Fedora's retry disabled the optional Cisco OpenH264 repository/package to
+  avoid its unavailable mirror content, then completed the targeted package
+  transaction. Handoff occurred before final validation and archive creation;
+  no Fedora output sidecar is accepted.
 - `scripts/play_rootfs/manifests.json` and
   `scripts/play_rootfs/build_play_rootfs.py` define the shared build/validation
   framework for Debian, Alpine, Fedora, Void, openSUSE, Chimera, Deepin,
   Manjaro, Ubuntu, Kali, Parrot, and Arch. The current validator result is:
-  Alpine, Void, Chimera, and Ubuntu **PASS**; Debian **FAIL** for incomplete
-  provenance; Fedora, openSUSE, Deepin, Manjaro, Kali, Parrot, and Arch
-  **FAIL** because their build-time provenance sidecars are missing.
+  Alpine, Void, Chimera, Manjaro, Ubuntu, Kali, and Arch **PASS**; Debian,
+  openSUSE, Deepin, and Parrot **FAIL** for incomplete upstream provenance;
+  Fedora **FAIL** because its final archive/sidecar is missing.
 - The generic builder now records the actual pinned input archive/hash and
   upstream source/hash for each transaction. Its container validation requires
   the Flux marker/package lock, package database, XFCE/dbus baseline, `/home/flux`,
@@ -218,6 +249,8 @@ Passed:
 - `scripts/verify_bootstrap.sh`
 - `scripts/build_alpine_play_baseline.sh` with a real `apk` transaction and
   complete provenance sidecar
+- shared ARM64 baseline builder transactions for Debian, Void, openSUSE,
+  Chimera, Deepin, Manjaro, Ubuntu, Kali, Parrot, and Arch
 - `scripts/build_termux_terminal_native_16k.sh`
 - `scripts/rebuild_proot_loader_16k.sh`
 - `scripts/verify_apk_host_assets.sh` on the refreshed Ivarna debug APK
@@ -234,9 +267,9 @@ Passed:
 
 Expected/recorded failures in this pass:
 
-- `scripts/verify_play_rootfs_provenance.py`: Alpine, Void, Chimera, and
-  Ubuntu pass; Debian lacks upstream source/hash; Fedora, openSUSE, Deepin,
-  Manjaro, Kali, Parrot, and Arch lack build sidecars.
+- `scripts/verify_play_rootfs_provenance.py`: Alpine, Void, Chimera, Manjaro,
+  Ubuntu, Kali, and Arch pass; Debian, openSUSE, Deepin, and Parrot lack
+  upstream source/hash; Fedora lacks a final archive/sidecar.
 - `scripts/prepare_play_payloads.py --verify-only`: refuses Debian because
   provenance is incomplete.
 - `./gradlew --no-daemon test`: stops at `:app:preparePlayPayloads` refusing
