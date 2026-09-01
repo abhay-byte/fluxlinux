@@ -2,6 +2,8 @@ package com.ivarna.fluxlinux.core.utils
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.ivarna.fluxlinux.core.terminal.TermuxHostPaths
 import java.io.File
@@ -29,6 +31,7 @@ object EmbeddedX11 {
     enum class State { STOPPED, STARTING, RUNNING, STOPPING }
 
     private val lifecycleLock = Any()
+    private val main = Handler(Looper.getMainLooper())
     @Volatile private var lifecycleState = State.STOPPED
     @Volatile private var serverThread: Thread? = null
 
@@ -53,7 +56,11 @@ object EmbeddedX11 {
                         com.termux.x11.CmdEntryPoint.setXkbConfigRoot(xkbRoot.absolutePath)
                     }
                     val status = com.termux.x11.CmdEntryPoint.main(
-                        arrayOf(":0", "-legacy-drawing")
+                        // The server and all guest clients share the app-private
+                        // X11 socket; no external TCP listener is exposed.
+                        // Disable X cookie/host access checks so PRoot clients
+                        // can connect through that shared socket.
+                        arrayOf(":0", "-ac", "-legacy-drawing")
                     ) {
                         synchronized(lifecycleLock) { lifecycleState = State.RUNNING }
                         Log.i(TAG, "Embedded X11 native server started")
@@ -72,6 +79,10 @@ object EmbeddedX11 {
             serverThread = thread
             return try {
                 thread.start()
+                main.post {
+                    if (lifecycleState != State.STOPPED)
+                        com.termux.x11.CmdEntryPoint.startFrameCallbacks()
+                }
                 true
             } catch (e: Exception) {
                 lifecycleState = State.STOPPED

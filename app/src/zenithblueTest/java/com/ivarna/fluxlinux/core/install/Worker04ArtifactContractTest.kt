@@ -40,6 +40,13 @@ class Worker04ArtifactContractTest {
         val gui = repoFile("src/main/assets/scripts/debian/proot/start/start_gui.sh").readText()
         assertTrue(gui.contains("FLUX_EMBEDDED_X11"))
         assertTrue(gui.contains("X server PID=embedded"))
+        assertTrue(gui.contains("Keep its live :0 socket and lock"))
+        assertTrue(gui.contains("dbus-uuidgen | head -c 32 > /etc/machine-id"))
+        assertTrue(gui.contains("umask 077"))
+        assertTrue(gui.contains("AM_CMD=/system/bin/am"))
+        assertTrue(gui.contains("env DISPLAY=:0 XDG_SESSION_TYPE=x11"))
+        assertTrue(gui.contains("dbus-run-session -- xfce4-session"))
+        assertFalse(gui.contains("dbus-run-session -- startxfce4"))
         assertFalse(gui.contains("/system/bin/app_process"))
         assertFalse(gui.contains("loader.apk"))
 

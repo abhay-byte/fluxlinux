@@ -4,12 +4,12 @@ Last updated: 2026-09-01
 
 ## Result
 
-**PARTIAL.** The host-prefix, source/artifact cleanup, DNS boundary, local-only
-Play setup path, real ARM64 package transactions, and native 16 KB compatibility
-contracts pass. The 04R closure below accepts seven release-backed Play distro
-modules; Fedora, Void, openSUSE, Deepin, and Parrot remain deferred. The common
-Ivarna provider and source directories remain unchanged in behavior. Worker 05
-remains pending.
+**PASS for the 04R fast release closure.** The host-prefix, source/artifact
+cleanup, DNS boundary, local-only Play setup path, real ARM64 package
+transactions, native 16 KB compatibility contracts, and device closure pass.
+The closure accepts seven release-backed Play distro modules; Fedora, Void,
+openSUSE, Deepin, and Parrot remain deferred. The common Ivarna provider and
+source directories remain unchanged in behavior. Worker 05 remains pending.
 
 The next worker remains pending and was not started:
 
@@ -45,11 +45,13 @@ estimated base-plus-feature total below 3.5 GiB. The largest module is Arch at
 The final Zenithblue release artifacts were verified as follows:
 
 - AAB: `app/build/outputs/bundle/zenithblueRelease/app-zenithblue-release.aab`
-  (SHA-256
-  `d595a9277a5393a7876d77d7a2f297220e89b257187d2d9b9ced020f712fd797`).
+  (2,722,514,163 bytes; SHA-256
+  `192f9ce0fe3480a1cfbf439d8746822028c869590cb8ba57fce16ec9681afffa`).
 - Bundletool 1.18.3 local-testing APKS were generated from that AAB and passed
   the logical-module verifier: base plus eight on-demand modules, with deferred
-  modules absent and no base bootstrap/rootfs/loader payload.
+  modules absent and no base bootstrap/rootfs/loader payload. The APKS artifact
+  is 5,608,106,346 bytes with SHA-256
+  `9fb12cbe9fb3f751ae9f4f9968a9cbff4dc49148a8e5cb21a26108575cd6805d`.
 - Host asset, Play host artifact, runtime-script, and 16 KiB ELF/page-alignment
   verifiers pass. The full Gradle test task and forced Zenithblue debug/release
   builds pass. Gradle daemons were stopped and confirmed absent after each
@@ -65,12 +67,17 @@ With Wi-Fi and mobile data disabled on this device only, an Alpine PRoot shell
 printed `PocoOfflinePass`; networking was restored afterward.
 
 The native X11 handoff was corrected to pass the app-private shared `TMPDIR`
-and guest XKB root into the embedded native server. On the Poco run, logs show
-the server using `/data/data/com.zenithblue.fluxlinux/files/usr/tmp`, starting
-successfully, and launching the same-package X11 activity. `xkbcomp` emitted
-only nonfatal duplicate-symbol warnings. A complete visible XFCE session and
-start/stop/restart lifecycle are not claimed here because the tested XFCE
-session subsequently exited; this remains a follow-up validation item.
+and guest XKB root into the embedded native server. The frame callback is
+started from Android's main Looper, and root-buffer publication follows RandR
+resize so the renderer uses the current screen dimensions. On the Poco run,
+logs show the server using `/data/data/com.zenithblue.fluxlinux/files/usr/tmp`,
+starting successfully, launching the same-package X11 activity, and running
+the XFCE session with Pulse available. `xkbcomp` emitted only nonfatal
+duplicate-symbol warnings. The visible XFCE desktop was captured; Stop
+released the `X0` socket and a subsequent clean start recreated the socket and
+reconnected to a visible XFCE desktop. The offline pass also reached the
+visible desktop with Wi-Fi and mobile data disabled; its host log recorded an
+audio-supervisor warning, while the desktop remained local-only and usable.
 
 An earlier Alpine theme step also logged the optional warning `tar exit 127`
 because `xz` was unavailable; Alpine installation itself completed.

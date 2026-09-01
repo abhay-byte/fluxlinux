@@ -210,6 +210,8 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
     public static native void setTmpDir(String path);
     /** Supply the app-private XKB tree to the embedded native server. */
     public static native void setXkbConfigRoot(String path);
+    /** Start frame callbacks from a Looper that is actively being pumped. */
+    public static native void startFrameCallbacks();
     private static native int waitForServer();
     public static native void stop();
     public native ParcelFileDescriptor getXConnection();
@@ -224,7 +226,11 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         } catch (Exception e) {
             Log.e("CmdEntryPoint", "Something went wrong when preparing MainLooper", e);
         }
-        handler = new Handler();
+        // EmbeddedX11 initializes this class from its server thread. The
+        // server thread blocks in waitForServer() and never enters a Looper,
+        // so delayed ACTION_START broadcasts must run on Android's main
+        // Looper where MainActivity can receive them.
+        handler = new Handler(Looper.getMainLooper());
         ctx = createContext();
 
         try {

@@ -35,8 +35,14 @@ mkdir -p "$PULSE_RUNTIME_PATH" 2>/dev/null
 pkill -f "virgl_test_server" 2>/dev/null || true
 sleep 2
 # Stale UNIX sockets make the embedded X11 server fail with "server already running"
-rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" \
-  "$TMPDIR/.X11-unix/X0" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
+if [ "${FLUX_EMBEDDED_X11:-0}" = "1" ]; then
+  # DesktopLauncher starts the in-process server before this host script.
+  # Keep its live :0 socket and lock; only clear the unused secondary display.
+  rm -f "$TMPDIR/.X1-lock" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
+else
+  rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" \
+    "$TMPDIR/.X11-unix/X0" "$TMPDIR/.X11-unix/X1" 2>/dev/null || true
+fi
 # PREFIX/tmp must stay app_data_file. A leftover tmpfs:s0 label (older chroot
 # start used chcon -R tmpfs) makes mkdir .X11-unix, the X lock, and dbus
 # sockets fail with Permission denied under enforcing SELinux.
@@ -94,10 +100,12 @@ sleep 3
 
 # Open X11 display activity in our app
 echo "FluxLinux: Launching X11 display activity..."
-am start -n "$PKG/com.termux.x11.MainActivity" \
+AM_CMD=/system/bin/am
+[ -x "$AM_CMD" ] || AM_CMD=am
+"$AM_CMD" start -n "$PKG/com.termux.x11.MainActivity" \
   --activity-single-top \
   --activity-clear-top 2>/dev/null || \
-am start -n "$PKG/com.termux.x11.MainActivity" 2>/dev/null
+"$AM_CMD" start -n "$PKG/com.termux.x11.MainActivity" 2>/dev/null
 sleep 1
 
 # Verify guest setup
@@ -163,6 +171,9 @@ else
     # Runtime dir must be 700 *and* writable by flux. /tmp/runtime-flux lives on
     # --shared-tmp (host PREFIX/tmp, app uid) so guest flux cannot chmod/chown it.
     export XDG_RUNTIME_DIR=/home/flux/.cache/runtime
+    umask 077
+    # Remove a stale D-Bus service directory left by an interrupted session.
+    rm -rf "$XDG_RUNTIME_DIR/dbus-1" 2>/dev/null || true
     mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
     mkdir -p /tmp/.ICE-unix && chmod 1777 /tmp/.ICE-unix
 
@@ -192,6 +203,11 @@ else
     # dbus machine-id (session bus soft-depends on it on some builds)
     if command -v dbus-uuidgen >/dev/null 2>&1; then
       dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null || true
+      # Alpine libdbus expects exactly 32 hexadecimal bytes here; some
+      # minirootfs images ship the otherwise-common trailing newline.
+      if [ "$(wc -c < /etc/machine-id 2>/dev/null || echo 0)" -ne 32 ]; then
+        dbus-uuidgen | head -c 32 > /etc/machine-id 2>/dev/null || true
+      fi
       mkdir -p /var/lib/dbus
       if [ ! -e /var/lib/dbus/machine-id ]; then
         ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || \
@@ -271,6 +287,10 @@ BWRAP_EOF
       unset DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID DBUS_SESSION_BUS_WINDOWID
       export DISPLAY=:0
       export PULSE_SERVER=tcp:127.0.0.1
+      export XDG_SESSION_TYPE=x11
+      export XDG_SESSION_DESKTOP=xfce
+      export DESKTOP_SESSION=xfce
+      export XDG_CURRENT_DESKTOP=XFCE
       export XDG_CONFIG_DIRS=/etc/xdg
       export XDG_DATA_DIRS=/usr/local/share:/usr/share
       export HOME=/home/flux
@@ -278,6 +298,7 @@ BWRAP_EOF
       export XDG_CACHE_HOME=/home/flux/.cache
       export XDG_DATA_HOME=/home/flux/.local/share
       export XDG_RUNTIME_DIR=/home/flux/.cache/runtime
+      umask 077
       mkdir -p /home/flux/.config /home/flux/.cache /home/flux/.local/share
       mkdir -p \"\$XDG_RUNTIME_DIR\" && chmod 700 \"\$XDG_RUNTIME_DIR\"
       export VTEST_SOCKET_NAME=/tmp/.virgl_test
@@ -306,9 +327,19 @@ BWRAP_EOF
         fi
       fi
       if command -v dbus-run-session >/dev/null 2>&1; then
-        exec dbus-run-session -- startxfce4
+        # The embedded X server already owns DISPLAY=:0.  startxfce4 is an
+        # xinit wrapper and deliberately refuses an existing display, then
+        # falls through to xinitrc (which may require the optional xrdb
+        # helper).  Start the session manager directly inside a fresh D-Bus
+        # session so it connects to the in-process server.
+        exec env DISPLAY=:0 XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=XFCE \
+          dbus-run-session -- xfce4-session
       else
-        exec dbus-launch --exit-with-session startxfce4
+        if command -v dbus-launch >/dev/null 2>&1; then
+          exec env DISPLAY=:0 XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=XFCE \
+            dbus-launch --exit-with-session xfce4-session
+        fi
+        exec env DISPLAY=:0 XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=XFCE xfce4-session
       fi
     "
   '

@@ -42,6 +42,7 @@ static pthread_t xserver_thread;
 static bool xserver_joinable = false;
 static pthread_mutex_t xserver_mutex = PTHREAD_MUTEX_INITIALIZER;
 static std::atomic_bool xserver_running(false);
+static std::atomic_bool frame_callbacks_active(false);
 static std::atomic_int xserver_status(0);
 __LIBC_HIDDEN__ volatile int conn_fd = -1;
 extern DeviceIntPtr lorieMouse, lorieTouch, lorieKeyboard, loriePen, lorieEraser;
@@ -204,10 +205,6 @@ Java_com_termux_x11_CmdEntryPoint_start(JNIEnv *env, __unused jclass cls, jobjec
         return JNI_FALSE;
     }
 
-    AChoreographer *choreographer = AChoreographer_getInstance();
-    // Trigger it first time
-    AChoreographer_postFrameCallback(choreographer, (AChoreographer_frameCallback) lorieChoreographerFrameCallback, choreographer);
-
     xorg_list_init(&registeredBuffers);
     pthread_mutex_lock(&xserver_mutex);
     if (xserver_running.load()) {
@@ -261,6 +258,29 @@ Java_com_termux_x11_CmdEntryPoint_setXkbConfigRoot(
     }
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_termux_x11_CmdEntryPoint_startFrameCallbacks(__unused JNIEnv *env, __unused jclass clazz) {
+    lorieStartFrameCallbacks();
+}
+
+void lorieStartFrameCallbacks(void) {
+    bool expected = false;
+    if (!frame_callbacks_active.compare_exchange_strong(expected, true))
+        return;
+    AChoreographer *choreographer = AChoreographer_getInstance();
+    if (choreographer)
+        AChoreographer_postFrameCallback(choreographer,
+                (AChoreographer_frameCallback) lorieChoreographerFrameCallback, choreographer);
+}
+
+void lorieStopFrameCallbacks(void) {
+    frame_callbacks_active.store(false);
+}
+
+bool lorieFrameCallbacksActive(void) {
+    return frame_callbacks_active.load();
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_termux_x11_CmdEntryPoint_waitForServer(__unused JNIEnv *env, __unused jclass clazz) {
     pthread_t thread;
@@ -278,11 +298,13 @@ Java_com_termux_x11_CmdEntryPoint_waitForServer(__unused JNIEnv *env, __unused j
     xserver_joinable = false;
     xserver_running.store(false);
     pthread_mutex_unlock(&xserver_mutex);
+    lorieStopFrameCallbacks();
     return static_cast<jint>(reinterpret_cast<intptr_t>(result));
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_termux_x11_CmdEntryPoint_stop(__unused JNIEnv *env, __unused jclass clazz) {
+    lorieStopFrameCallbacks();
     if (!xserver_running.load())
         return;
     // GiveUp is Xorg's own shutdown path: it wakes Dispatch, closes clients,

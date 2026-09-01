@@ -537,7 +537,8 @@ static Bool lorieRedraw(__unused ClientPtr pClient, __unused void *closure) {
     }
 
     if (pvfb->state->drawRequested || pvfb->state->cursor.moved || pvfb->state->cursor.updated) {
-        pvfb->state->rootWindowTextureID = LorieBuffer_description(priv->buffer)->id;
+        const LorieBuffer_Desc *desc = LorieBuffer_description(priv->buffer);
+        pvfb->state->rootWindowTextureID = desc->id;
 
         // Sending signal about pending root window changes to renderer thread.
         // We do not explicitly lock the pvfb->state->lock here because we do not want to wait
@@ -662,7 +663,15 @@ static Bool lorieRRScreenSetSize(ScreenPtr pScreen, CARD16 width, CARD16 height,
         pScreen->DestroyPixmap(oldPixmap);
     }
 
-    lorieRegisterBuffer(LORIE_BUFFER_FROM_PIXMAP(pScreenPtr->devPrivate));
+    // The renderer may still be holding the previous root texture while the
+    // RandR resize replaces the screen pixmap. Publish the new root buffer
+    // together with the resize so it stops rejecting the old dimensions.
+    LorieBuffer *newBuffer = LORIE_BUFFER_FROM_PIXMAP(pScreenPtr->devPrivate);
+    lorieRegisterBuffer(newBuffer);
+    if (newBuffer) {
+        pvfb->state->rootWindowTextureID = LorieBuffer_description(newBuffer)->id;
+        pvfb->state->drawRequested = TRUE;
+    }
 
     pScreen->ResizeWindow(pScreen->root, 0, 0, width, height, NULL);
     RegionReset(&pScreen->root->winSize, &box);
@@ -729,6 +738,8 @@ static void lorieWorkingQueueCallback(int fd, int __unused ready, void __unused 
 }
 
 void lorieChoreographerFrameCallback(__unused long t, AChoreographer* d) {
+    if (!lorieFrameCallbacksActive())
+        return;
     AChoreographer_postFrameCallback(d, (AChoreographer_frameCallback) lorieChoreographerFrameCallback, d);
     if (pScreenPtr) {
         QueueWorkProc(lorieRedraw, NULL, NULL);
@@ -1017,7 +1028,7 @@ void lorieGpuCopyAck(PixmapPtr pixmap, void *dst_buffer) {
 
 Bool loriePresentFlip(__unused RRCrtcPtr crtc, __unused uint64_t event_id, __unused uint64_t target_msc, PixmapPtr pixmap, __unused Bool sync_flip) {
     LoriePixmapPriv* priv = (LoriePixmapPriv*) exaGetPixmapDriverPrivate(pixmap);
-    if (!priv || !priv->buffer || priv->mem || pvfb->root.width != pixmap->drawable.width || pvfb->root.width != pixmap->drawable.height)
+    if (!priv || !priv->buffer || priv->mem || pvfb->root.width != pixmap->drawable.width || pvfb->root.height != pixmap->drawable.height)
         return FALSE;
 
     const LorieBuffer_Desc *desc = LorieBuffer_description(priv->buffer);

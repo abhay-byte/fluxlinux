@@ -61,6 +61,8 @@ object DesktopLauncher {
     @Volatile private var guiUserStopping: Boolean = false
     @Volatile private var guiX11Launched: Boolean = false
     @Volatile private var startInFlight: Boolean = false
+    @Volatile private var stopInFlight: Boolean = false
+    @Volatile private var operationGeneration: Long = 0L
     private val healthyLineSeen = AtomicBoolean(false)
     /** Ensures [onResult] is invoked at most once per start. */
     private val startResultDelivered = AtomicBoolean(false)
@@ -102,6 +104,12 @@ object DesktopLauncher {
      */
     fun start(ctx: Context, distroId: String, onResult: ((Boolean) -> Unit)? = null) {
         val app = ctx.applicationContext
+
+        if (stopInFlight) {
+            toast(app, "Desktop is still stopping — try again shortly")
+            onResult?.invoke(false)
+            return
+        }
 
         val existing = DesktopSessionQuery.current(app, _ui.value)
         if (existing != null && existing.distroId != distroId) {
@@ -220,6 +228,7 @@ object DesktopLauncher {
             }
         }
 
+        val startGeneration = ++operationGeneration
         guiShellJob?.cancel()
         guiUserStopping = false
         guiX11Launched = false
@@ -278,6 +287,7 @@ object DesktopLauncher {
                 }
             },
             onDone = { code ->
+                if (startGeneration != operationGeneration) return@runStreamedCancelable
                 GuiDesktopLog.append(app, "[exit $code]")
                 appendLive("[exit $code]")
                 when {
@@ -304,10 +314,13 @@ object DesktopLauncher {
     fun stop(ctx: Context, distroId: String, onDone: (() -> Unit)? = null) {
         val app = ctx.applicationContext
         val method = methodFor(distroId)
+        val stopGeneration = ++operationGeneration
+        stopInFlight = true
         guiUserStopping = true
         startInFlight = false
 
         if (method == "chroot" && !PayloadProviders.androidRoot.enabled) {
+            stopInFlight = false
             StateManager.setGuiRunning(app, distroId, false)
             StateManager.setGuiRunningType(app, distroId, "")
             onDone?.invoke()
@@ -329,6 +342,7 @@ object DesktopLauncher {
         appendLive("=== STOP method=$method script=$scriptName ===")
 
         if (!script.isFile) {
+            stopInFlight = false
             GuiDesktopLog.append(app, "WARN: stop script missing ${script.absolutePath}")
             appendLive("WARN: stop script missing")
             _ui.update {
@@ -363,6 +377,8 @@ object DesktopLauncher {
                     appendLive(line)
                 },
                 onDone = { code ->
+                    if (stopGeneration != operationGeneration) return@runStreamedCancelable
+                    stopInFlight = false
                     GuiDesktopLog.append(app, "[exit $code]")
                     appendLive("[exit $code]")
                     _ui.update {

@@ -694,8 +694,12 @@ void Renderer::refreshContext() {
     eglSwapInterval(egl_display, 0);
 
     // We should redraw image at least once right after surface change
-    if (state)
+    if (state) {
         state->surfaceAvailable = state->drawRequested = state->cursor.updated = win != defaultWin;
+        // A new Android surface needs a complete redraw even when the previous
+        // surface had already completed its frame and set this wait latch.
+        state->waitForNextFrame = false;
+    }
 
     glViewport(0, 0, ANativeWindow_getWidth(win), ANativeWindow_getHeight(win));
     log("Xlorie: new surface applied: %p\n", sfc);
