@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -113,6 +114,17 @@ test -e "/work/rootfs$package_db"
 for required in /bin/sh /usr/bin/startxfce4 /usr/bin/dbus-daemon /usr/bin/xfce4-session /usr/bin/xfwm4 /usr/bin/xfce4-panel /usr/bin/xfdesktop /usr/bin/thunar /etc/fluxlinux/play-baseline-v1; do
   test -e "/work/rootfs$required" || { echo "missing required $required" >&2; exit 1; }
 done
+test -e /work/rootfs/home/flux
+test -e /work/rootfs/usr/bin/pactl
+test -e /work/rootfs/usr/lib/libpulse.so.0 || \
+  test -e /work/rootfs/usr/lib/aarch64-linux-gnu/libpulse.so.0 || \
+  test -e /work/rootfs/usr/lib64/pulseaudio/libpulse.so.0
+test -e /work/rootfs/usr/lib/libGL.so.1 || \
+  test -e /work/rootfs/usr/lib/aarch64-linux-gnu/libGL.so.1 || \
+  test -e /work/rootfs/usr/lib64/libGL.so.1
+test -e /work/rootfs/etc/ssl/certs/ca-certificates.crt || \
+  test -e /work/rootfs/etc/pki/tls/certs/ca-bundle.crt || \
+  test -e /work/rootfs/etc/ssl/ca-bundle.pem
 grep -q '^schema=1$' /work/rootfs/etc/fluxlinux/play-baseline-v1
 test -s /work/rootfs/etc/fluxlinux/play-baseline-packages.lock
 apk add --no-cache tar xz >/dev/null
@@ -181,10 +193,12 @@ def main() -> int:
         builder_id = "unknown"
 
     for entry in entries:
-        source = (args.source_root / entry["archive"]).resolve()
+        input_archive = entry.get("inputArchive", entry["archive"])
+        input_sha256 = entry.get("inputSha256", entry["sha256"])
+        source = (args.source_root / input_archive).resolve()
         if not source.is_file():
             raise SystemExit(f"missing input {source}")
-        if sha256(source) != entry["sha256"]:
+        if sha256(source) != input_sha256:
             raise SystemExit(f"input SHA-256 mismatch for {source}")
         output = (args.output_dir / entry["archive"]).resolve()
         if entry.get("builder") == "alpine_apk_transaction":
@@ -196,17 +210,21 @@ def main() -> int:
             "payloadVersion": manifest["payloadVersion"],
             "distroId": entry["id"],
             "architecture": manifest["architecture"],
-            "upstreamSource": None,
-            "upstreamSha256": None,
-            "inputArchive": entry["archive"],
-            "inputArchiveSha256": entry["sha256"],
+            "upstreamSource": entry.get("upstreamSource"),
+            "upstreamSha256": entry.get("upstreamSha256"),
+            "inputArchive": input_archive,
+            "inputArchiveSha256": input_sha256,
             "packageManager": entry["packageManager"],
             "packageTransaction": "maintainer aarch64 chroot transaction using the distro family script",
             "packageDatabase": entry["packageDb"],
             "builderImage": args.image,
             "builderImageId": builder_id,
             "sourceCommit": commit,
-            "buildDate": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "buildDate": (
+                datetime.fromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]), timezone.utc)
+                if os.environ.get("SOURCE_DATE_EPOCH")
+                else datetime.now(timezone.utc)
+            ).isoformat().replace("+00:00", "Z"),
             "archiveFileName": output.name,
             "archiveSha256": sha256(output),
             "compressedSize": output.stat().st_size,
