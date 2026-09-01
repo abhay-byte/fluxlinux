@@ -5,14 +5,12 @@ Prove the exact `zenithblue` AAB is technically sound, upgrades safely, receives
 
 ## Inherited Worker 04 release blocker
 
-The inspected arm64 base APK produced Android's exact warning: **“This app
-isn’t 16 KB compatible. ELF alignment check failed.”** Affected libraries and
-first `LOAD` alignments were:
-
-`libtermux.so=0x1000`, `libpulseaudio.so=0x4000`, `libproot.so=0x4000`,
-`libpactl.so=0x4000`, `libloader32.so=0x1000`, `libloader.so=0x4000`,
-`libbash.so=0x4000`, `libandroidx.graphics.path.so=0x4000`, and
-`libXlorie.so=0x4000`.
+Worker 04 added `scripts/verify_16k_page_compat.sh`, which audits every arm64
+ELF `LOAD` segment, APK ZIP page alignment, and AAB bundletool configuration.
+The inspected APK has two blockers: `libloader32.so` is ELF32 with
+`0x1000,0x1000,0x1000` `LOAD` alignments, and `libtermux.so` is ELF64 with
+`0x1000,0x1000`; all other inspected libraries have `0x4000` alignment. The
+APK ZIP check passes, but bundletool was unavailable in this environment.
 
 This is a release blocker for Worker 10. The exact tested AAB cannot be
 accepted for release until every affected library is rebuilt or supplied with

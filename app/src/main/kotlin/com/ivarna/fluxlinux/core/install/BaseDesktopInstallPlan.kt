@@ -2,6 +2,7 @@ package com.ivarna.fluxlinux.core.install
 
 import android.content.Context
 import android.util.Base64
+import com.ivarna.fluxlinux.BuildConfig
 import com.ivarna.fluxlinux.core.data.Distro
 import com.ivarna.fluxlinux.core.data.DistroRepository
 import com.ivarna.fluxlinux.core.data.ScriptManager
@@ -53,7 +54,16 @@ object BaseDesktopInstallPlan {
         val profile = DistroInstallProfile.forId(distroId)
             ?: DistroInstallProfile.require("debian")
         val sm = ScriptManager(ctx)
-        val family = sm.getScriptContent(profile.familyScript)
+        // Play family setup is one shared local-only finalizer. The normal
+        // family scripts remain available to Ivarna, but must not be selected
+        // by the Play onboarding path because they provision through distro
+        // repositories at runtime.
+        val familyScript = if (BuildConfig.FLAVOR == "zenithblue") {
+            "common/setup/play_family_local_only.sh"
+        } else {
+            profile.familyScript
+        }
+        val family = sm.getScriptContent(familyScript)
         val common = runCatching {
             sm.getScriptContent("common/setup/flux_guest_common.sh")
         }.getOrDefault("")

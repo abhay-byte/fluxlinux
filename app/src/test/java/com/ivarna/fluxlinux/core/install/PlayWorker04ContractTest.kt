@@ -25,7 +25,19 @@ class PlayWorker04ContractTest {
     @Test
     fun playCustomizationAssetsContainNoRemoteInstallers() {
         val paths = listOf(
+            "src/zenithblue/assets/scripts/common/setup/play_family_local_only.sh",
+            "src/zenithblue/assets/scripts/debian/common/setup/setup_debian_family.sh",
             "src/zenithblue/assets/scripts/alpine/common/setup/setup_alpine_family.sh",
+            "src/zenithblue/assets/scripts/fedora/common/setup/setup_fedora_family.sh",
+            "src/zenithblue/assets/scripts/void/common/setup/setup_void_family.sh",
+            "src/zenithblue/assets/scripts/opensuse/common/setup/setup_opensuse_family.sh",
+            "src/zenithblue/assets/scripts/chimera/common/setup/setup_chimera_family.sh",
+            "src/zenithblue/assets/scripts/deepin/common/setup/setup_deepin_family.sh",
+            "src/zenithblue/assets/scripts/manjaro/common/setup/setup_manjaro_family.sh",
+            "src/zenithblue/assets/scripts/ubuntu/common/setup/setup_ubuntu_family.sh",
+            "src/zenithblue/assets/scripts/kali/common/setup/setup_kali_family.sh",
+            "src/zenithblue/assets/scripts/parrot/common/setup/setup_parrot_family.sh",
+            "src/zenithblue/assets/scripts/arch/common/setup/setup_arch_family.sh",
             "src/zenithblue/assets/scripts/alpine/common/setup/setup_customization_alpine.sh",
             "src/zenithblue/assets/scripts/debian/common/setup/setup_customization_debian.sh",
             "src/zenithblue/assets/scripts/debian/common/setup/setup_customization_kde_debian.sh",
@@ -59,5 +71,25 @@ class PlayWorker04ContractTest {
         ).readText()
         assertTrue(text.contains("play-baseline-v1"))
         assertTrue(text.contains("refusing runtime package-network customization"))
+    }
+
+    @Test
+    fun playFamilySelectionUsesTheSharedLocalOnlyFinalizer() {
+        val plan = repoFile(
+            "src/main/kotlin/com/ivarna/fluxlinux/core/install/BaseDesktopInstallPlan.kt"
+        ).readText()
+        assertTrue(plan.contains("common/setup/play_family_local_only.sh"))
+        assertTrue(plan.contains("BuildConfig.FLAVOR == \"zenithblue\""))
+    }
+
+    @Test
+    fun allTwelvePlayDistroModulesHaveBuilderManifests() {
+        val manifest = repoFile("scripts/play_rootfs/manifests.json").readText()
+        listOf(
+            "debian", "alpine", "fedora", "void", "opensuse", "chimera",
+            "deepin", "manjaro", "ubuntu", "kali", "parrot", "archlinux"
+        ).forEach { assertTrue("missing $it", manifest.contains("\"id\": \"$it\"")) }
+        assertTrue(repoFile("scripts/play_rootfs/build_play_rootfs.py").isFile)
+        assertTrue(repoFile("scripts/verify_play_rootfs_provenance.py").isFile)
     }
 }

@@ -52,8 +52,8 @@ _flux_ensure_tmp() {
 
 _flux_ensure_dns() {
     # Android supplies a comma-separated list from the active validated
-    # LinkProperties. Prefer it over rootfs/public DNS and write only numeric
-    # addresses so malformed inherited environment cannot become shell code.
+    # LinkProperties. Use it only when it is non-empty. An unavailable Android
+    # resolver must not overwrite a usable resolver already in the guest.
     if [ -n "${FLUX_DNS_SERVERS:-}" ]; then
         _flux_dns_tmp="/etc/resolv.conf.flux.$$"
         : > "$_flux_dns_tmp"
@@ -69,7 +69,15 @@ _flux_ensure_dns() {
         if [ -s "$_flux_dns_tmp" ]; then
             if ! cmp -s "$_flux_dns_tmp" /etc/resolv.conf 2>/dev/null; then
                 _flux_log "Writing Android active-network DNS to /etc/resolv.conf"
-                mv -f "$_flux_dns_tmp" /etc/resolv.conf
+                # resolv.conf can be a bind mount supplied by the host. A
+                # rename is rejected for such a mount, while a write keeps
+                # the guest-visible resolver update possible.
+                if cat "$_flux_dns_tmp" > /etc/resolv.conf; then
+                    rm -f "$_flux_dns_tmp"
+                else
+                    _flux_log "Unable to write Android DNS; preserving guest resolver"
+                    rm -f "$_flux_dns_tmp"
+                fi
             else
                 rm -f "$_flux_dns_tmp"
             fi
@@ -77,10 +85,35 @@ _flux_ensure_dns() {
         fi
         rm -f "$_flux_dns_tmp"
     fi
-    if [ ! -s /etc/resolv.conf ] || ! grep -q nameserver /etc/resolv.conf 2>/dev/null; then
-        _flux_log "Android DNS unavailable; using final public DNS fallback"
-        printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 8.8.4.4\n' > /etc/resolv.conf
+
+    # Treat only a numeric nameserver as usable. This keeps a malformed or
+    # comment-only resolver file from suppressing the final fallback while
+    # keeping the check available in the minimal BusyBox guests.
+    if [ -s /etc/resolv.conf ] && command -v awk >/dev/null 2>&1 &&
+        awk '
+            function valid4(s, n, a, i) {
+                n = split(s, a, ".")
+                if (n != 4) return 0
+                for (i = 1; i <= n; i++)
+                    if (a[i] !~ /^[0-9]+$/ || a[i] + 0 > 255) return 0
+                return 1
+            }
+            function valid6(s) { return s ~ /:/ && s !~ /[^0-9A-Fa-f:.%]/ }
+            $1 == "nameserver" && (valid4($2) || valid6($2)) { found = 1 }
+            END { exit(found ? 0 : 1) }
+        ' /etc/resolv.conf; then
+        _flux_log "Android DNS unavailable; preserving existing guest resolver"
+        return 0
     fi
+
+    if ! command -v awk >/dev/null 2>&1 && [ -s /etc/resolv.conf ] &&
+        grep -qE '^[[:space:]]*nameserver[[:space:]]+[0-9A-Fa-f:.%]+([[:space:]]|$)' /etc/resolv.conf 2>/dev/null; then
+        _flux_log "Android DNS unavailable; preserving existing guest resolver"
+        return 0
+    fi
+
+    _flux_log "Android DNS unavailable; using final public DNS fallback"
+    printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 8.8.4.4\n' > /etc/resolv.conf
 }
 
 _flux_ensure_dbus() {

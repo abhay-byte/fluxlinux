@@ -28,7 +28,7 @@ object PlayPayloadRegistry {
     const val PAYLOAD_VERSION = "2.0.0"
     const val ARCHITECTURE = "arm64-v8a"
     const val ALPINE_PLAY_BASELINE_SHA256 =
-        "da25146101274ce944472380285f09b96583dcb6093cdf57058ef2648b5f75d7"
+        "88714e4cc1637cdad5916200c5ac5b72c506506dd33166a12a0a58635618724c"
     val runtimeHost = PlayFeaturePayloadSpec(
         moduleName = "runtime_host",
         payloadId = "host_bootstrap_com.zenithblue.fluxlinux",

@@ -40,7 +40,7 @@ SCHEMA_VERSION = 1
 # upstream checksum is represented as null, never invented.
 ROOTFS = [
     ("distro_debian", "rootfs.debian", "debian", "debian_13_rootfs.tar.xz", "13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803", 50 * 1024 * 1024, "Debian 13 arm64 maintainer-supplied Flux rootfs; source URL not recorded", None, "docs/playstore/v2_0_compliance_roadmap.md"),
-    ("distro_alpine", "rootfs.alpine", "alpine", "alpine_3.24_rootfs.tar.gz", "da25146101274ce944472380285f09b96583dcb6093cdf57058ef2648b5f75d7", 1 * 1024 * 1024, "Official Alpine minirootfs 3.24.1 expanded with the FluxLinux Play baseline package set", None, "docs/distro/alpine.md"),
+    ("distro_alpine", "rootfs.alpine", "alpine", "alpine_3.24_rootfs.tar.gz", "f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259", 1 * 1024 * 1024, "Official Alpine minirootfs 3.24.1 expanded with the FluxLinux Play baseline package set", None, "docs/distro/alpine.md"),
     ("distro_fedora", "rootfs.fedora", "fedora", "fedora_44_rootfs.tar.xz", "2d89fe437973e4596d56bf096f71c182d273942a307e7e1e51462dba43db1bd4", 20 * 1024 * 1024, "Fedora Container Base Generic-Minimal 44 aarch64 OCI input; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
     ("distro_void", "rootfs.void", "void", "void_20250202_rootfs.tar.xz", "01a30f17ae06d4d5b322cd579ca971bc479e02cc284ec1e5a4255bea6bac3ce6", 20 * 1024 * 1024, "Void Linux glibc aarch64 2025-02-02 maintainer-supplied rootfs; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
     ("distro_opensuse", "rootfs.opensuse", "opensuse", "opensuse_tumbleweed_rootfs.tar.xz", "bdcb8522a9672cfa513081313b2788f8844340e800918d16a2154e4ed785a12a", 15 * 1024 * 1024, "openSUSE Tumbleweed aarch64 20251127 maintainer-supplied rootfs; source URL not recorded", None, "docs/plan/fedora-void-opensuse.md"),
@@ -246,6 +246,32 @@ def main() -> None:
             if distro_id == "alpine" and args.alpine_source
             else source_root / archive_name
         )
+        # A real build-time transaction may replace a maintainer input with a
+        # provisioned archive of the same filename. In that case its sidecar
+        # is the authoritative final hash/provenance; never silently reuse the
+        # old raw-rootfs hash.
+        sidecar = source.with_name(source.name + ".provenance.json")
+        if not sidecar.is_file():
+            raise SystemExit(
+                f"ERROR: {distro_id} needs a build-time Play provenance sidecar "
+                f"({sidecar}); refusing to stage a raw rootfs"
+            )
+        sidecar_data = json.loads(sidecar.read_text(encoding="utf-8"))
+        if not sidecar_data.get("upstreamSource") or not (
+            sidecar_data.get("upstreamSha256") or sidecar_data.get("upstreamChecksum")
+        ):
+            raise SystemExit(
+                f"ERROR: {distro_id} provenance must record upstream source and hash"
+            )
+        if sidecar_data.get("runtimeNetworkRequired") is not False:
+            raise SystemExit(
+                f"ERROR: {distro_id} provenance permits runtime network access"
+            )
+        expected_hash = str(sidecar_data.get("archiveSha256", expected_hash))
+        min_bytes = 0
+        upstream = sidecar_data.get("upstreamSource") or upstream
+        upstream_hash = sidecar_data.get("upstreamSha256") or sidecar_data.get("upstreamChecksum") or upstream_hash
+        record = sidecar_data.get("sourceRecord") or record
         digest, compressed, expanded = verify_one(source, expected_hash, min_bytes, archive_name)
         metadata = manifest_for(
             payload_id,

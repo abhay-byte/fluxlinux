@@ -5,14 +5,12 @@ Make distribution/policy regressions fail automatically before a `zenithblue` AA
 
 ## Inherited Worker 04 release blocker
 
-Worker 04 found the Android warning **“This app isn’t 16 KB compatible. ELF
-alignment check failed.”** in the inspected arm64 base APK. The affected
-libraries and first `LOAD` alignments are:
-
-`libtermux.so=0x1000`, `libpulseaudio.so=0x4000`, `libproot.so=0x4000`,
-`libpactl.so=0x4000`, `libloader32.so=0x1000`, `libloader.so=0x4000`,
-`libbash.so=0x4000`, `libandroidx.graphics.path.so=0x4000`, and
-`libXlorie.so=0x4000`.
+Worker 04 added `scripts/verify_16k_page_compat.sh`, which audits every arm64
+ELF `LOAD` segment, APK ZIP page alignment, and AAB bundletool configuration.
+The inspected APK has two blockers: `libloader32.so` is ELF32 with
+`0x1000,0x1000,0x1000` `LOAD` alignments, and `libtermux.so` is ELF64 with
+`0x1000,0x1000`; all other inspected libraries have `0x4000` alignment. The
+APK ZIP check passes, but bundletool was unavailable in this environment.
 
 The policy gate must carry this as a release-blocking check: it may not report
 the Play release as ready until all affected libraries are rebuilt or verified

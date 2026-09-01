@@ -30,4 +30,20 @@ class GuestDnsConfiguratorTest {
             GuestDnsConfigurator.decode("").ifEmpty { GuestDnsConfigurator.PUBLIC_FALLBACK }
         )
     }
+
+    @Test
+    fun emptyAndroidResolverIsNotExportedToTheGuest() {
+        assertEquals("", GuestDnsConfigurator.encode(emptyList()))
+        assertTrue(GuestDnsConfigurator.decode("").isEmpty())
+    }
+
+    @Test
+    fun malformedEnvironmentCannotSurviveEncoding() {
+        assertEquals(
+            "2001:db8::53",
+            GuestDnsConfigurator.encode(
+                listOf("192.168.1.1;touch /tmp/pwned", "2001:db8::53", "1.2.3.999")
+            )
+        )
+    }
 }

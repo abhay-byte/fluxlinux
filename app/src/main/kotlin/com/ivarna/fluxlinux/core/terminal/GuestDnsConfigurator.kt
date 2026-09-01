@@ -27,8 +27,8 @@ object GuestDnsConfigurator {
     fun fromLinkProperties(linkProperties: LinkProperties?): List<String> =
         linkProperties?.dnsServers.orEmpty().mapNotNull { normalize(it.hostAddress) }.distinct()
 
-    /** Resolve the active Android network, falling back only when necessary. */
-    fun resolve(context: Context): List<String> {
+    /** Return only resolver addresses supplied by Android's active network. */
+    fun androidDns(context: Context): List<String> {
         val manager = context.applicationContext
             .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val network = manager?.activeNetwork
@@ -38,12 +38,20 @@ object GuestDnsConfigurator {
             Log.i(TAG, "activeNetwork=$network dnsServers=${androidServers.joinToString()}")
             return androidServers
         }
-        Log.w(TAG, "Android active-network DNS unavailable; using final public fallback")
-        return PUBLIC_FALLBACK
+        Log.w(TAG, "Android active-network DNS unavailable; guest will preserve its resolver")
+        return emptyList()
     }
 
-    /** The environment representation consumed by flux_guest_common.sh. */
-    fun environmentValue(context: Context): String = encode(resolve(context))
+    /** Backward-compatible name for callers that need Android-only resolver data. */
+    fun resolve(context: Context): List<String> = androidDns(context)
+
+    /** The environment representation consumed by flux_guest_common.sh.
+     *
+     * An empty value is intentional. The guest helper then preserves a usable
+     * existing resolv.conf and applies the public list only as its final
+     * fallback. Returning PUBLIC_FALLBACK here would overwrite that resolver.
+     */
+    fun environmentValue(context: Context): String = encode(androidDns(context))
 
     fun encode(servers: Iterable<String>): String =
         servers.mapNotNull(::normalize).distinct().joinToString(SEPARATOR)
@@ -71,7 +79,7 @@ object GuestDnsConfigurator {
             val address = InetAddress.getByName(value)
             when {
                 address is Inet4Address && isValidIpv4(value) -> address.hostAddress
-                value.contains(':') -> address.hostAddress?.substringBefore('%')
+                value.contains(':') -> value
                 else -> null
             }
         } catch (_: Exception) {

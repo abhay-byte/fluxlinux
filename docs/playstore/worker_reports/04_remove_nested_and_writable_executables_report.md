@@ -4,24 +4,13 @@ Last updated: 2026-09-01
 
 ## Result
 
-**PARTIAL.** The source, generated host prefix, Play bundle, split APKs, and
-host-runtime cleanup contracts pass. Worker 04 now also carries Android's
-active-network DNS into the guest, uses a pre-provisioned Alpine Play baseline,
-keeps Play customization local-only, and has a non-process-killing embedded
-X11 lifecycle. Device-visible X11 start/stop/restart and a clean offline Alpine
-end-to-end run remain unverified.
-
-The precise networking status is: **Android connectivity/DNS is healthy;
-guest resolver/package-network failure is under investigation.** On device
-`2a580689`, Android could ping both `1.1.1.1` and
-`dl-cdn.alpinelinux.org`, and the active Wi-Fi DNS was `192.168.1.1`. The PRoot
-guest initially had public resolvers (`8.8.8.8`, `8.8.4.4`); guest hostname
-resolution failed and `apk update` reported transient DNS errors. Replacing the
-guest resolver with the Android DNS was attempted, but the interrupted install
-left a rootfs directory without PRoot container metadata, so no valid Alpine
-package/customization retry is claimed. Guest BusyBox ping and the direct app
-UID ping also hit raw-socket `EPERM`; those results are not treated as proof of
-an Android network failure.
+**PARTIAL.** The host-prefix, source/artifact cleanup, DNS boundary, local-only
+Play setup path, and build-time Alpine transaction contracts pass. A shared
+12-distro Play baseline framework is present, but only Alpine is provenance
+complete in this pass; Debian has a completed transaction with incomplete
+upstream provenance and the other ten inputs have not been provisioned. The
+16 KB ELF gate still has two unaligned libraries, and clean device-visible
+Alpine/XFCE/X11, bundletool, and offline end-to-end evidence remain unproven.
 
 The next worker remains pending and was not started:
 
@@ -60,32 +49,50 @@ The next worker remains pending and was not started:
 
 ### C. Android-derived guest DNS
 
-- Added `GuestDnsConfigurator`, which reads numeric DNS servers from the active
-  Android `LinkProperties.dnsServers` list and exports them as
+- Added `GuestDnsConfigurator`, which reads only numeric DNS servers from the
+  active Android `LinkProperties.dnsServers` list and exports them as
   `FLUX_DNS_SERVERS`.
-- `flux_guest_common.sh` writes that list to the guest `/etc/resolv.conf`
-  after validation. Public resolvers are used only when Android supplies no
-  usable resolver and the guest has no usable existing resolver.
-- Alpine family/customization setup uses the same helper for direct invocation;
-  the common concatenated PRoot path remains the normal path.
-- Unit coverage includes IPv4, IPv6, multiple, empty, invalid, duplicate, and
-  final-fallback resolver inputs.
+- An empty Android list is intentionally exported as empty. The common guest
+  helper then preserves a usable existing guest resolver; public resolvers are
+  written only when the existing resolver is absent or malformed.
+- Resolver replacement writes through `/etc/resolv.conf` so an Alpine bind
+  mount is not broken by an attempted `mv`.
+- Container probes cover preservation of a valid resolver, replacement of a
+  malformed resolver, and application of valid Android IPv4/IPv6 values. Unit
+  coverage includes empty, invalid, duplicate, and fallback inputs.
 
-### D. Alpine Play baseline and customization boundary
+### D. Play baseline provisioning and customization boundary
 
-- Built the Play Alpine `aarch64` baseline from the official Alpine 3.24
-  minirootfs plus the required shell/base tools, certificates, D-Bus, XFCE4,
-  terminal, Mesa, Pulse client, and current Alpine family package set.
-- Baseline marker: `/etc/fluxlinux/play-baseline-v1`.
-- Baseline archive: `alpine_3.24_play_baseline_v1.tar.gz`,
-  `254299349` bytes, SHA-256
-  `da25146101274ce944472380285f09b96583dcb6093cdf57058ef2648b5f75d7`.
-- Play Alpine setup verifies the marker and performs only local user,
-  ownership, machine-id, Pulse, XFCE, and Flux asset setup. It does not run
-  `apk update`, `apk add`, or remote customization downloads at runtime.
-- Play Alpine, Debian, KDE-Debian, generic XFCE, and Debian customization
-  assets are flavor-specific local-only overrides. The ivarna flavor keeps its
-  existing remote customization implementation behind the flavor boundary.
+- Built the Play Alpine `aarch64` baseline from the pinned official Alpine
+  3.24.1 minirootfs using a real `apk --root ... --arch aarch64 --update add`
+  transaction. The upstream URL is recorded in the sidecar with input SHA-256
+  `f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259`.
+- Alpine final artifact: `alpine_3.24_rootfs.tar.gz`, `255103653` bytes,
+  SHA-256
+  `88714e4cc1637cdad5916200c5ac5b72c506506dd33166a12a0a58635618724c`.
+  The sidecar records APK database hash
+  `a669f37eef75ed89a54db93d84f93bad6e7735af89d0d761105b4e2a683736b0`,
+  repository index hashes, 359 requested packages, and
+  `runtimeNetworkRequired=false`. Final archive and upstream hashes are
+  distinct and both are recorded.
+- Debian has a valid xz-compressed final artifact from a completed aarch64
+  package transaction: `420609048` bytes, SHA-256
+  `48f341afe25da408fe30a41a1420f307c61feea93f5ad0be5682c8cea319d823`.
+  Its sidecar deliberately retains `upstreamSource=null` and
+  `upstreamSha256=null` because the original source URL/checksum was not
+  recorded; the provenance gate therefore rejects it.
+- `scripts/play_rootfs/manifests.json` and
+  `scripts/play_rootfs/build_play_rootfs.py` define the shared build/validation
+  framework for Debian, Alpine, Fedora, Void, openSUSE, Chimera, Deepin,
+  Manjaro, Ubuntu, Kali, Parrot, and Arch. The current validator result is:
+  Alpine **PASS**; Debian **FAIL** for incomplete provenance; Fedora, Void,
+  openSUSE, Chimera, Deepin, Manjaro, Ubuntu, Kali, Parrot, and Arch **FAIL**
+  because their build-time provenance sidecars are missing.
+- `prepare_play_payloads.py` now requires a sidecar with upstream source/hash
+  and `runtimeNetworkRequired=false`, so it refuses to stage raw rootfs inputs.
+- Play family and customization assets are local-only overlays. The Ivarna
+  flavor retains its existing remote customization implementation behind the
+  flavor boundary.
 
 ### E. Nested/disguised APK and ELF inventory
 
@@ -132,54 +139,51 @@ The next worker remains pending and was not started:
 
 ### H. Device and artifact evidence
 
-Validated artifact facts:
+Validated artifact facts from the existing Play outputs and the refreshed
+Ivarna debug build:
 
 - Package metadata remains `com.zenithblue.fluxlinux`, `versionCode=12`,
   `versionName=2.0.0`, `targetSdk=36`.
-- Fresh Zenithblue and Ivarna debug APKs and the Zenithblue release AAB build
-  successfully with the Play baseline source and native X11 lifecycle.
-- Final artifact hashes:
-  - Zenithblue debug APK: `48141518` bytes,
-    `5b4d7af8f2dc485ee4b5a8a124029cffab89d445df377ceab01c81add6d6c41f`.
-  - Ivarna debug APK: `48084453` bytes,
-    `6190e9358bd8488b61ed6f22b157568f6f7d09ffef4e61788652c2ba4967ca84`.
-  - Zenithblue release AAB: `1086112666` bytes,
-    `3cea428aee5244776f4793ad3d323455261d6fe4aa9f254fd179e304f5c46e31`.
-- `scripts/verify_play_host_artifacts.sh` passes on the release AAB and
-  Zenithblue debug APK. `scripts/verify_apk_host_assets.sh` passes on both
-  Zenithblue and Ivarna debug APKs.
-- The refreshed AAB customization scan passes for Alpine, Debian, KDE-Debian,
-  generic XFCE, and the four legacy Termux customization entry points; no
-  remote installer/download command remains in those Play assets. The Play
-  DEX contains no `IvarnaRemoteCustomization` or `ProotZshBootstrap` class.
-- The current device package is present on realme serial `2a580689`, but its
-  interrupted Alpine attempt is not a valid installed PRoot container:
-  `proot-distro list` reports no installed containers despite a stale rootfs
-  directory. Therefore no current device Alpine/PFD/XFCE/X11 E2E pass is
-  recorded here.
+- The existing Zenithblue debug APK is `48141518` bytes,
+  `5b4d7af8f2dc485ee4b5a8a124029cffab89d445df377ceab01c81add6d6c41f`; the
+  existing Zenithblue release AAB is `1086112666` bytes,
+  `3cea428aee5244776f4793ad3d323455261d6fe4aa9f254fd179e304f5c46e31`.
+  These Play artifacts predate the current fail-closed payload staging change
+  and are not presented as a refreshed compliant Play build.
+- The refreshed Ivarna debug APK is `48755699` bytes,
+  `289477779f7c374bfa47ed09f35de255d896e088b14549c6271df29ebaadecc3`.
+- `scripts/verify_play_host_artifacts.sh` and
+  `scripts/verify_apk_host_assets.sh` pass on the refreshed Ivarna debug APK;
+  the merged Play runtime scanner also passes on source assets. The existing
+  Play DEX contains no `IvarnaRemoteCustomization` or
+  `ProotZshBootstrap` class.
+- `adb devices` sees realme serial `2a580689` and two wireless entries, but no
+  refreshed Play AAB could be installed locally because bundletool is absent
+  and Play payload preparation is correctly blocked. No current device
+  Alpine/PFD/XFCE/X11 E2E pass is recorded.
 
 ### I. 16 KB compatibility blocker
 
-Android reported the exact warning: **“This app isn’t 16 KB compatible. ELF
-alignment check failed.”** The affected libraries and first `LOAD` alignment in
-the inspected arm64 base APK were:
+The permanent audit script scans every arm64 native library and every `LOAD`
+segment. On the inspected Zenithblue debug APK, the full result was:
 
-| Library | First `LOAD` alignment |
-|---|---:|
-| `libtermux.so` | `0x1000` |
-| `libpulseaudio.so` | `0x4000` |
-| `libproot.so` | `0x4000` |
-| `libpactl.so` | `0x4000` |
-| `libloader32.so` | `0x1000` |
-| `libloader.so` | `0x4000` |
-| `libbash.so` | `0x4000` |
-| `libandroidx.graphics.path.so` | `0x4000` |
-| `libXlorie.so` | `0x4000` |
+| Library | ELF class | All `LOAD` alignments | Status |
+|---|---|---|---|
+| `libXlorie.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libandroidx.graphics.path.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libbash.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libloader.so` | ELF64 | `0x4000,0x4000` | aligned |
+| `libloader32.so` | ELF32 | `0x1000,0x1000,0x1000` | **UNALIGNED** |
+| `libpactl.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libproot.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libpulseaudio.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
+| `libtermux.so` | ELF64 | `0x1000,0x1000` | **UNALIGNED** |
 
-This is a release blocker carried into Workers 09 and 10. Worker 04 does not
-claim release compatibility until every affected library is rebuilt or
-otherwise supplied with verified 16 KB-compatible ELF alignment and the exact
-warning is absent.
+The APK ZIP page-alignment check passes. A bundletool check could not run because
+bundletool is not installed. `libtermux.so` comes from the pinned
+`terminal-emulator-v0.118.0` dependency, and `libloader32.so` is a prebuilt
+Termux loader without a source checkout in this worktree; neither was rebuilt
+or replaced. This remains a release blocker carried into Workers 09 and 10.
 
 ## Verification
 
@@ -187,21 +191,36 @@ Passed:
 
 - `scripts/assemble_bootstrap.py --mode full`
 - `scripts/verify_bootstrap.sh`
-- `scripts/prepare_play_payloads.py`
-- `scripts/build_alpine_play_baseline.sh` with deterministic hash/size output
-- `scripts/verify_play_host_artifacts.sh` on the AAB and base split APK
-- `scripts/verify_apk_host_assets.sh` on the Zenithblue and Ivarna debug APKs
-- `testZenithblueDebugUnitTest` (367 tests, 0 failures)
-- combined Zenithblue and Ivarna debug unit-test build
-- Zenithblue and Ivarna debug APK builds plus the Zenithblue release AAB build
-- static DNS, typed-permission, Play asset, and embedded-X11 lifecycle tests
-- Android-layer DNS evidence and host-prefix inspection described above
+- `scripts/build_alpine_play_baseline.sh` with a real `apk` transaction and
+  complete provenance sidecar
+- `scripts/verify_apk_host_assets.sh` on the refreshed Ivarna debug APK
+- `scripts/verify_play_host_artifacts.sh` on the refreshed Ivarna debug APK
+- `scripts/verify_play_runtime_scripts.sh`
+- `testIvarnaDebugUnitTest` (371 tests, 0 failures)
+- Python and shell syntax checks
+- Android-layer DNS and Alpine resolver container probes
+
+Expected/recorded failures in this pass:
+
+- `scripts/verify_play_rootfs_provenance.py`: Alpine passes; Debian lacks
+  upstream source/hash; Fedora, Void, openSUSE, Chimera, Deepin, Manjaro,
+  Ubuntu, Kali, Parrot, and Arch lack build sidecars.
+- `scripts/prepare_play_payloads.py --verify-only`: refuses Debian because
+  provenance is incomplete.
+- `testZenithblueDebugUnitTest`: stops at `preparePlayPayloads` refusing the
+  raw Debian input; no Play unit results are claimed from that invocation.
+- `scripts/verify_16k_page_compat.sh`: APK ZIP alignment passes, but
+  `libloader32.so` and `libtermux.so` are unaligned and bundletool is absent.
+- `:app:assembleZenithblueDebug` and `:app:bundleZenithblueRelease` were not
+  accepted as current builds because Play payload preparation is blocked by
+  the missing provenance sidecars.
 
 Not proven in this pass:
 
-- clean bundletool/local-testing installation of the refreshed AAB;
+- clean bundletool/local-testing installation of a refreshed AAB;
 - offline Alpine extraction/setup through XFCE and visible X11;
 - visible X11 start/stop/restart on device;
+- clean PRoot/Pulse device smoke tests;
 - real Google Play feature delivery.
 
 Gradle was run with `--no-daemon`; after each Gradle invocation,
