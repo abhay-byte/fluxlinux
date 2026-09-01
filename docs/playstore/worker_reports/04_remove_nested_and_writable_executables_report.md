@@ -5,12 +5,12 @@ Last updated: 2026-09-01
 ## Result
 
 **PARTIAL.** The host-prefix, source/artifact cleanup, DNS boundary, local-only
-Play setup path, and build-time Alpine transaction contracts pass. A shared
-12-distro Play baseline framework is present, but only Alpine is provenance
-complete in this pass; Debian has a completed transaction with incomplete
-upstream provenance and the other ten inputs have not been provisioned. The
-16 KB ELF gate still has two unaligned libraries, and clean device-visible
-Alpine/XFCE/X11, bundletool, and offline end-to-end evidence remain unproven.
+Play setup path, build-time Alpine transaction, and native 16 KB compatibility
+contracts pass. A shared 12-distro Play baseline framework is present, but only
+Alpine is provenance complete in this pass; Debian has a completed transaction
+with incomplete upstream provenance and the other ten inputs have not been
+provisioned. Clean device-visible Alpine/XFCE/X11, refreshed Play AAB, and
+offline end-to-end evidence remain unproven.
 
 The next worker remains pending and was not started:
 
@@ -158,14 +158,24 @@ Ivarna debug build:
   Play DEX contains no `IvarnaRemoteCustomization` or
   `ProotZshBootstrap` class.
 - `adb devices` sees realme serial `2a580689` and two wireless entries, but no
-  refreshed Play AAB could be installed locally because bundletool is absent
-  and Play payload preparation is correctly blocked. No current device
+  refreshed Play AAB could be installed locally because Play payload
+  preparation is correctly blocked on incomplete provenance. No current device
   Alpine/PFD/XFCE/X11 E2E pass is recorded.
 
-### I. 16 KB compatibility blocker
+### I. 16 KB compatibility audit
 
 The permanent audit script scans every arm64 native library and every `LOAD`
-segment. On the inspected Zenithblue debug APK, the full result was:
+segment. The two previously unaligned host binaries were rebuilt from pinned
+sources with the NDK 29.0.14206865 and an explicit 16 KB linker page size:
+
+- `libtermux.so`: official `termux-app` v0.118.0 JNI source, locally linked for
+  all supported ABIs; arm64 SHA-256
+  `4f2ca55c2f69076217211b581e56f7a90ff913881216c3b4b4f2dc5fc512ccdc`.
+- `libloader32.so`: official Termux PRoot v5.1.107.84 source, rebuilt as the
+  ARM32 loader; SHA-256
+  `c4e974242cda050cb47a8b1fa18af4df9ac79e396825ffcb74d0d66c8708d777`.
+
+On the refreshed Ivarna debug APK, the full result was:
 
 | Library | ELF class | All `LOAD` alignments | Status |
 |---|---|---|---|
@@ -173,17 +183,16 @@ segment. On the inspected Zenithblue debug APK, the full result was:
 | `libandroidx.graphics.path.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
 | `libbash.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
 | `libloader.so` | ELF64 | `0x4000,0x4000` | aligned |
-| `libloader32.so` | ELF32 | `0x1000,0x1000,0x1000` | **UNALIGNED** |
+| `libloader32.so` | ELF32 | `0x4000,0x4000,0x4000` | aligned |
 | `libpactl.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
 | `libproot.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
 | `libpulseaudio.so` | ELF64 | `0x4000,0x4000,0x4000` | aligned |
-| `libtermux.so` | ELF64 | `0x1000,0x1000` | **UNALIGNED** |
+| `libtermux.so` | ELF64 | `0x4000,0x4000` | aligned |
 
-The APK ZIP page-alignment check passes. A bundletool check could not run because
-bundletool is not installed. `libtermux.so` comes from the pinned
-`terminal-emulator-v0.118.0` dependency, and `libloader32.so` is a prebuilt
-Termux loader without a source checkout in this worktree; neither was rebuilt
-or replaced. This remains a release blocker carried into Workers 09 and 10.
+The APK ZIP page-alignment check passes. Bundletool 1.18.3 also reports
+`PAGE_ALIGNMENT_16K` for the inspected AAB. The refreshed Ivarna APK passes the
+full ELF/ZIP gate; a refreshed Zenithblue AAB cannot yet be produced because
+Play payload preparation correctly stops on incomplete distro provenance.
 
 ## Verification
 
@@ -193,9 +202,13 @@ Passed:
 - `scripts/verify_bootstrap.sh`
 - `scripts/build_alpine_play_baseline.sh` with a real `apk` transaction and
   complete provenance sidecar
+- `scripts/build_termux_terminal_native_16k.sh`
+- `scripts/rebuild_proot_loader_16k.sh`
 - `scripts/verify_apk_host_assets.sh` on the refreshed Ivarna debug APK
 - `scripts/verify_play_host_artifacts.sh` on the refreshed Ivarna debug APK
 - `scripts/verify_play_runtime_scripts.sh`
+- `scripts/verify_16k_page_compat.sh` on the refreshed Ivarna APK and available
+  Zenithblue AAB, including bundletool 1.18.3 `PAGE_ALIGNMENT_16K` output
 - `testIvarnaDebugUnitTest` (371 tests, 0 failures)
 - Python and shell syntax checks
 - Android-layer DNS and Alpine resolver container probes
@@ -209,8 +222,6 @@ Expected/recorded failures in this pass:
   provenance is incomplete.
 - `testZenithblueDebugUnitTest`: stops at `preparePlayPayloads` refusing the
   raw Debian input; no Play unit results are claimed from that invocation.
-- `scripts/verify_16k_page_compat.sh`: APK ZIP alignment passes, but
-  `libloader32.so` and `libtermux.so` are unaligned and bundletool is absent.
 - `:app:assembleZenithblueDebug` and `:app:bundleZenithblueRelease` were not
   accepted as current builds because Play payload preparation is blocked by
   the missing provenance sidecars.

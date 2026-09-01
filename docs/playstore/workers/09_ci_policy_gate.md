@@ -3,18 +3,19 @@
 ## Goal
 Make distribution/policy regressions fail automatically before a `zenithblue` AAB can be released, while avoiding false positives against expected Linux guest payloads.
 
-## Inherited Worker 04 release blocker
+## Inherited Worker 04 release status
 
 Worker 04 added `scripts/verify_16k_page_compat.sh`, which audits every arm64
 ELF `LOAD` segment, APK ZIP page alignment, and AAB bundletool configuration.
-The inspected APK has two blockers: `libloader32.so` is ELF32 with
-`0x1000,0x1000,0x1000` `LOAD` alignments, and `libtermux.so` is ELF64 with
-`0x1000,0x1000`; all other inspected libraries have `0x4000` alignment. The
-APK ZIP check passes, but bundletool was unavailable in this environment.
+The previously unaligned `libloader32.so` and `libtermux.so` were rebuilt from
+pinned upstream sources with NDK 29.0.14206865. The refreshed Ivarna APK now
+has `0x4000` or larger alignment for every arm64 `LOAD` segment, the APK ZIP
+check passes, and bundletool 1.18.3 reports `PAGE_ALIGNMENT_16K` for the
+inspected AAB.
 
-The policy gate must carry this as a release-blocking check: it may not report
-the Play release as ready until all affected libraries are rebuilt or verified
-with 16 KB-compatible ELF alignment and the warning is absent.
+The policy gate must retain this check for the final Zenithblue AAB. A fresh
+Zenithblue AAB remains unavailable until the fail-closed Play payload
+provenance gate passes for all twelve distro payloads.
 
 ## Scope rule
 

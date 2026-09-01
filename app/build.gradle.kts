@@ -208,6 +208,20 @@ for ((flavorName, appId) in flavorAppIds) {
     }
 }
 
+// The pinned termux-app AAR supplies the Java terminal classes and a legacy
+// 4 KB libtermux.so. Build the tiny JNI source locally with an explicit 16 KB
+// linker setting and put it in the app source set, which AGP gives precedence
+// over the duplicate AAR native entry. The generated directory is ignored and
+// is recreated on every clean checkout/build.
+tasks.register<Exec>("prepareTermuxNative16k") {
+    group = "build"
+    description = "Build the pinned Termux terminal JNI library with 16 KB LOAD alignment"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "scripts/build_termux_terminal_native_16k.sh")
+    inputs.files(fileTree(rootProject.file("native/third_party/termux-terminal-emulator")))
+    outputs.dir(file("src/main/jniLibs"))
+}
+
 val playPayloadSourceRoot = providers.gradleProperty("playPayloadSourceRoot")
     .orElse(rootProject.file("assets/rootfs").absolutePath)
 val playAlpineSource = providers.gradleProperty("playAlpineSource")
@@ -283,6 +297,7 @@ for (flavorName in flavorAppIds.keys) {
             it.name.startsWith("pre${cap}")
     }.configureEach {
         dependsOn("packageHostAssets$cap")
+        dependsOn("prepareTermuxNative16k")
         if (flavorName == "zenithblue") dependsOn("preparePlayPayloads")
     }
 }

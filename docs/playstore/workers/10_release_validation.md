@@ -3,18 +3,19 @@
 ## Goal
 Prove the exact `zenithblue` AAB is technically sound, upgrades safely, receives Flux-managed executable/runtime payloads only through Google Play, and matches every Play Console/store declaration.
 
-## Inherited Worker 04 release blocker
+## Inherited Worker 04 release status
 
 Worker 04 added `scripts/verify_16k_page_compat.sh`, which audits every arm64
 ELF `LOAD` segment, APK ZIP page alignment, and AAB bundletool configuration.
-The inspected APK has two blockers: `libloader32.so` is ELF32 with
-`0x1000,0x1000,0x1000` `LOAD` alignments, and `libtermux.so` is ELF64 with
-`0x1000,0x1000`; all other inspected libraries have `0x4000` alignment. The
-APK ZIP check passes, but bundletool was unavailable in this environment.
+The previously unaligned `libloader32.so` and `libtermux.so` were rebuilt from
+pinned upstream sources with NDK 29.0.14206865. The refreshed Ivarna APK now
+has `0x4000` or larger alignment for every arm64 `LOAD` segment, the APK ZIP
+check passes, and bundletool 1.18.3 reports `PAGE_ALIGNMENT_16K` for the
+inspected AAB.
 
-This is a release blocker for Worker 10. The exact tested AAB cannot be
-accepted for release until every affected library is rebuilt or supplied with
-verified 16 KB-compatible alignment and the warning is absent.
+The 16 KB check remains mandatory for the final Zenithblue AAB. That exact AAB
+cannot yet be tested because Play payload preparation remains correctly blocked
+by incomplete provenance for eleven of the twelve distro payloads.
 
 ## Build gates
 
