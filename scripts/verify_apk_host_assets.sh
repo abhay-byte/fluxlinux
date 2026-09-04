@@ -65,14 +65,21 @@ else
   fi
 fi
 
-# Negative rootfs gate: rootfs archives ship via the GitHub release tag `rootfs`,
-# never inside the APK.
+# Negative rootfs gate: rootfs archives ship via the GitHub release tag `rootfs` (ivarna)
+# or via Play dynamic feature modules (zenithblue), never inside base APK.
 rootfs_entries=$(unzip -l "$APK" | grep -c "assets/rootfs/" || true)
-if [ "$rootfs_entries" -eq 0 ]; then
-  echo "  [OK] zero assets/rootfs/* entries (rootfs downloads at install time)"
+payloads_entries=$(unzip -l "$APK" | grep -c "payloads/" || true)
+if [ "$rootfs_entries" -eq 0 ] && [ "$payloads_entries" -eq 0 ]; then
+  echo "  [OK] zero assets/rootfs/* and zero payloads/* entries in base APK"
 else
-  echo "  [FAIL] APK contains $rootfs_entries assets/rootfs/* entries — must be zero"
-  unzip -l "$APK" | grep "assets/rootfs/" || true
+  if [ "$rootfs_entries" -ne 0 ]; then
+    echo "  [FAIL] APK contains $rootfs_entries assets/rootfs/* entries — must be zero"
+    unzip -l "$APK" | grep "assets/rootfs/" || true
+  fi
+  if [ "$payloads_entries" -ne 0 ]; then
+    echo "  [FAIL] APK contains $payloads_entries payloads/* entries — must be zero"
+    unzip -l "$APK" | grep "payloads/" || true
+  fi
   fail=1
 fi
 

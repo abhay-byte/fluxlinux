@@ -71,7 +71,8 @@ fun DistroScreen(
     }
     
     val availableDistros = DistroRepository.supportedDistros.filter { 
-        !installedDistroIds.contains(it.id)
+        !installedDistroIds.contains(it.id) &&
+            com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.supports(context, it.id)
     }
 
     var methodTab by remember { mutableStateOf(MethodTab.PROOT) }

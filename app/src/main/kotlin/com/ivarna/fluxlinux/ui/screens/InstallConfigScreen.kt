@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +75,7 @@ fun InstallConfigScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showLog by remember { mutableStateOf(true) }
     val runner = remember { OnboardingInstallRunner(appCtx) }
+    val coroutineScope = rememberCoroutineScope()
 
     fun startInstall() {
         // Generation cancel inside runner; single instance avoids parallel jobs
@@ -84,22 +86,25 @@ fun InstallConfigScreen(
         detail = ""
         logText = ""
         phase = InstallPhase.RUNNING
-        runner.start(distro.id, selectedTheme) { progress ->
-            percent = progress.overallPercent
-            phaseLabel = progress.phaseLabel
-            detail = progress.detail
-            progress.logLine?.let { line ->
-                logText = (logText + line + "\n").takeLast(12_000)
-            }
-            if (progress.failed) {
+        com.ivarna.fluxlinux.ui.install.InstallFlowHelper.startInstall(
+            context = context,
+            scope = coroutineScope,
+            distroId = distro.id,
+            theme = selectedTheme,
+            runner = runner,
+            onPhaseChange = { phaseLabel = it },
+            onDetailChange = { detail = it },
+            onPercentChange = { percent = it },
+            onLogLine = { line -> logText = (logText + line + "\n").takeLast(12_000) },
+            onFailed = { msg ->
                 failed = true
-                errorMessage = progress.errorMessage ?: progress.detail
-            }
-            if (progress.finished && !progress.failed) {
+                errorMessage = msg
+            },
+            onSuccess = {
                 phase = InstallPhase.DONE
                 Toast.makeText(context, "Base desktop installed", Toast.LENGTH_SHORT).show()
             }
-        }
+        )
     }
 
     DisposableEffect(Unit) {

@@ -54,8 +54,18 @@ android {
         // Rootfs archives are no longer packaged (GitHub release download) —
         // only bootstrap.tar and the xfce theme assets remain.
         @Suppress("UnstableApiUsage")
-        noCompress += listOf("xz", "tar")
+        noCompress += listOf("xz", "tar", "gz")
     }
+
+    dynamicFeatures += listOf(
+        ":distro_debian",
+        ":distro_alpine",
+        ":distro_ubuntu",
+        ":distro_kali",
+        ":distro_arch",
+        ":distro_manjaro",
+        ":distro_chimera"
+    )
 
     // Disable dependency metadata block for F-Droid
     dependenciesInfo {
@@ -265,6 +275,9 @@ dependencies {
 
     // Embedded Termux:X11 (cloned + integrated directly, same-package rendering)
     implementation(project(":termux-x11"))
+
+    // Play Feature Delivery
+    implementation(libs.play.feature.delivery)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

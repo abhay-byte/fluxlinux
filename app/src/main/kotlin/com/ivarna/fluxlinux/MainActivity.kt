@@ -70,6 +70,11 @@ enum class Screen {
 
 class MainActivity : ComponentActivity() {
     
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(newBase)
+        com.google.android.play.core.splitcompat.SplitCompat.install(this)
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         handleScriptCallback(intent)
@@ -478,6 +483,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.google.android.play.core.splitcompat.SplitCompat.installActivity(this)
         if (savedInstanceState == null) {
             dispatchLegacyTermuxCallback(intent)
         }

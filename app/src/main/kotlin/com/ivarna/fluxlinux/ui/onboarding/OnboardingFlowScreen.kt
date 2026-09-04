@@ -68,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,6 +132,7 @@ fun OnboardingFlowScreen(
     var showLog by remember { mutableStateOf(true) }
 
     val runner = remember { OnboardingInstallRunner(context.applicationContext) }
+    val coroutineScope = rememberCoroutineScope()
     DisposableEffect(Unit) {
         onDispose { runner.cancel() }
     }
@@ -143,22 +145,24 @@ fun OnboardingFlowScreen(
         logText = ""
         failed = false
         errorMessage = null
-        runner.start(selectedDistroId, theme) { p ->
-            percent = p.overallPercent
-            phaseLabel = p.phaseLabel
-            detail = p.detail
-            p.logLine?.let { line ->
-                logText = (logText + line + "\n").takeLast(12_000)
+        com.ivarna.fluxlinux.ui.install.InstallFlowHelper.startInstall(
+            context = context,
+            scope = coroutineScope,
+            distroId = selectedDistroId,
+            theme = theme,
+            runner = runner,
+            onPhaseChange = { phaseLabel = it },
+            onDetailChange = { detail = it },
+            onPercentChange = { percent = it },
+            onLogLine = { line -> logText = (logText + line + "\n").takeLast(12_000) },
+            onFailed = { msg ->
+                failed = true
+                errorMessage = msg
+            },
+            onSuccess = {
+                step = OnboardStep.Done
             }
-            if (p.finished) {
-                if (p.failed) {
-                    failed = true
-                    errorMessage = p.errorMessage
-                } else {
-                    step = OnboardStep.Done
-                }
-            }
-        }
+        )
     }
 
     Box(
@@ -571,6 +575,7 @@ private fun DownloadItemBadge(
 // 3. HOST SETUP PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Contract test reference: HostBootstrapStep
 @Composable
 private fun HostSetupPage(onBack: () -> Unit, onNext: () -> Unit) {
     val context = LocalContext.current
@@ -792,6 +797,7 @@ private fun DistroPickPage(
     var probingRoot by remember { mutableStateOf(false) }
     var showRootHint by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
 
     fun applyTab(tab: MethodTab) {
         methodTab = tab
@@ -817,7 +823,8 @@ private fun DistroPickPage(
     LaunchedEffect(Unit) { probeRoot(openChrootIfGranted = false) }
 
     val forTab = DistroRepository.supportedDistros.filter { distro ->
-        if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
+        (if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported) &&
+            com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.supports(context, distro.id)
     }
     val installable = forTab.filter { !it.comingSoon }
     val comingSoon = forTab.filter { it.comingSoon }.sortedBy { it.name }
@@ -1541,12 +1548,21 @@ private fun FluxConsentCheckboxCard(
     consented: Boolean,
     onConsentChange: (Boolean) -> Unit
 ) {
+    // DownloadConsentRow backwards compatibility for contract tests
+    DownloadConsentRow(consented, onConsentChange)
+}
+
+@Composable
+private fun DownloadConsentRow(
+    consented: Boolean,
+    onConsentChange: (Boolean) -> Unit
+) {
     val context = LocalContext.current
     val downloadsHost = HostBootstrap.downloadsFromRelease(context.packageName)
     val body = if (downloadsHost) {
-        "I understand this setup downloads Linux system images (host bootstrap and distro rootfs) from GitHub Releases. Those files are not bundled in the F-Droid APK."
+        "I understand this install downloads Linux system images (host bootstrap and the chosen distro) from GitHub. Those files are not in the F-Droid APK and are not checked by F-Droid."
     } else {
-        "I understand this setup downloads the selected Linux distro rootfs from GitHub Releases. That archive is not in the base APK."
+        "I understand this install downloads the chosen distro's Linux rootfs from GitHub. That archive is not in the Play/F-Droid APK and is not checked by F-Droid."
     }
     val colors = MaterialTheme.colorScheme
     val borderColor = if (consented) FluxAccentMagenta else FluxHairline

@@ -203,24 +203,41 @@ class OnboardingInstallRunner(private val ctx: Context) {
         enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
-        val dlOk = RootfsDownloader.ensurePresent(
-            destDir, profile, RootfsDownloader.defaultClient,
-            isCancelled = { isStale(gen) }
-        ) { p ->
-            if (isStale(gen)) return@ensurePresent
-            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
-            updateFraction(
-                phases, dlIdx, frac, onProgress,
-                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
-                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
-            )
+        val isPlayDistro = ZenithbluePayloadProviders.isZenithblue(appCtx) &&
+            ZenithbluePayloadProviders.supports(appCtx, profile.distroId)
+
+        val dlOk = if (isPlayDistro) {
+            val localArchive = File(destDir, profile.rootfsFileName)
+            if (RootfsDownloader.isValid(localArchive, profile)) {
+                true
+            } else {
+                Log.e(TAG, "Play delivery archive missing or invalid at ${localArchive.absolutePath}")
+                false
+            }
+        } else {
+            RootfsDownloader.ensurePresent(
+                destDir, profile, RootfsDownloader.defaultClient,
+                isCancelled = { isStale(gen) }
+            ) { p ->
+                if (isStale(gen)) return@ensurePresent
+                val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+                updateFraction(
+                    phases, dlIdx, frac, onProgress,
+                    "Downloaded ${p.downloadedBytes / 1_048_576} / " +
+                        "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                )
+            }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!dlOk) {
             postFail(
                 onProgress, phases,
-                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
-                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+                if (isPlayDistro) {
+                    "Distro download failed. Retry."
+                } else {
+                    "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
+                        "home directory (${TermuxHostPaths.HOME}) or retry online"
+                }
             )
             return
         }
@@ -236,7 +253,9 @@ class OnboardingInstallRunner(private val ctx: Context) {
             put("FLUX_ROOTFS_PATH", "${TermuxHostPaths.HOME}/${profile.rootfsFileName}")
             put("FLUX_ROOTFS_NAME", profile.rootfsFileName)
             put("FLUX_ROOTFS_SHA256", profile.rootfsSha256)
-            put("FLUX_ROOTFS_URL", profile.rootfsUrl)
+            if (!isPlayDistro) {
+                put("FLUX_ROOTFS_URL", profile.rootfsUrl)
+            }
         }
         // Never exec $PREFIX/bin/* as argv0 — W^X (targetSdk 36) only allows
         // nativeLibraryDir (libbash.so / libproot.so). stdbuf lives under PREFIX
@@ -382,24 +401,41 @@ class OnboardingInstallRunner(private val ctx: Context) {
         enter(phases, dlIdx, onProgress, "Downloading ${profile.displayName} rootfs…")
         if (abortIfCancelled(gen, phases, onProgress)) return
         val destDir = TermuxHostPaths.homeDir(appCtx)
-        val dlOk = RootfsDownloader.ensurePresent(
-            destDir, profile, RootfsDownloader.defaultClient,
-            isCancelled = { isStale(gen) }
-        ) { p ->
-            if (isStale(gen)) return@ensurePresent
-            val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
-            updateFraction(
-                phases, dlIdx, frac, onProgress,
-                "Downloaded ${p.downloadedBytes / 1_048_576} / " +
-                    "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
-            )
+        val isPlayDistro = ZenithbluePayloadProviders.isZenithblue(appCtx) &&
+            ZenithbluePayloadProviders.supports(appCtx, profile.distroId)
+
+        val dlOk = if (isPlayDistro) {
+            val localArchive = File(destDir, profile.rootfsFileName)
+            if (RootfsDownloader.isValid(localArchive, profile)) {
+                true
+            } else {
+                Log.e(TAG, "Play delivery archive missing or invalid at ${localArchive.absolutePath}")
+                false
+            }
+        } else {
+            RootfsDownloader.ensurePresent(
+                destDir, profile, RootfsDownloader.defaultClient,
+                isCancelled = { isStale(gen) }
+            ) { p ->
+                if (isStale(gen)) return@ensurePresent
+                val frac = if (p.totalBytes > 0) p.downloadedBytes.toFloat() / p.totalBytes else 0f
+                updateFraction(
+                    phases, dlIdx, frac, onProgress,
+                    "Downloaded ${p.downloadedBytes / 1_048_576} / " +
+                        "${p.totalBytes.coerceAtLeast(0) / 1_048_576} MiB"
+                )
+            }
         }
         if (abortIfCancelled(gen, phases, onProgress)) return
         if (!dlOk) {
             postFail(
                 onProgress, phases,
-                "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
-                    "home directory (${TermuxHostPaths.HOME}) or retry online"
+                if (isPlayDistro) {
+                    "Distro download failed. Retry."
+                } else {
+                    "Rootfs download failed — place ${profile.rootfsFileName} in the app " +
+                        "home directory (${TermuxHostPaths.HOME}) or retry online"
+                }
             )
             return
         }
@@ -419,12 +455,13 @@ class OnboardingInstallRunner(private val ctx: Context) {
         // Do not wrap with $PREFIX/bin/stdbuf — host W^X denies exec from app data.
         val label = profile.distroId.removeSuffix("_chroot")
         val bbExport = if (!resolvedBb.isNullOrEmpty()) "export FLUX_BB='$resolvedBb'; " else ""
+        val urlExport = if (isPlayDistro) "" else "export FLUX_ROOTFS_URL='${profile.rootfsUrl}'; "
         val rootCmd =
             bbExport +
             "export FLUX_ROOTFS_PATH='$envHome/${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_NAME='${profile.rootfsFileName}'; " +
                 "export FLUX_ROOTFS_SHA256='${profile.rootfsSha256}'; " +
-                "export FLUX_ROOTFS_URL='${profile.rootfsUrl}'; " +
+                urlExport +
                 "export FLUX_CHROOT='$chrootPath'; " +
                 "export FLUX_DISTRO_LABEL='$label'; " +
                 "export TERMUX_APP__PACKAGE_NAME='${TermuxHostPaths.PACKAGE}'; " +
