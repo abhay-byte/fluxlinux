@@ -1,5 +1,13 @@
 # RootFS Play Delivery Final Review
 
+> SUPERSEDED by `rootfs_play_delivery_final_closure.md` (final closure on the
+> required Poco X6 Pro, 12 modules everywhere, Zenithblue manifest boundary,
+> Legacy Termux hidden, flavor-aware Welcome/consent copy). This document is
+> kept for history; fields below describe the earlier `9b792db` state unless
+> noted. The ~800 MiB cumulative AAB is NOT a blocker: each of the 12
+> on-demand modules is < 500 MB compressed and cumulative modules are
+> < 4 GB (verified in closure).
+
 Verdict: PASS WITH POLICY DECISION
 
 Branch: feat/oneshot-rootfs-play-delivery

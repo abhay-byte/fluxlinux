@@ -176,12 +176,14 @@ fun SettingsScreen(
                 subtitle = "Installed containers and app-storage size",
                 onClick = { onNavigateToProotSettings?.invoke() }
             )
-            SettingsNavCard(
-                icon = Icons.Default.History,
-                title = "Legacy Termux",
-                subtitle = "Leftover PRoot installs from FluxLinux ≤ v1.8.0 live in the Termux app",
-                onClick = { onNavigateToLegacyTermuxSettings?.invoke() }
-            )
+            if (!isPlay) {
+                SettingsNavCard(
+                    icon = Icons.Default.History,
+                    title = "Legacy Termux",
+                    subtitle = "Leftover PRoot installs from FluxLinux ≤ v1.8.0 live in the Termux app",
+                    onClick = { onNavigateToLegacyTermuxSettings?.invoke() }
+                )
+            }
 
             Text(
                 "Help",

@@ -226,6 +226,9 @@ fun OnboardingFlowScreen(
 @Composable
 private fun WelcomePage(onNext: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    // Play variant (zenithblue): chroot is hidden — do not advertise it.
+    val isPlay = !HostBootstrap.downloadsFromRelease(context.packageName)
 
     Column(
         modifier = Modifier
@@ -293,12 +296,13 @@ private fun WelcomePage(onNext: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Feature 1: PRoot & Chroot
+            // Feature 1: PRoot (Play) / PRoot & Chroot (Ivarna)
             ModernFeatureCard(
                 icon = Icons.Filled.Storage,
                 iconTint = FluxAccentMagenta,
-                title = "PRoot & Chroot",
-                description = "No root required with PRoot mode, or run with full native speed via Chroot on rooted devices."
+                title = if (isPlay) "PRoot Linux" else "PRoot & Chroot",
+                description = if (isPlay) "Run full Linux distributions without root."
+                else "No root required with PRoot mode, or run with full native speed via Chroot on rooted devices."
             )
 
             // Feature 2: Desktop & Themes
@@ -434,7 +438,7 @@ private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
         StepHeader(
             currentStep = 1,
             totalSteps = 4,
-            title = "External Downloads",
+            title = if (isPlay) "Linux Setup" else "External Downloads",
             onBack = onBack
         )
 
@@ -482,7 +486,7 @@ private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
 
                     Text(
-                        text = if (isPlay) "This version delivers the Linux system components through Play Feature Delivery. Tapping Continue prepares the complete Linux environment:"
+                        text = if (isPlay) "The base Linux rootfs is delivered through Google Play Feature Delivery. Additional Linux packages may be installed from the selected distribution's package repositories during setup. Tapping Continue prepares the Linux environment:"
                         else "The F-Droid APK is intentionally lightweight and does not bundle large Linux OS archives. To provide a complete Linux environment, FluxLinux downloads the required system components directly from GitHub Releases upon continuation:",
                         color = colors.onSurface.copy(alpha = 0.75f),
                         fontSize = 13.5.sp,
@@ -1571,7 +1575,7 @@ private fun DownloadConsentRow(
     val body = if (downloadsHost) {
         "I understand this install downloads Linux system images (host bootstrap and the chosen distro) from GitHub. Those files are not in the F-Droid APK and are not checked by F-Droid."
     } else {
-        "I understand this install prepares the chosen distro's Linux system delivered with this app via Play. No separate download review applies beyond Play Store review."
+        "I understand this install prepares the chosen distro's Linux system whose base rootfs is delivered with this app via Play; additional Linux packages may come from the distro's own package repositories."
     }
     val colors = MaterialTheme.colorScheme
     val borderColor = if (consented) FluxAccentMagenta else FluxHairline

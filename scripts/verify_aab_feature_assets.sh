@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/verify_aab_feature_assets.sh
-# Verifies all 7 Play dynamic feature modules in the target AAB:
+# Verifies all 12 Play dynamic feature modules in the target AAB:
 # - Base contains zero rootfs and zero payloads
 # - Each expected feature module contains exactly its expected rootfs
 # - Feature payload SHA-256 matches DistroInstallProfile SSOT

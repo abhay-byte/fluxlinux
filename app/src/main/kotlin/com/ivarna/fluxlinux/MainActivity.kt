@@ -1004,10 +1004,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Screen.SETTINGS_LEGACY_TERMUX -> {
-                        com.ivarna.fluxlinux.ui.screens.LegacyTermuxSettingsScreen(
-                            onBack = { currentScreen = Screen.SETTINGS },
-                            permissionState = permissionState
-                        )
+                        // Play variant (zenithblue): Legacy Termux is hidden — refuse and return to Settings.
+                        if (com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(this@MainActivity)) {
+                            LaunchedEffect(Unit) {
+                                currentScreen = Screen.SETTINGS
+                            }
+                        } else {
+                            com.ivarna.fluxlinux.ui.screens.LegacyTermuxSettingsScreen(
+                                onBack = { currentScreen = Screen.SETTINGS },
+                                permissionState = permissionState
+                            )
+                        }
                     }
                     Screen.TROUBLESHOOTING -> {
                         com.ivarna.fluxlinux.ui.screens.TroubleshootingScreen(

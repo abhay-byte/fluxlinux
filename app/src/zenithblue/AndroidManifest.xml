@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Zenithblue (Play) policy surface: chroot is hidden from Play UI and the
+      product never drives an external Termux app, so the Play merged manifest
+      must not expose root escalation or external-Termux hooks. Ivarna keeps
+      everything from the main manifest. Only remaining Play-reachable consumer
+      of these entries was the deferred legacy-external KDE driver (explicit
+      com.termux intents), which cannot function on a Play device without a
+      sideloaded Termux and fails gracefully (caught, toast). Embedded
+      terminal, embedded X11 (own-package broadcasts), and PFD install paths
+      do not need them.
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_SUPERUSER"
+        tools:node="remove" />
+    <uses-permission
+        android:name="com.termux.permission.RUN_COMMAND"
+        tools:node="remove" />
+    <queries>
+        <package
+            android:name="com.termux"
+            tools:node="remove" />
+        <package
+            android:name="com.termux.x11"
+            tools:node="remove" />
+    </queries>
+
+</manifest>
