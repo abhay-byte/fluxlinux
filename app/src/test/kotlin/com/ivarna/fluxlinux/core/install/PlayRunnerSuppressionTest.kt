@@ -35,10 +35,10 @@ class PlayRunnerSuppressionTest {
             ZenithbluePayloadProviders.supports(ivarnaCtx, "alpine")
         assertFalse(isAlpineIvarna)
 
-        // Fedora on zenithblue -> false (not in registry)
-        val isFedoraZenith = ZenithbluePayloadProviders.isZenithblue(zenithblueCtx) &&
-            ZenithbluePayloadProviders.supports(zenithblueCtx, "fedora")
-        assertFalse(isFedoraZenith)
+        // Adelie on zenithblue -> false (not in registry / coming soon)
+        val isAdelieZenith = ZenithbluePayloadProviders.isZenithblue(zenithblueCtx) &&
+            ZenithbluePayloadProviders.supports(zenithblueCtx, "adelie")
+        assertFalse(isAdelieZenith)
     }
 
     @Test

@@ -151,7 +151,11 @@ fi
 
 if [ -z "$TERMUX_X11_APK_PATH" ]; then
   # /system/bin/pm — termux-exec rewrites bare "pm" to $PREFIX/bin/pm (missing).
-  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://')
+  # When split APKs exist, pm path returns multiple lines; pick base.apk
+  TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://' | grep 'base\.apk' | head -1)
+  if [ -z "$TERMUX_X11_APK_PATH" ]; then
+    TERMUX_X11_APK_PATH=$(/system/bin/pm path "$PKG" 2>/dev/null | tr -d '\r' | sed 's/^package://' | head -1)
+  fi
 fi
 if [ -z "$TERMUX_X11_APK_PATH" ] || [ ! -f "$TERMUX_X11_APK_PATH" ]; then
   TERMUX_X11_APK_PATH=$(/system/bin/find /data/app -name "base.apk" -path "*$PKG*" 2>/dev/null | head -1)
@@ -159,16 +163,35 @@ fi
 export TERMUX_X11_APK_PATH
 echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
 
+# Extract libXlorie.so to /data/data app lib dir if not already there
+# This is the only location app_process can dlopen without corrupting its linker namespace
 APP_LIB_DIR="/data/data/$PKG/lib"
 mkdir -p "$APP_LIB_DIR" 2>/dev/null
-if [ ! -f "$APP_LIB_DIR/libXlorie.so" ] && [ -n "$TERMUX_X11_APK_PATH" ]; then
-  echo "FluxLinux: Extracting libXlorie.so..."
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/arm64-v8a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/arm64-v8a/libXlorie.so . && rm -rf lib ) || \
-  ( cd "$APP_LIB_DIR" && \
-    unzip -o "$TERMUX_X11_APK_PATH" 'lib/armeabi-v7a/libXlorie.so' 2>/dev/null && \
-    mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
+if [ ! -f "$APP_LIB_DIR/libXlorie.so" ]; then
+  # Try copying from nativeLibraryDir directly if available
+  _NLD="${PD_PROOT_BIN%/*}"
+  if [ -n "$_NLD" ] && [ -f "$_NLD/libXlorie.so" ]; then
+    cp -f "$_NLD/libXlorie.so" "$APP_LIB_DIR/libXlorie.so" 2>/dev/null && \
+    chmod 755 "$APP_LIB_DIR/libXlorie.so" 2>/dev/null
+  fi
+  # Fallback: check split_config APKs or base APK
+  if [ ! -f "$APP_LIB_DIR/libXlorie.so" ]; then
+    echo "FluxLinux: Extracting libXlorie.so..."
+    _SRC_APK="$TERMUX_X11_APK_PATH"
+    if [ ! -f "$_SRC_APK" ] || ! unzip -l "$_SRC_APK" 'lib/*/libXlorie.so' 2>/dev/null | grep -q libXlorie; then
+      _SPLIT=$(/system/bin/find /data/app -name "*arm64*" -path "*$PKG*" 2>/dev/null | head -1)
+      [ -n "$_SPLIT" ] && _SRC_APK="$_SPLIT"
+    fi
+    ( cd "$APP_LIB_DIR" && \
+      unzip -o "$_SRC_APK" 'lib/arm64-v8a/libXlorie.so' 2>/dev/null && \
+      mv -f lib/arm64-v8a/libXlorie.so . && rm -rf lib ) || \
+    ( cd "$APP_LIB_DIR" && \
+      unzip -o "$_SRC_APK" 'lib/armeabi-v7a/libXlorie.so' 2>/dev/null && \
+      mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
+  fi
+  ls -la "$APP_LIB_DIR/libXlorie.so" 2>/dev/null && \
+    echo "FluxLinux: libXlorie.so ready in $APP_LIB_DIR" || \
+    echo "FluxLinux: [WARN] libXlorie.so extraction failed"
 fi
 
 rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X1-lock" "$TMPDIR/.tX0-lock" 2>/dev/null || true

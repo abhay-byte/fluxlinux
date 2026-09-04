@@ -14,7 +14,8 @@ data class PlayInstallProgress(
     val phase: String,
     val bytesDownloaded: Long = 0,
     val totalBytesToDownload: Long = 0,
-    val fraction: Float = 0f
+    val fraction: Float = 0f,
+    val confirmationState: SplitInstallProgress.RequiresUserConfirmation? = null
 )
 
 object ZenithbluePayloadProviders {
@@ -97,6 +98,15 @@ object ZenithbluePayloadProviders {
                     }
                     is SplitInstallProgress.Installed -> {
                         downloadSuccess = true
+                    }
+                    is SplitInstallProgress.RequiresUserConfirmation -> {
+                        onProgress(
+                            PlayInstallProgress(
+                                phase = "Confirmation required…",
+                                fraction = 0f,
+                                confirmationState = progress
+                            )
+                        )
                     }
                     is SplitInstallProgress.Failed -> {
                         Log.e(TAG, "Module install failed: ${progress.errorCode}", progress.exception)

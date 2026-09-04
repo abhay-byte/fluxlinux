@@ -525,7 +525,7 @@ fun HostBootstrapStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Embedded host card (ivarna: download bootstrap.tar from GitHub; zenithblue: APK asset)
+        // Embedded host card (ivarna: download bootstrap.tar from release; zenithblue: APK asset)
         PrerequisiteItem(
             name = "FluxLinux Host (embedded)",
             isInstalled = bootstrapDone,
@@ -887,7 +887,7 @@ fun PrerequisiteItem(
                                 )
                             }
                             Text(
-                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
+                                text = "Play Store version will not work. Install v0.118.3 from the official releases.",
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                                 fontSize = 13.sp,
                                 lineHeight = 18.sp,
@@ -903,7 +903,7 @@ fun PrerequisiteItem(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Download v0.118.3 (GitHub)", color = Color.White, fontSize = 14.sp)
+                            Text("Download v0.118.3", color = Color.White, fontSize = 14.sp)
                         }
                     }
                 }
@@ -935,7 +935,7 @@ fun PrerequisiteItem(
                         }
                         if (minVersionHint != null) {
                             Text(
-                                text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
+                                text = "Play Store version will not work. Install v0.118.3 from the official releases.",
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f),
                                 fontSize = 11.sp,
                                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -1047,7 +1047,7 @@ fun PrerequisiteItem(
  * T4: Critical alert shown at the top of the prerequisite list when the
  * installed Termux is too old. Renders above the Termux install-check card
  * so the requirement (uninstall Play Store Termux, install v0.118.3 from
- * GitHub) is unmissable.
+ * official releases) is unmissable.
  */
 @Composable
 fun TermuxVersionAlertBanner() {
@@ -1080,7 +1080,7 @@ fun TermuxVersionAlertBanner() {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Play Store version will not work. Install v0.118.3 from F-Droid or GitHub releases.",
+                    text = "Play Store version will not work. Install v0.118.3 from the official releases.",
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,

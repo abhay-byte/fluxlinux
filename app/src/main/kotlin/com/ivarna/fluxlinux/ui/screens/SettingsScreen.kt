@@ -43,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,6 +99,8 @@ fun SettingsScreen(
     val _onNavigateToRootCheck = onNavigateToRootCheck
 
     val context = LocalContext.current
+    // Play variant (zenithblue): chroot is policy-risk — hide chroot settings entry.
+    val isPlay = remember { com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(context) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -159,12 +162,14 @@ fun SettingsScreen(
                 subtitle = "Host PulseAudio status, start, restart, logs",
                 onClick = { onNavigateToAudioSettings?.invoke() }
             )
-            SettingsNavCard(
-                icon = Icons.Default.Storage,
-                title = "Chroot",
-                subtitle = "Installed roots, size, kill orphan processes",
-                onClick = { onNavigateToChrootSettings?.invoke() }
-            )
+            if (!isPlay) {
+                SettingsNavCard(
+                    icon = Icons.Default.Storage,
+                    title = "Chroot",
+                    subtitle = "Installed roots, size, kill orphan processes",
+                    onClick = { onNavigateToChrootSettings?.invoke() }
+                )
+            }
             SettingsNavCard(
                 icon = Icons.Default.Folder,
                 title = "PRoot",

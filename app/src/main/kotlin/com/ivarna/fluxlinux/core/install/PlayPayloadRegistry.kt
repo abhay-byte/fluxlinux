@@ -72,14 +72,75 @@ object PlayPayloadRegistry {
             minBytes = DistroInstallProfile.CHIMERA_ROOTFS_MIN_BYTES,
             compressedSize = 5343176L,
         ),
+        PlayPayloadInfo(
+            distroId = "fedora",
+            moduleName = "distro_fedora",
+            archiveFileName = DistroInstallProfile.FEDORA_ROOTFS_NAME,
+            sha256 = DistroInstallProfile.FEDORA_ROOTFS_SHA256,
+            minBytes = DistroInstallProfile.FEDORA_ROOTFS_MIN_BYTES,
+            compressedSize = 30917104L,
+        ),
+        PlayPayloadInfo(
+            distroId = "void",
+            moduleName = "distro_void",
+            archiveFileName = DistroInstallProfile.VOID_ROOTFS_NAME,
+            sha256 = DistroInstallProfile.VOID_ROOTFS_SHA256,
+            minBytes = DistroInstallProfile.VOID_ROOTFS_MIN_BYTES,
+            compressedSize = 45789416L,
+        ),
+        PlayPayloadInfo(
+            distroId = "opensuse",
+            moduleName = "distro_opensuse",
+            archiveFileName = DistroInstallProfile.OPENSUSE_ROOTFS_NAME,
+            sha256 = DistroInstallProfile.OPENSUSE_ROOTFS_SHA256,
+            minBytes = DistroInstallProfile.OPENSUSE_ROOTFS_MIN_BYTES,
+            compressedSize = 22130672L,
+        ),
+        PlayPayloadInfo(
+            distroId = "deepin",
+            moduleName = "distro_deepin",
+            archiveFileName = DistroInstallProfile.DEEPIN_ROOTFS_NAME,
+            sha256 = DistroInstallProfile.DEEPIN_ROOTFS_SHA256,
+            minBytes = DistroInstallProfile.DEEPIN_ROOTFS_MIN_BYTES,
+            compressedSize = 55705284L,
+        ),
+        PlayPayloadInfo(
+            distroId = "parrot",
+            moduleName = "distro_parrot",
+            archiveFileName = DistroInstallProfile.PARROT_ROOTFS_NAME,
+            sha256 = DistroInstallProfile.PARROT_ROOTFS_SHA256,
+            minBytes = DistroInstallProfile.PARROT_ROOTFS_MIN_BYTES,
+            compressedSize = 111851420L,
+        ),
     ).associateBy { it.distroId }
 
-    fun find(distroId: String): PlayPayloadInfo? = REGISTRY[distroId]
+    private val ALIASES: Map<String, String> = mapOf(
+        "debian13_chroot" to "debian",
+        "debian_chroot" to "debian",
+        "alpine_chroot" to "alpine",
+        "ubuntu_chroot" to "ubuntu",
+        "kali_chroot" to "kali",
+        "archlinux_chroot" to "archlinux",
+        "manjaro_chroot" to "manjaro",
+        "chimera_chroot" to "chimera",
+        "fedora_chroot" to "fedora",
+        "void_chroot" to "void",
+        "opensuse_chroot" to "opensuse",
+        "deepin_chroot" to "deepin",
+        "parrot_chroot" to "parrot",
+    )
+
+    fun resolveCanonicalDistroId(distroId: String): String =
+        ALIASES[distroId] ?: distroId
+
+    fun find(distroId: String): PlayPayloadInfo? =
+        REGISTRY[resolveCanonicalDistroId(distroId)]
 
     fun require(distroId: String): PlayPayloadInfo =
         find(distroId) ?: error("Distro '$distroId' is not registered in PlayPayloadRegistry")
 
-    fun contains(distroId: String): Boolean = REGISTRY.containsKey(distroId)
+    fun contains(distroId: String): Boolean =
+        REGISTRY.containsKey(resolveCanonicalDistroId(distroId))
 
     fun all(): List<PlayPayloadInfo> = REGISTRY.values.toList()
 }

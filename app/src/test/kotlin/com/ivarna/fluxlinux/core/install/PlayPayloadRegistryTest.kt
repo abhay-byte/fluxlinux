@@ -16,12 +16,17 @@ class PlayPayloadRegistryTest {
         "archlinux" to ("distro_arch" to DistroInstallProfile.ARCH_ROOTFS_NAME),
         "manjaro" to ("distro_manjaro" to DistroInstallProfile.MANJARO_ROOTFS_NAME),
         "chimera" to ("distro_chimera" to DistroInstallProfile.CHIMERA_ROOTFS_NAME),
+        "fedora" to ("distro_fedora" to DistroInstallProfile.FEDORA_ROOTFS_NAME),
+        "void" to ("distro_void" to DistroInstallProfile.VOID_ROOTFS_NAME),
+        "opensuse" to ("distro_opensuse" to DistroInstallProfile.OPENSUSE_ROOTFS_NAME),
+        "deepin" to ("distro_deepin" to DistroInstallProfile.DEEPIN_ROOTFS_NAME),
+        "parrot" to ("distro_parrot" to DistroInstallProfile.PARROT_ROOTFS_NAME),
     )
 
     @Test
-    fun `registry contains exactly 7 proot distros`() {
+    fun `registry contains exactly 12 proot distros`() {
         val all = PlayPayloadRegistry.all()
-        assertEquals(7, all.size)
+        assertEquals(12, all.size)
         expectedDistros.forEach { (distroId, _) ->
             assertTrue(PlayPayloadRegistry.contains(distroId))
         }
@@ -44,17 +49,34 @@ class PlayPayloadRegistryTest {
     }
 
     @Test
-    fun `registry does not contain chroot or unsupported distros`() {
-        val nonRegistry = listOf(
-            "debian13_chroot",
-            "alpine_chroot",
-            "fedora",
-            "void",
-            "opensuse",
-            "deepin",
-            "parrot"
+    fun `registry aliases map chroot ids to matching proot modules and metadata`() {
+        val chrootMappings = listOf(
+            "debian13_chroot" to "distro_debian",
+            "debian_chroot" to "distro_debian",
+            "alpine_chroot" to "distro_alpine",
+            "ubuntu_chroot" to "distro_ubuntu",
+            "kali_chroot" to "distro_kali",
+            "archlinux_chroot" to "distro_arch",
+            "manjaro_chroot" to "distro_manjaro",
+            "chimera_chroot" to "distro_chimera",
+            "fedora_chroot" to "distro_fedora",
+            "void_chroot" to "distro_void",
+            "opensuse_chroot" to "distro_opensuse",
+            "deepin_chroot" to "distro_deepin",
+            "parrot_chroot" to "distro_parrot",
         )
-        nonRegistry.forEach { id ->
+        chrootMappings.forEach { (chrootId, expectedModule) ->
+            assertTrue(PlayPayloadRegistry.contains(chrootId))
+            val info = PlayPayloadRegistry.find(chrootId)
+            assertNotNull(info)
+            assertEquals(expectedModule, info!!.moduleName)
+        }
+    }
+
+    @Test
+    fun `registry does not contain unknown distro names`() {
+        val unknown = listOf("redhat", "centos", "gentoo", "slackware", "unknown_distro")
+        unknown.forEach { id ->
             assertFalse(PlayPayloadRegistry.contains(id))
             assertEquals(null, PlayPayloadRegistry.find(id))
         }

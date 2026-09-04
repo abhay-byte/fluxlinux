@@ -133,7 +133,7 @@ class InstallFlowHelperTest {
             val ctx = mockContext(HostBootstrap.ZENITHBLUE_PACKAGE, filesDirFile = tempDir)
             val runner = OnboardingInstallRunner(ctx)
 
-            listOf("debian", "ubuntu", "kali", "archlinux", "manjaro", "chimera").forEach { distroId ->
+            listOf("debian", "ubuntu", "kali", "archlinux", "manjaro", "chimera", "fedora", "void", "opensuse", "deepin", "parrot").forEach { distroId ->
                 val job = kotlinx.coroutines.Job()
                 val scope = CoroutineScope(Dispatchers.Unconfined + job)
                 InstallFlowHelper.startInstall(
@@ -159,7 +159,12 @@ class InstallFlowHelperTest {
                 "distro_kali",
                 "distro_arch",
                 "distro_manjaro",
-                "distro_chimera"
+                "distro_chimera",
+                "distro_fedora",
+                "distro_void",
+                "distro_opensuse",
+                "distro_deepin",
+                "distro_parrot"
             )
             assertEquals(expected, requestedModules)
         } finally {

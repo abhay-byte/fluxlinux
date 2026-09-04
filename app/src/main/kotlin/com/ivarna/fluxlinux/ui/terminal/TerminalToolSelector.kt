@@ -92,6 +92,8 @@ fun TerminalToolSelector(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    // Play variant (zenithblue): chroot is policy-risk — hide chroot rows/tabs entirely.
+    val isPlay = remember { com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(context) }
     var rootAvailable by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         RootShell.probeRootAvailable { ok -> rootAvailable = ok }
@@ -103,9 +105,12 @@ fun TerminalToolSelector(
             TerminalShellCatalog.availability(context, rootAvailable)
         )
     }
-    val groups = remember(sections) { groupCatalogByMethod(sections.flatMap { it.cards }) }
+    val allGroups = remember(sections) { groupCatalogByMethod(sections.flatMap { it.cards }) }
+    val groups = remember(allGroups, isPlay) {
+        if (isPlay) allGroups.filter { it.method != "chroot" } else allGroups
+    }
     var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
-    val activeMethod = if (methodTab == MethodTab.CHROOT) "chroot" else "proot"
+    val activeMethod = if (methodTab == MethodTab.CHROOT && !isPlay) "chroot" else "proot"
     val activeGroup = groups.firstOrNull { it.method == activeMethod }
     val hostGroup = groups.firstOrNull { it.method == "host" }
     val prootCount = groups.firstOrNull { it.method == "proot" }?.rows?.size ?: 0
@@ -113,12 +118,14 @@ fun TerminalToolSelector(
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(Modifier.height(4.dp))
-        MethodTabs(
-            selected = methodTab,
-            onSelected = { methodTab = it },
-            prootCount = prootCount,
-            chrootCount = chrootCount
-        )
+        if (!isPlay) {
+            MethodTabs(
+                selected = methodTab,
+                onSelected = { methodTab = it },
+                prootCount = prootCount,
+                chrootCount = chrootCount
+            )
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),

@@ -70,6 +70,18 @@ enum class Screen {
 
 class MainActivity : ComponentActivity() {
     
+    companion object {
+        const val REQUEST_CODE_SPLIT_CONFIRMATION = 1402
+        var currentActivityRef: java.lang.ref.WeakReference<ComponentActivity>? = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (currentActivityRef?.get() == this) {
+            currentActivityRef = null
+        }
+    }
+
     override fun attachBaseContext(newBase: android.content.Context) {
         super.attachBaseContext(newBase)
         com.google.android.play.core.splitcompat.SplitCompat.install(this)
@@ -483,6 +495,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalPermissionsApi::class, ExperimentalHazeMaterialsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentActivityRef = java.lang.ref.WeakReference(this)
         com.google.android.play.core.splitcompat.SplitCompat.installActivity(this)
         if (savedInstanceState == null) {
             dispatchLegacyTermuxCallback(intent)

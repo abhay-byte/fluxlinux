@@ -21,7 +21,7 @@ class PlayUiFilteringTest {
     }
 
     @Test
-    fun `zenithblue filters out all non-registry distros and chroots`() {
+    fun `zenithblue supports all 12 registered distros and their chroots`() {
         val zenithCtx = mockContext(HostBootstrap.ZENITHBLUE_PACKAGE)
         val allDistros = DistroRepository.supportedDistros
 
@@ -29,16 +29,15 @@ class PlayUiFilteringTest {
             ZenithbluePayloadProviders.supports(zenithCtx, it.id)
         }
 
-        // Must contain debian, alpine, ubuntu, kali, archlinux, manjaro, chimera
-        val expected = listOf("debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera")
-        val actualIds = filtered.map { it.id }
-
-        assertEquals(expected.sorted(), actualIds.sorted())
-
-        // Ensure NO chroot variants
+        // 12 proot + 12 chroot = 24 supported distros (excluding comingSoon distros)
+        assertEquals(24, filtered.size)
         filtered.forEach { distro ->
-            assertFalse(distro.id.endsWith("_chroot"))
             assertTrue(PlayPayloadRegistry.contains(distro.id))
+        }
+
+        val comingSoonIds = listOf("adelie", "artix", "backbox", "centos_stream", "gentoo", "openkylin", "rocky")
+        filtered.forEach { distro ->
+            assertFalse(comingSoonIds.contains(distro.id))
         }
     }
 

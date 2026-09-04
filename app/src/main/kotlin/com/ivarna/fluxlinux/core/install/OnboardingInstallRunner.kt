@@ -245,6 +245,7 @@ class OnboardingInstallRunner(private val ctx: Context) {
 
         enter(phases, rootfsIdx, onProgress, "Installing ${profile.displayName} via proot-distro…")
         if (abortIfCancelled(gen, phases, onProgress)) return
+        TermuxHostPaths.writeHostEnvFile(appCtx.filesDir, appCtx)
         val bash = TermuxHostPaths.libBash(appCtx).absolutePath
         val installScript = TermuxHostPaths.hostScript(appCtx, "flux_install.sh").absolutePath
         val setupB64 = BaseDesktopInstallPlan.familySetupB64(appCtx, theme, distroId)

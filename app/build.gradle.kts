@@ -64,7 +64,12 @@ android {
         ":distro_kali",
         ":distro_arch",
         ":distro_manjaro",
-        ":distro_chimera"
+        ":distro_chimera",
+        ":distro_fedora",
+        ":distro_void",
+        ":distro_opensuse",
+        ":distro_deepin",
+        ":distro_parrot"
     )
 
     // Disable dependency metadata block for F-Droid
@@ -235,6 +240,13 @@ for ((flavorName, appId) in flavorAppIds) {
     }
 }
 
+tasks.register<Exec>("stagePlayRootfsFeatures") {
+    group = "build"
+    description = "Stage existing verified rootfs archives into Play Dynamic Feature asset directories"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "scripts/stage_play_rootfs_features.sh")
+}
+
 // Every assemble / bundle / pre-build for a flavor depends on its package task so
 // mergeAssets / mergeJniLibFolders never see an empty host (P0-T7).
 for (flavorName in flavorAppIds.keys) {
@@ -245,6 +257,9 @@ for (flavorName in flavorAppIds.keys) {
             it.name.startsWith("pre${cap}")
     }.configureEach {
         dependsOn("packageHostAssets$cap")
+        if (flavorName == "zenithblue") {
+            dependsOn("stagePlayRootfsFeatures")
+        }
     }
 }
 

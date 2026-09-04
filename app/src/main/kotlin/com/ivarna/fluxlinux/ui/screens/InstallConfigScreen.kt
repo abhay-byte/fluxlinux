@@ -1,6 +1,7 @@
 package com.ivarna.fluxlinux.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -111,6 +112,11 @@ fun InstallConfigScreen(
         onDispose { runner.cancel() }
     }
 
+    // Block back navigation during active install or completion; only allow back on options or failure
+    BackHandler(enabled = (phase == InstallPhase.RUNNING && !failed) || phase == InstallPhase.DONE) {
+        // No-op: user must wait for install to finish or fail, or tap Continue when done
+    }
+
     GlassScaffold(
         hazeState = hazeState,
         topBar = {
@@ -127,19 +133,21 @@ fun InstallConfigScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (phase == InstallPhase.RUNNING && !failed) {
-                                runner.cancel()
+                    if (phase == InstallPhase.OPTIONS || failed) {
+                        IconButton(
+                            onClick = {
+                                if (phase == InstallPhase.RUNNING && !failed) {
+                                    runner.cancel()
+                                }
+                                onBack()
                             }
-                            onBack()
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),

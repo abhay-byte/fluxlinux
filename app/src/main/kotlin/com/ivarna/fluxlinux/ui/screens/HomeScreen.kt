@@ -143,9 +143,12 @@ fun HomeScreen(
 
         // Installed Distros Detection — filesystem truth (plan P4-T13): a stale
         // "installed" pref without a rootfs on disk must show Install, not a broken shell.
+        // Play variant (zenithblue): chroot is policy-risk — hide chroot cards entirely.
+        val isPlay = remember { com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(context) }
         val installedDistros = remember(refreshKey.value) {
             DistroRepository.sortForDistroPage(
                 DistroRepository.supportedDistros.filter {
+                    if (isPlay && it.isChrootCard()) return@filter false
                     com.ivarna.fluxlinux.core.terminal.TerminalLauncher.isDistroInstalledOnFs(context, it.id)
                 }
             )
@@ -223,15 +226,17 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        MethodTabs(
-            selected = methodTab,
-            onSelected = { tab ->
-                methodTab = tab
-                if (tab == MethodTab.CHROOT) probeRoot(force = true)
-            },
-            prootCount = prootInstalled.size,
-            chrootCount = chrootInstalled.size
-        )
+        if (!isPlay) {
+            MethodTabs(
+                selected = methodTab,
+                onSelected = { tab ->
+                    methodTab = tab
+                    if (tab == MethodTab.CHROOT) probeRoot(force = true)
+                },
+                prootCount = prootInstalled.size,
+                chrootCount = chrootInstalled.size
+            )
+        }
 
         if (methodTab == MethodTab.CHROOT && !rootAvailable && chrootInstalled.isNotEmpty()) {
             Text(

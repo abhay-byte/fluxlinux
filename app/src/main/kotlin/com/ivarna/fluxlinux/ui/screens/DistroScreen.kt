@@ -43,6 +43,8 @@ fun DistroScreen(
     onNavigateToInstall: (com.ivarna.fluxlinux.core.data.Distro) -> Unit
 ) {
     val context = LocalContext.current
+    // Play variant (zenithblue): chroot is policy-risk — hide chroot cards/tabs entirely.
+    val isPlay = remember { com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(context) }
     
     val installState by InstallationQueueManager.installState.collectAsState()
     val stateRefresh by StateManager.refreshTrigger.collectAsState()
@@ -72,13 +74,15 @@ fun DistroScreen(
     
     val availableDistros = DistroRepository.supportedDistros.filter { 
         !installedDistroIds.contains(it.id) &&
-            com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.supports(context, it.id)
+            com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.supports(context, it.id) &&
+            (!isPlay || it.prootSupported)
     }
 
     var methodTab by remember { mutableStateOf(MethodTab.PROOT) }
     val visibleDistros = DistroRepository.sortForDistroPage(
         availableDistros.filter { distro ->
-            if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
+            if (isPlay) distro.prootSupported
+            else if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
         }
     )
     val prootCount = availableDistros.count { it.prootSupported }
@@ -105,13 +109,17 @@ fun DistroScreen(
         }
 
         item(key = "tabs") {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                MethodTabs(
-                    selected = methodTab,
-                    onSelected = { methodTab = it },
-                    prootCount = prootCount,
-                    chrootCount = chrootCount
-                )
+            if (!isPlay) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    MethodTabs(
+                        selected = methodTab,
+                        onSelected = { methodTab = it },
+                        prootCount = prootCount,
+                        chrootCount = chrootCount
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            } else {
                 Spacer(modifier = Modifier.height(10.dp))
             }
         }

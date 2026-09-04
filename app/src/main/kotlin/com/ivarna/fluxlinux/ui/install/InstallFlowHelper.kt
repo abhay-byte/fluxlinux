@@ -62,6 +62,21 @@ object InstallFlowHelper {
                     onPhaseChange(p.phase)
                     val pct = (p.fraction * 100).toInt().coerceIn(0, 100)
                     onPercentChange(pct)
+                    if (p.confirmationState != null) {
+                        val activity = com.ivarna.fluxlinux.MainActivity.currentActivityRef?.get()
+                            ?: (context as? android.app.Activity)
+                        if (activity != null) {
+                            try {
+                                p.confirmationState.splitInstallManager.startConfirmationDialogForResult(
+                                    p.confirmationState.sessionState,
+                                    activity,
+                                    com.ivarna.fluxlinux.MainActivity.REQUEST_CODE_SPLIT_CONFIRMATION
+                                )
+                            } catch (e: Exception) {
+                                android.util.Log.e("InstallFlowHelper", "Failed to start confirmation dialog", e)
+                            }
+                        }
+                    }
                     if (p.totalBytesToDownload > 0) {
                         val dlMiB = p.bytesDownloaded / 1_048_576
                         val totalMiB = p.totalBytesToDownload / 1_048_576

@@ -103,28 +103,18 @@ done
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.ivarna.fluxlinux}"
 PREFIX_DEFAULT="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 
+# Snapshot W^X proot paths from the ProcessBuilder / host env before profile can clobber.
+# Without PD_PROOT_BIN + PROOT_LOADER (jniLibs), proot cannot exec guest bash on targetSdk 36.
+_SAVED_PD_PROOT_BIN="${PD_PROOT_BIN:-}"
+_SAVED_PROOT_LOADER="${PROOT_LOADER:-}"
+_SAVED_PROOT_LOADER_32="${PROOT_LOADER_32:-}"
+
 # SSOT env from Kotlin TermuxHostPaths
 _HOST_ENV="${PREFIX_DEFAULT}/etc/fluxlinux-host.env"
 if [ -r "$_HOST_ENV" ]; then
     # shellcheck source=/dev/null
     . "$_HOST_ENV"
 fi
-
-export TERMUX_APP__PACKAGE_NAME="${TERMUX_APP__PACKAGE_NAME:-$PKG}"
-export TERMUX__PREFIX="${TERMUX__PREFIX:-/data/data/${TERMUX_APP__PACKAGE_NAME}/files/usr}"
-export TERMUX__HOME="${TERMUX__HOME:-/data/data/${TERMUX_APP__PACKAGE_NAME}/files/home}"
-export PREFIX="${PREFIX:-$TERMUX__PREFIX}"
-export HOME="${HOME:-$TERMUX__HOME}"
-export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
-export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$(dirname "$PREFIX")/proot-tmp}"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-$PREFIX/lib}"
-export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
-
-# Snapshot W^X proot paths from the ProcessBuilder / host env before profile can clobber.
-# Without PD_PROOT_BIN + PROOT_LOADER (jniLibs), proot cannot exec guest bash on targetSdk 36.
-_SAVED_PD_PROOT_BIN="${PD_PROOT_BIN:-}"
-_SAVED_PROOT_LOADER="${PROOT_LOADER:-}"
-_SAVED_PROOT_LOADER_32="${PROOT_LOADER_32:-}"
 
 # Load rewritten host profile (paths must match PREFIX)
 if [ -r "$PREFIX/etc/profile" ]; then
@@ -165,6 +155,25 @@ fi
 if [ ! -f "$PROOT_DISTRO" ]; then
     echo "FluxLinux: missing $PROOT_DISTRO"
     exit 1
+fi
+
+# Dynamic fallback: if PD_PROOT_BIN is missing or invalid (e.g. app update changed codePath), resolve from lib/ or pm path.
+if [ -z "${PD_PROOT_BIN:-}" ] || [ ! -e "${PD_PROOT_BIN}" ]; then
+    if [ -f "/data/data/${PKG}/lib/libproot.so" ]; then
+        export PD_PROOT_BIN="/data/data/${PKG}/lib/libproot.so"
+        export PROOT_LOADER="/data/data/${PKG}/lib/libloader.so"
+        export PROOT_LOADER_32="/data/data/${PKG}/lib/libloader32.so"
+    else
+        _PM_BASE="$(pm path "${PKG}" 2>/dev/null | grep 'base\.apk' | head -n 1 | cut -d: -f2 || true)"
+        if [ -n "$_PM_BASE" ]; then
+            _APP_DIR="$(dirname "$_PM_BASE")"
+            if [ -f "$_APP_DIR/lib/arm64/libproot.so" ]; then
+                export PD_PROOT_BIN="$_APP_DIR/lib/arm64/libproot.so"
+                export PROOT_LOADER="$_APP_DIR/lib/arm64/libloader.so"
+                export PROOT_LOADER_32="$_APP_DIR/lib/arm64/libloader32.so"
+            fi
+        fi
+    fi
 fi
 
 # Fail early with a clear message if W^X proot paths are unset (host ProcessBuilder bug).

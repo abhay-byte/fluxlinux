@@ -451,7 +451,7 @@ fun LegacyTermuxSettingsScreen(
                     )
                     if (termuxInstalled && !termuxVersionOk) {
                         Text(
-                            "Play Store version will not work. Install v0.118.3 or newer from F-Droid or GitHub releases.",
+                            "Play Store version will not work. Install v0.118.3 or newer from the official releases.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.error,
                             lineHeight = 14.sp

@@ -415,13 +415,15 @@ private fun ModernFeatureCard(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. CONSENT PAGE (GITHUB DOWNLOAD NOTICE)
+// 2. CONSENT PAGE (PACKAGE DOWNLOAD NOTICE)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
     var downloadConsent by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val isPlay = !HostBootstrap.downloadsFromRelease(context.packageName)
 
     Column(
         modifier = Modifier
@@ -470,7 +472,7 @@ private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            text = "F-Droid & Package Notice",
+                            text = if (isPlay) "Package Notice" else "F-Droid & Package Notice",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = colors.onSurface
@@ -480,7 +482,8 @@ private fun ConsentPage(onBack: () -> Unit, onNext: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
 
                     Text(
-                        text = "The F-Droid APK is intentionally lightweight and does not bundle large Linux OS archives. To provide a complete Linux environment, FluxLinux downloads the required system components directly from GitHub Releases upon continuation:",
+                        text = if (isPlay) "This version delivers the Linux system components through Play Feature Delivery. Tapping Continue prepares the complete Linux environment:"
+                        else "The F-Droid APK is intentionally lightweight and does not bundle large Linux OS archives. To provide a complete Linux environment, FluxLinux downloads the required system components directly from GitHub Releases upon continuation:",
                         color = colors.onSurface.copy(alpha = 0.75f),
                         fontSize = 13.5.sp,
                         lineHeight = 19.sp
@@ -798,6 +801,8 @@ private fun DistroPickPage(
     var showRootHint by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
+    // Play variant (zenithblue): chroot is policy-risk — proot only.
+    val isPlay = remember { com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.isZenithblue(context) }
 
     fun applyTab(tab: MethodTab) {
         methodTab = tab
@@ -823,7 +828,9 @@ private fun DistroPickPage(
     LaunchedEffect(Unit) { probeRoot(openChrootIfGranted = false) }
 
     val forTab = DistroRepository.supportedDistros.filter { distro ->
-        (if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported) &&
+        val matchesTab = if (isPlay) distro.prootSupported
+        else if (methodTab == MethodTab.CHROOT) distro.chrootSupported else distro.prootSupported
+        matchesTab &&
             com.ivarna.fluxlinux.core.install.ZenithbluePayloadProviders.supports(context, distro.id)
     }
     val installable = forTab.filter { !it.comingSoon }
@@ -843,21 +850,23 @@ private fun DistroPickPage(
 
         Spacer(Modifier.height(14.dp))
 
-        // PRoot vs Chroot Mode Tabs
-        MethodTabs(
-            selected = methodTab,
-            onSelected = { tab ->
-                if (tab == MethodTab.CHROOT && !rootAvailable) {
-                    showRootHint = true
-                    probeRoot(openChrootIfGranted = true)
-                } else {
-                    applyTab(tab)
-                }
-            },
-            chrootLabel = "Chroot (Rooted)",
-            chrootEnabled = true,
-            horizontalPadding = 0.dp
-        )
+        // PRoot vs Chroot Mode Tabs (Play: proot only, no chroot tab)
+        if (!isPlay) {
+            MethodTabs(
+                selected = methodTab,
+                onSelected = { tab ->
+                    if (tab == MethodTab.CHROOT && !rootAvailable) {
+                        showRootHint = true
+                        probeRoot(openChrootIfGranted = true)
+                    } else {
+                        applyTab(tab)
+                    }
+                },
+                chrootLabel = "Chroot (Rooted)",
+                chrootEnabled = true,
+                horizontalPadding = 0.dp
+            )
+        }
 
         // Root Warning / Notice Card
         if (showRootHint && !rootAvailable) {
@@ -1562,7 +1571,7 @@ private fun DownloadConsentRow(
     val body = if (downloadsHost) {
         "I understand this install downloads Linux system images (host bootstrap and the chosen distro) from GitHub. Those files are not in the F-Droid APK and are not checked by F-Droid."
     } else {
-        "I understand this install downloads the chosen distro's Linux rootfs from GitHub. That archive is not in the Play/F-Droid APK and is not checked by F-Droid."
+        "I understand this install prepares the chosen distro's Linux system delivered with this app via Play. No separate download review applies beyond Play Store review."
     }
     val colors = MaterialTheme.colorScheme
     val borderColor = if (consented) FluxAccentMagenta else FluxHairline

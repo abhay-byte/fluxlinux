@@ -17,6 +17,11 @@ sealed class SplitInstallProgress {
     data class Downloading(val bytesDownloaded: Long, val totalBytesToDownload: Long) : SplitInstallProgress()
     data object Installing : SplitInstallProgress()
     data object Installed : SplitInstallProgress()
+    data class RequiresUserConfirmation(
+        val sessionId: Int,
+        val splitInstallManager: SplitInstallManager,
+        val sessionState: com.google.android.play.core.splitinstall.SplitInstallSessionState
+    ) : SplitInstallProgress()
     data class Failed(val errorCode: Int, val exception: Throwable?) : SplitInstallProgress()
 }
 
@@ -46,7 +51,16 @@ open class PlayFeatureDelivery(
         var sessionId = 0
 
         val listener = SplitInstallStateUpdatedListener { state ->
-            if (state.sessionId() == sessionId) {
+            val matchesSession = if (sessionId != 0) {
+                state.sessionId() == sessionId
+            } else {
+                state.moduleNames().contains(moduleName)
+            }
+
+            if (matchesSession) {
+                if (sessionId == 0 && state.sessionId() != 0) {
+                    sessionId = state.sessionId()
+                }
                 when (state.status()) {
                     SplitInstallSessionStatus.DOWNLOADING -> {
                         trySend(
@@ -62,6 +76,15 @@ open class PlayFeatureDelivery(
                     SplitInstallSessionStatus.INSTALLED -> {
                         trySend(SplitInstallProgress.Installed)
                         close()
+                    }
+                    SplitInstallSessionStatus.REQUIRES_USER_CONFIRMATION -> {
+                        trySend(
+                            SplitInstallProgress.RequiresUserConfirmation(
+                                sessionId = state.sessionId(),
+                                splitInstallManager = manager,
+                                sessionState = state
+                            )
+                        )
                     }
                     SplitInstallSessionStatus.FAILED -> {
                         trySend(

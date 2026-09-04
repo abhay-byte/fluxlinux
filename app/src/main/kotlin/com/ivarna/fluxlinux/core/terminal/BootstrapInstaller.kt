@@ -82,12 +82,10 @@ object BootstrapInstaller {
         onProgress: (done: Long, total: Long, phase: String) -> Unit = { _, _, _ -> }
     ): Boolean {
         if (!force && isExtracted(ctx)) {
-            // Happy path (proot-opt-01): the prefix is already extracted AND the
-            // package rewrite / host env were applied when markExtracted() ran.
-            // Re-walking the whole prefix tree here on every terminal open is the
-            // multi-second startup stall — skip it. Old trees predating the W^X
-            // rewrite carry an older EXTRACT_VERSION marker → fail isExtracted →
-            // full re-extract path below re-applies applyPackageToExtractedPrefix.
+            // Happy path (proot-opt-01): the prefix is already extracted.
+            // Always refresh host env file to capture the current nativeLibraryDir across app updates
+            // (e.g. split APK reinstall / dynamic feature install changes /data/app/... hash).
+            TermuxHostPaths.writeHostEnvFile(ctx.filesDir, ctx)
             return true
         }
         return try {
@@ -99,7 +97,7 @@ object BootstrapInstaller {
 
             val source = resolveBootstrapSource(ctx, onProgress) ?: throw IllegalStateException(
                 "host bootstrap missing — place ${HostBootstrap.forApplicationId(ctx.packageName).fileName} " +
-                    "in the app home directory or allow the GitHub download"
+                    "in the app home directory or allow the download"
             )
             onProgress(0L, source.totalBytes, "Extracting host bootstrap")
             source.stream.use { input ->
@@ -186,7 +184,7 @@ object BootstrapInstaller {
                 onProgress(
                     p.downloadedBytes,
                     p.totalBytes,
-                    "Downloading host bootstrap from GitHub"
+                    "Downloading host bootstrap"
                 )
             }
         )

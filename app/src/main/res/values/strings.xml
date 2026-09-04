@@ -8,4 +8,9 @@
     <string name="distro_arch_title">Arch Linux</string>
     <string name="distro_manjaro_title">Manjaro</string>
     <string name="distro_chimera_title">Chimera</string>
+    <string name="distro_fedora_title">Fedora</string>
+    <string name="distro_void_title">Void</string>
+    <string name="distro_opensuse_title">openSUSE</string>
+    <string name="distro_deepin_title">Deepin</string>
+    <string name="distro_parrot_title">Parrot</string>
 </resources>

@@ -187,14 +187,24 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
         ClassLoader loader = CmdEntryPoint.class.getClassLoader();
         URL res = loader != null ? loader.getResource(path) : null;
         String libPath = res != null ? res.getFile().replace("file:", "") : null;
-        if (libPath == null || libPath.contains("base.apk!")) {
-            // Under targetSdk 36, library loading from apk inside app_process namespace fails.
-            // Fall back to the extracted library directory of the host app package
-            // (embedded X11: the host app is the package that carries libXlorie.so).
-            String pkg = getenv("TERMUX_X11_OVERRIDE_PACKAGE");
-            if (pkg == null)
-                pkg = "com.termux.x11";
-            libPath = "/data/data/" + pkg + "/lib/libXlorie.so";
+        if (libPath == null || libPath.contains("base.apk!") || libPath.contains(".apk!")) {
+            // Check nativeLibraryDir from host environment (e.g. PD_PROOT_BIN directory)
+            String pdProot = getenv("PD_PROOT_BIN");
+            if (pdProot != null && pdProot.contains("/")) {
+                String candidate = pdProot.substring(0, pdProot.lastIndexOf('/')) + "/libXlorie.so";
+                if (new java.io.File(candidate).exists()) {
+                    libPath = candidate;
+                }
+            }
+            if (libPath == null || libPath.contains(".apk!")) {
+                // Under targetSdk 36, library loading from apk inside app_process namespace fails.
+                // Fall back to the extracted library directory of the host app package
+                // (embedded X11: the host app is the package that carries libXlorie.so).
+                String pkg = getenv("TERMUX_X11_OVERRIDE_PACKAGE");
+                if (pkg == null)
+                    pkg = "com.termux.x11";
+                libPath = "/data/data/" + pkg + "/lib/libXlorie.so";
+            }
         }
         if (libPath != null) {
             try {

@@ -40,22 +40,26 @@ class ZenithbluePayloadProvidersTest {
         val zenithblueCtx = mockContext(HostBootstrap.ZENITHBLUE_PACKAGE)
         val ivarnaCtx = mockContext(HostBootstrap.IVARNA_PACKAGE)
 
-        val registryDistros = listOf("debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera")
-        val nonRegistryDistros = listOf("debian13_chroot", "fedora", "void", "opensuse", "deepin", "parrot")
+        val registryDistros = listOf(
+            "debian", "alpine", "ubuntu", "kali", "archlinux", "manjaro", "chimera",
+            "fedora", "void", "opensuse", "deepin", "parrot",
+            "debian13_chroot", "alpine_chroot", "fedora_chroot"
+        )
+        val unsupportedDistros = listOf("adelie", "artix", "backbox", "centos_stream", "gentoo", "openkylin", "rocky")
 
         // On Ivarna, everything is supported (filter skipped)
         registryDistros.forEach { id ->
             assertTrue(ZenithbluePayloadProviders.supports(ivarnaCtx, id))
         }
-        nonRegistryDistros.forEach { id ->
+        unsupportedDistros.forEach { id ->
             assertTrue(ZenithbluePayloadProviders.supports(ivarnaCtx, id))
         }
 
-        // On Zenithblue, only registry distros are supported
+        // On Zenithblue, only registry and supported chroot alias distros are supported
         registryDistros.forEach { id ->
             assertTrue(ZenithbluePayloadProviders.supports(zenithblueCtx, id))
         }
-        nonRegistryDistros.forEach { id ->
+        unsupportedDistros.forEach { id ->
             assertFalse(ZenithbluePayloadProviders.supports(zenithblueCtx, id))
         }
     }
